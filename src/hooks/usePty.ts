@@ -15,6 +15,11 @@ const pendingOutput = new Map<number, string[]>();
 
 export function registerTerminal(ptyId: number, term: Terminal) {
   terminalInstances.set(ptyId, term);
+}
+
+export function flushPendingOutput(ptyId: number) {
+  const term = terminalInstances.get(ptyId);
+  if (!term) return;
 
   // Flush any buffered output
   const buffered = pendingOutput.get(ptyId);
@@ -48,22 +53,32 @@ function writeToPty(ptyId: number, data: string) {
 
 export function usePty() {
   const activeRepoPath = useRepoStore((s) => s.activeRepoPath);
-  const { setCommandStatus, setCommandPtyId } = useCommandStore();
+  const {
+    setCommandStatus,
+    setCommandPtyId,
+    setCommandStatusForProject,
+    setCommandPtyIdForProject,
+  } = useCommandStore();
   const { addTab, removeTab, findTabByCommand, setActiveTab } =
     useTerminalStore();
 
   const handlePtyMessage = useCallback(
-    (ptyId: number, commandName: string | null, msg: PtyOutput) => {
+    (
+      ptyId: number,
+      commandName: string | null,
+      repoPath: string,
+      msg: PtyOutput,
+    ) => {
       if (msg.event === "data") {
         writeToPty(ptyId, msg.data);
       } else if (msg.event === "exit") {
         if (commandName) {
-          setCommandStatus(commandName, "crashed");
-          setCommandPtyId(commandName, null);
+          setCommandStatusForProject(repoPath, commandName, "crashed");
+          setCommandPtyIdForProject(repoPath, commandName, null);
         }
       }
     },
-    [setCommandStatus, setCommandPtyId],
+    [setCommandStatusForProject, setCommandPtyIdForProject],
   );
 
   const spawnSession = useCallback(
@@ -73,34 +88,34 @@ export function usePty() {
       cols: number,
       rows: number,
       commandName: string | null,
+      repoPath: string,
     ) => {
-      if (!activeRepoPath) return;
-
       let resolvedPtyId: number | null = null;
       const bufferedMessages: PtyOutput[] = [];
 
-      const ptyId = await spawnPty(command, activeRepoPath, env, cols, rows, (msg) => {
+      const ptyId = await spawnPty(command, repoPath, env, cols, rows, (msg) => {
         if (resolvedPtyId === null) {
           bufferedMessages.push(msg);
           return;
         }
 
-        handlePtyMessage(resolvedPtyId, commandName, msg);
+        handlePtyMessage(resolvedPtyId, commandName, repoPath, msg);
       });
 
       resolvedPtyId = ptyId;
 
       for (const msg of bufferedMessages) {
-        handlePtyMessage(ptyId, commandName, msg);
+        handlePtyMessage(ptyId, commandName, repoPath, msg);
       }
 
       return ptyId;
     },
-    [activeRepoPath, handlePtyMessage],
+    [handlePtyMessage],
   );
 
   const startCommand = useCallback(
     async (command: CommandConfig, cols: number, rows: number) => {
+      if (!activeRepoPath) return;
       const commandName = command.name;
 
       try {
@@ -110,6 +125,7 @@ export function usePty() {
           cols,
           rows,
           commandName,
+          activeRepoPath,
         );
         if (!ptyId) return;
 
@@ -125,6 +141,7 @@ export function usePty() {
             id,
             label: commandName,
             ptyId,
+            repoPath: activeRepoPath,
             commandName,
             assistantId: null,
           });
@@ -136,6 +153,7 @@ export function usePty() {
       }
     },
     [
+      activeRepoPath,
       spawnSession,
       setCommandStatus,
       setCommandPtyId,
@@ -147,7 +165,9 @@ export function usePty() {
 
   const stopCommand = useCallback(
     async (commandName: string) => {
-      const commands = useCommandStore.getState().commands;
+      const path = useCommandStore.getState().activeProjectPath;
+      if (!path) return;
+      const commands = useCommandStore.getState().projectCommands[path] ?? [];
       const command = commands.find((c) => c.name === commandName);
       if (command?.ptyId) {
         await killPty(command.ptyId).catch(() => {});
@@ -169,6 +189,8 @@ export function usePty() {
 
   const spawnBlankShell = useCallback(
     async (cols: number, rows: number) => {
+      if (!activeRepoPath) return;
+
       try {
         const ptyId = await spawnSession(
           "/bin/zsh -l",
@@ -176,6 +198,7 @@ export function usePty() {
           cols,
           rows,
           null,
+          activeRepoPath,
         );
         if (!ptyId) return;
 
@@ -184,6 +207,7 @@ export function usePty() {
           id,
           label: "Shell",
           ptyId,
+          repoPath: activeRepoPath,
           commandName: null,
           assistantId: null,
         });
@@ -193,11 +217,12 @@ export function usePty() {
         console.error("Failed to spawn shell:", e);
       }
     },
-    [spawnSession, addTab],
+    [activeRepoPath, spawnSession, addTab],
   );
 
   const launchAssistant = useCallback(
     async (assistantId: string, cols: number, rows: number) => {
+      if (!activeRepoPath) return;
       const assistant = CODING_ASSISTANTS.find((a) => a.id === assistantId);
       if (!assistant) return;
 
@@ -208,6 +233,7 @@ export function usePty() {
           cols,
           rows,
           null,
+          activeRepoPath,
         );
         if (!ptyId) return;
 
@@ -216,6 +242,7 @@ export function usePty() {
           id,
           label: assistant.name,
           ptyId,
+          repoPath: activeRepoPath,
           commandName: null,
           assistantId,
         });
@@ -225,12 +252,15 @@ export function usePty() {
         console.error(`Failed to launch ${assistant.name}:`, e);
       }
     },
-    [spawnSession, addTab],
+    [activeRepoPath, spawnSession, addTab],
   );
 
   const closeTab = useCallback(
     async (tabId: string) => {
-      const tabs = useTerminalStore.getState().tabs;
+      const state = useTerminalStore.getState();
+      const path = state.activeProjectPath;
+      if (!path) return;
+      const tabs = state.projectState[path]?.tabs ?? [];
       const tab = tabs.find((t) => t.id === tabId);
       if (!tab) return;
 
@@ -247,8 +277,9 @@ export function usePty() {
     [setCommandStatus, setCommandPtyId, removeTab],
   );
 
-  const killAllPtys = useCallback(async () => {
-    const tabs = useTerminalStore.getState().tabs;
+  const killProjectPtys = useCallback(async (repoPath: string) => {
+    const state = useTerminalStore.getState();
+    const tabs = state.projectState[repoPath]?.tabs ?? [];
     for (const tab of tabs) {
       await killPty(tab.ptyId).catch(() => {});
       unregisterTerminal(tab.ptyId);
@@ -262,6 +293,6 @@ export function usePty() {
     spawnBlankShell,
     launchAssistant,
     closeTab,
-    killAllPtys,
+    killProjectPtys,
   };
 }

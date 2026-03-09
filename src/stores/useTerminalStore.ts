@@ -1,15 +1,30 @@
 import { create } from "zustand";
 import type { TerminalTab } from "../lib/types";
 
-interface TerminalStore {
+interface ProjectTerminalState {
   tabs: TerminalTab[];
   activeTabId: string | null;
+}
+
+interface TerminalStore {
+  projectState: Record<string, ProjectTerminalState>;
+  activeProjectPath: string | null;
+  switchProject: (repoPath: string) => void;
+  removeProject: (repoPath: string) => void;
   addTab: (tab: TerminalTab) => void;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   findTabByCommand: (commandName: string) => TerminalTab | undefined;
   findTabByPtyId: (ptyId: number) => TerminalTab | undefined;
-  clearTabs: () => void;
+}
+
+function emptyState(): ProjectTerminalState {
+  return { tabs: [], activeTabId: null };
+}
+
+function getActiveState(state: TerminalStore): ProjectTerminalState {
+  if (!state.activeProjectPath) return emptyState();
+  return state.projectState[state.activeProjectPath] ?? emptyState();
 }
 
 let tabCounter = 0;
@@ -18,42 +33,94 @@ export function nextTabId(): string {
 }
 
 export const useTerminalStore = create<TerminalStore>((set, get) => ({
-  tabs: [],
-  activeTabId: null,
+  projectState: {},
+  activeProjectPath: null,
+
+  switchProject: (repoPath: string) => {
+    set((state) => {
+      if (state.projectState[repoPath]) {
+        // Project already exists — only change the active pointer
+        return { activeProjectPath: repoPath };
+      }
+      return {
+        projectState: { ...state.projectState, [repoPath]: emptyState() },
+        activeProjectPath: repoPath,
+      };
+    });
+  },
+
+  removeProject: (repoPath: string) => {
+    set((state) => {
+      const projectState = { ...state.projectState };
+      delete projectState[repoPath];
+      return {
+        projectState,
+        ...(state.activeProjectPath === repoPath
+          ? { activeProjectPath: null }
+          : {}),
+      };
+    });
+  },
 
   addTab: (tab: TerminalTab) => {
-    set((state) => ({
-      tabs: [...state.tabs, tab],
-      activeTabId: tab.id,
-    }));
+    set((state) => {
+      const path = state.activeProjectPath;
+      if (!path) return state;
+      const current = state.projectState[path] ?? emptyState();
+      return {
+        projectState: {
+          ...state.projectState,
+          [path]: {
+            tabs: [...current.tabs, tab],
+            activeTabId: tab.id,
+          },
+        },
+      };
+    });
   },
 
   removeTab: (id: string) => {
     set((state) => {
-      const tabs = state.tabs.filter((t) => t.id !== id);
+      const path = state.activeProjectPath;
+      if (!path) return state;
+      const current = state.projectState[path] ?? emptyState();
+      const tabs = current.tabs.filter((t) => t.id !== id);
       const activeTabId =
-        state.activeTabId === id
+        current.activeTabId === id
           ? tabs.length > 0
             ? tabs[tabs.length - 1].id
             : null
-          : state.activeTabId;
-      return { tabs, activeTabId };
+          : current.activeTabId;
+      return {
+        projectState: {
+          ...state.projectState,
+          [path]: { tabs, activeTabId },
+        },
+      };
     });
   },
 
   setActiveTab: (id: string) => {
-    set({ activeTabId: id });
+    set((state) => {
+      const path = state.activeProjectPath;
+      if (!path) return state;
+      const current = state.projectState[path] ?? emptyState();
+      return {
+        projectState: {
+          ...state.projectState,
+          [path]: { ...current, activeTabId: id },
+        },
+      };
+    });
   },
 
   findTabByCommand: (commandName: string) => {
-    return get().tabs.find((t) => t.commandName === commandName);
+    const active = getActiveState(get());
+    return active.tabs.find((t) => t.commandName === commandName);
   },
 
   findTabByPtyId: (ptyId: number) => {
-    return get().tabs.find((t) => t.ptyId === ptyId);
-  },
-
-  clearTabs: () => {
-    set({ tabs: [], activeTabId: null });
+    const active = getActiveState(get());
+    return active.tabs.find((t) => t.ptyId === ptyId);
   },
 }));

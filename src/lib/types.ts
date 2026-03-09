@@ -35,6 +35,7 @@ export interface TerminalTab {
   id: string;
   label: string;
   ptyId: number;
+  repoPath: string;
   commandName: string | null; // null = blank shell or assistant
   assistantId: string | null; // null = not an assistant tab
 }

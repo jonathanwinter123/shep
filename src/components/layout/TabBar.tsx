@@ -1,6 +1,8 @@
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useCommandStore } from "../../stores/useCommandStore";
-import type { CommandStatus } from "../../lib/types";
+import type { CommandState, CommandStatus } from "../../lib/types";
+
+const EMPTY_COMMANDS: CommandState[] = [];
 import ClaudeLogo from "../sidebar/icons/ClaudeLogo";
 import CodexLogo from "../sidebar/icons/CodexLogo";
 import GeminiLogo from "../sidebar/icons/GeminiLogo";
@@ -23,8 +25,16 @@ interface TabBarProps {
 }
 
 export default function TabBar({ onClose, onNewShell }: TabBarProps) {
-  const { tabs, activeTabId, setActiveTab } = useTerminalStore();
-  const commands = useCommandStore((s) => s.commands);
+  const projectTerminals = useTerminalStore(
+    (s) => (s.activeProjectPath ? s.projectState[s.activeProjectPath] : null),
+  );
+  const tabs = projectTerminals?.tabs ?? [];
+  const activeTabId = projectTerminals?.activeTabId ?? null;
+  const setActiveTab = useTerminalStore((s) => s.setActiveTab);
+
+  const commands = useCommandStore(
+    (s) => (s.activeProjectPath ? s.projectCommands[s.activeProjectPath] ?? EMPTY_COMMANDS : EMPTY_COMMANDS),
+  );
 
   return (
     <div className="flex items-center bg-gray-800/50 border-b border-white/5 h-9 overflow-x-auto">

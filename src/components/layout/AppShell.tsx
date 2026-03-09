@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useMemo } from "react";
 import Sidebar from "../sidebar/Sidebar";
 import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
@@ -6,25 +6,56 @@ import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { usePty } from "../../hooks/usePty";
+import { computeTerminalSize } from "../../lib/terminalMeasure";
 
-const DEFAULT_COLS = 80;
-const DEFAULT_ROWS = 24;
+import type { CommandState, TerminalTab } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
+
+// Stable empty arrays to avoid infinite re-render loops with zustand v5's
+// useSyncExternalStore — selectors must return the same reference for the same state.
+const EMPTY_TABS: TerminalTab[] = [];
+const EMPTY_COMMANDS: CommandState[] = [];
 
 export default function AppShell() {
   const { repos, activeRepoPath, fetchRepos, openRepo, addRepo, removeRepo } =
     useRepoStore();
-  const { commands, loadCommands, clearCommands } = useCommandStore();
-  const { tabs, activeTabId, clearTabs, setActiveTab } = useTerminalStore();
-  const {
-    startCommand,
-    stopCommand,
-    spawnBlankShell,
-    launchAssistant,
-    closeTab,
-    killAllPtys,
-  } = usePty();
+  const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab, killProjectPtys } =
+    usePty();
   const restoreAttemptedRef = useRef(false);
+  const terminalContainerRef = useRef<HTMLDivElement>(null);
+
+  const getTerminalDimensions = useCallback(() => {
+    const el = terminalContainerRef.current;
+    if (!el || el.clientWidth === 0 || el.clientHeight === 0) {
+      return { cols: 80, rows: 24 };
+    }
+    return computeTerminalSize(el.clientWidth, el.clientHeight);
+  }, []);
+
+  // Derive active project's tabs and commands from stores
+  const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
+  const activeProjectTerminals = useTerminalStore(
+    (s) => (s.activeProjectPath ? s.projectState[s.activeProjectPath] : null),
+  );
+  const tabs = activeProjectTerminals?.tabs ?? EMPTY_TABS;
+  const activeTabId = activeProjectTerminals?.activeTabId ?? null;
+
+  // Derive allTabs via useMemo instead of a selector that returns a new array
+  // every call — zustand v5 + useSyncExternalStore would infinite-loop otherwise.
+  const projectState = useTerminalStore((s) => s.projectState);
+  const allTabs = useMemo(() => {
+    const all: TerminalTab[] = [];
+    for (const project of Object.values(projectState)) {
+      all.push(...project.tabs);
+    }
+    return all;
+  }, [projectState]);
+
+  const commands = useCommandStore(
+    (s) => (s.activeProjectPath ? s.projectCommands[s.activeProjectPath] ?? EMPTY_COMMANDS : EMPTY_COMMANDS),
+  );
+
+  const setActiveTab = useTerminalStore((s) => s.setActiveTab);
 
   useEffect(() => {
     fetchRepos();
@@ -34,58 +65,56 @@ export default function AppShell() {
     async (repoPath: string) => {
       if (repoPath === activeRepoPath) return;
 
-      await killAllPtys();
-      clearTabs();
-      clearCommands();
+      const isFirstVisit = !useCommandStore.getState().hasProject(repoPath);
 
       const config = await openRepo(repoPath);
-      loadCommands(config.commands);
+      useTerminalStore.getState().switchProject(repoPath);
+      useCommandStore.getState().switchProject(repoPath);
 
-      for (const cmd of config.commands) {
-        if (cmd.autostart) {
-          await startCommand(cmd, DEFAULT_COLS, DEFAULT_ROWS);
+      if (isFirstVisit) {
+        useCommandStore.getState().loadCommands(repoPath, config.commands);
+
+        for (const cmd of config.commands) {
+          if (cmd.autostart) {
+            const { cols, rows } = getTerminalDimensions();
+            await startCommand(cmd, cols, rows);
+          }
         }
       }
     },
-    [
-      activeRepoPath,
-      killAllPtys,
-      clearTabs,
-      clearCommands,
-      openRepo,
-      loadCommands,
-      startCommand,
-    ],
+    [activeRepoPath, openRepo, startCommand, getTerminalDimensions],
   );
 
   const handleAddProject = useCallback(
     async (repoPath: string) => {
-      await killAllPtys();
-      clearTabs();
-      clearCommands();
-
       const config = await addRepo(repoPath);
-      loadCommands(config.commands);
+      // addRepo sets activeRepoPath in the repo store, get the canonical path
+      const canonicalPath = useRepoStore.getState().activeRepoPath!;
+      useTerminalStore.getState().switchProject(canonicalPath);
+      useCommandStore.getState().switchProject(canonicalPath);
+      useCommandStore.getState().loadCommands(canonicalPath, config.commands);
     },
-    [killAllPtys, clearTabs, clearCommands, addRepo, loadCommands],
+    [addRepo],
   );
 
   const handleRemoveProject = useCallback(
     async (repoPath: string) => {
-      if (repoPath === activeRepoPath) {
-        await killAllPtys();
-        clearTabs();
-        clearCommands();
-      }
+      await killProjectPtys(repoPath);
+      useTerminalStore.getState().removeProject(repoPath);
+      useCommandStore.getState().removeProject(repoPath);
       await removeRepo(repoPath);
     },
-    [activeRepoPath, killAllPtys, clearTabs, clearCommands, removeRepo],
+    [killProjectPtys, removeRepo],
   );
 
   const handleStartCommand = useCallback(
     (name: string) => {
-      const cmd = useCommandStore.getState().commands.find((c) => c.name === name);
+      const path = useCommandStore.getState().activeProjectPath;
+      if (!path) return;
+      const cmds = useCommandStore.getState().projectCommands[path] ?? [];
+      const cmd = cmds.find((c) => c.name === name);
       if (cmd) {
+        const { cols, rows } = getTerminalDimensions();
         startCommand(
           {
             name: cmd.name,
@@ -93,19 +122,21 @@ export default function AppShell() {
             autostart: cmd.autostart,
             env: cmd.env,
           },
-          DEFAULT_COLS,
-          DEFAULT_ROWS,
+          cols,
+          rows,
         );
       }
     },
-    [startCommand],
+    [startCommand, getTerminalDimensions],
   );
 
   const handleFocusCommand = useCallback(
     (name: string) => {
-      const tab = useTerminalStore.getState().tabs.find(
-        (t) => t.commandName === name,
-      );
+      const state = useTerminalStore.getState();
+      const path = state.activeProjectPath;
+      if (!path) return;
+      const projectTabs = state.projectState[path]?.tabs ?? [];
+      const tab = projectTabs.find((t) => t.commandName === name);
       if (tab) {
         setActiveTab(tab.id);
       } else {
@@ -117,14 +148,16 @@ export default function AppShell() {
 
   const handleLaunchAssistant = useCallback(
     (assistantId: string) => {
-      launchAssistant(assistantId, DEFAULT_COLS, DEFAULT_ROWS);
+      const { cols, rows } = getTerminalDimensions();
+      launchAssistant(assistantId, cols, rows);
     },
-    [launchAssistant],
+    [launchAssistant, getTerminalDimensions],
   );
 
   const handleNewShell = useCallback(() => {
-    spawnBlankShell(DEFAULT_COLS, DEFAULT_ROWS);
-  }, [spawnBlankShell]);
+    const { cols, rows } = getTerminalDimensions();
+    spawnBlankShell(cols, rows);
+  }, [spawnBlankShell, getTerminalDimensions]);
 
   useEffect(() => {
     if (activeRepoPath) {
@@ -170,29 +203,31 @@ export default function AppShell() {
       <div className="flex-1 flex flex-col min-w-0">
         <TabBar onClose={closeTab} onNewShell={handleNewShell} />
 
-        <div className="flex-1 relative">
+        <div ref={terminalContainerRef} className="flex-1 relative">
           {tabs.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-500 text-sm">
               {activeRepoPath
                 ? "Launch an assistant or open a terminal"
                 : "Select or add a project to begin"}
             </div>
-          ) : (
-            tabs.map((tab) => (
-              <div
-                key={tab.id}
-                className="absolute inset-0"
-                style={{
-                  display: tab.id === activeTabId ? "block" : "none",
-                }}
-              >
-                <TerminalView
-                  ptyId={tab.ptyId}
-                  visible={tab.id === activeTabId}
-                />
-              </div>
-            ))
-          )}
+          ) : null}
+          {allTabs.map((tab) => (
+            <div
+              key={tab.id}
+              className="absolute inset-0"
+              style={{
+                display:
+                  tab.repoPath === activeProjectPath && tab.id === activeTabId
+                    ? "block"
+                    : "none",
+              }}
+            >
+              <TerminalView
+                ptyId={tab.ptyId}
+                visible={tab.repoPath === activeProjectPath && tab.id === activeTabId}
+              />
+            </div>
+          ))}
         </div>
       </div>
     </div>

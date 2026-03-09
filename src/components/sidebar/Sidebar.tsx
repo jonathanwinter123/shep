@@ -1,9 +1,6 @@
 import type { RepoInfo, TerminalTab, CommandState } from "../../lib/types";
 import SectionHeader from "./SectionHeader";
 import ProjectList from "./ProjectList";
-import AssistantList from "./AssistantList";
-import TerminalList from "./TerminalList";
-import CommandList from "./CommandList";
 
 interface SidebarProps {
   repos: RepoInfo[];
@@ -44,33 +41,19 @@ export default function Sidebar({
       <ProjectList
         repos={repos}
         activeRepoPath={activeRepoPath}
+        tabs={tabs}
+        activeTabId={activeTabId}
+        commands={commands}
         onSelectRepo={onSelectRepo}
         onAddProject={onAddProject}
         onRemoveProject={onRemoveProject}
+        onLaunchAssistant={onLaunchAssistant}
+        onSelectTab={onSelectTab}
+        onNewShell={onNewShell}
+        onStartCommand={onStartCommand}
+        onStopCommand={onStopCommand}
+        onFocusCommand={onFocusCommand}
       />
-
-      {activeRepoPath && (
-        <div className="ml-2 border-l border-white/5">
-          <SectionHeader label="Coding Assistants" />
-          <AssistantList onLaunch={onLaunchAssistant} />
-
-          <SectionHeader label="Terminals" />
-          <TerminalList
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onSelectTab={onSelectTab}
-            onNewShell={onNewShell}
-          />
-
-          <SectionHeader label="Commands" />
-          <CommandList
-            commands={commands}
-            onStart={onStartCommand}
-            onStop={onStopCommand}
-            onFocus={onFocusCommand}
-          />
-        </div>
-      )}
 
       <div className="flex-1" />
     </div>

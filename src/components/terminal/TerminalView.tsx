@@ -1,10 +1,22 @@
 import { useEffect, useRef, useCallback } from "react";
 import { Terminal } from "@xterm/xterm";
+import { CanvasAddon } from "@xterm/addon-canvas";
 import { FitAddon } from "@xterm/addon-fit";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { writePty, resizePty } from "../../lib/tauri";
-import { registerTerminal, unregisterTerminal } from "../../hooks/usePty";
+import {
+  flushPendingOutput,
+  registerTerminal,
+  unregisterTerminal,
+} from "../../hooks/usePty";
+import {
+  TERMINAL_FONT_FAMILY,
+  TERMINAL_FONT_SIZE,
+  TERMINAL_LINE_HEIGHT,
+} from "../../lib/terminalConfig";
 
 interface TerminalViewProps {
   ptyId: number;
@@ -14,12 +26,14 @@ interface TerminalViewProps {
 // Keep terminal instances alive across tab switches
 const terminalCache = new Map<
   number,
-  { term: Terminal; fitAddon: FitAddon }
+  { term: Terminal; fitAddon: FitAddon; rendererAddon: WebglAddon | CanvasAddon | null }
 >();
 
 export default function TerminalView({ ptyId, visible }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
+  const attachedRef = useRef(false);
+  const lastSizeRef = useRef<{ cols: number; rows: number } | null>(null);
 
   const getOrCreateTerminal = useCallback(() => {
     const cached = terminalCache.get(ptyId);
@@ -27,8 +41,10 @@ export default function TerminalView({ ptyId, visible }: TerminalViewProps) {
 
     const term = new Terminal({
       cursorBlink: true,
-      fontSize: 13,
-      fontFamily: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
+      fontSize: TERMINAL_FONT_SIZE,
+      fontFamily: TERMINAL_FONT_FAMILY,
+      lineHeight: TERMINAL_LINE_HEIGHT,
+      reflowCursorLine: true,
       theme: {
         background: "#1a1b26",
         foreground: "#a9b1d6",
@@ -57,51 +73,105 @@ export default function TerminalView({ ptyId, visible }: TerminalViewProps) {
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
+    const unicodeAddon = new Unicode11Addon();
+    term.loadAddon(unicodeAddon);
+    term.unicode.activeVersion = "11";
     term.loadAddon(new WebLinksAddon());
+
+    let rendererAddon: WebglAddon | CanvasAddon | null = null;
+    try {
+      rendererAddon = new WebglAddon();
+      term.loadAddon(rendererAddon);
+    } catch (error) {
+      console.warn("Falling back to canvas terminal renderer", error);
+      rendererAddon = new CanvasAddon();
+      term.loadAddon(rendererAddon);
+    }
 
     // Send input to PTY
     term.onData((data) => {
       writePty(ptyId, data).catch(console.error);
     });
 
-    const entry = { term, fitAddon };
+    const entry = { term, fitAddon, rendererAddon };
     terminalCache.set(ptyId, entry);
     return entry;
+  }, [ptyId]);
+
+  const fitAndResize = useCallback(async () => {
+    const cached = terminalCache.get(ptyId);
+    if (!cached) return;
+
+    cached.fitAddon.fit();
+    const size = { cols: cached.term.cols, rows: cached.term.rows };
+    const lastSize = lastSizeRef.current;
+
+    if (
+      lastSize &&
+      lastSize.cols === size.cols &&
+      lastSize.rows === size.rows
+    ) {
+      return;
+    }
+
+    lastSizeRef.current = size;
+    await resizePty(ptyId, size.cols, size.rows).catch(console.error);
+    cached.term.refresh(0, cached.term.rows - 1);
   }, [ptyId]);
 
   useEffect(() => {
     if (!containerRef.current || !visible) return;
 
-    const { term, fitAddon } = getOrCreateTerminal();
+    const { term } = getOrCreateTerminal();
+    let disposed = false;
 
     if (!mountedRef.current) {
       term.open(containerRef.current);
       mountedRef.current = true;
     }
 
-    // Register after the terminal is opened so buffered PTY output is flushed
-    // into a live xterm instance instead of being written before attach.
-    registerTerminal(ptyId, term);
+    const attachTerminal = async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      if (disposed) return;
 
-    // Fit after mount
-    requestAnimationFrame(() => {
-      fitAddon.fit();
-      resizePty(ptyId, term.cols, term.rows).catch(console.error);
-    });
+      await fitAndResize();
+      if (disposed) return;
+
+      if (!attachedRef.current) {
+        registerTerminal(ptyId, term);
+        flushPendingOutput(ptyId);
+        attachedRef.current = true;
+      }
+
+      window.setTimeout(() => {
+        if (disposed) return;
+        void fitAndResize();
+      }, 100);
+
+      if ("fonts" in document) {
+        void document.fonts.ready.then(() => {
+          if (disposed) return;
+          void fitAndResize();
+        });
+      }
+    };
+
+    void attachTerminal();
 
     // ResizeObserver for auto-fitting
     const observer = new ResizeObserver(() => {
       requestAnimationFrame(() => {
-        fitAddon.fit();
-        resizePty(ptyId, term.cols, term.rows).catch(console.error);
+        if (disposed) return;
+        void fitAndResize();
       });
     });
     observer.observe(containerRef.current);
 
     return () => {
+      disposed = true;
       observer.disconnect();
     };
-  }, [ptyId, visible, getOrCreateTerminal]);
+  }, [ptyId, visible, getOrCreateTerminal, fitAndResize]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -113,6 +183,8 @@ export default function TerminalView({ ptyId, visible }: TerminalViewProps) {
         unregisterTerminal(ptyId);
       }
       mountedRef.current = false;
+      attachedRef.current = false;
+      lastSizeRef.current = null;
     };
   }, [ptyId]);
 
