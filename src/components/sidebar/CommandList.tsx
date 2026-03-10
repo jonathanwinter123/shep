@@ -16,14 +16,14 @@ export default function CommandList({
 }: CommandListProps) {
   if (commands.length === 0) {
     return (
-      <div className="px-4 py-2 text-[12px] text-slate-300/42">
-        Edit .shep/workspace.yml to add commands
+      <div className="px-2.5 py-1.5" style={{ color: "var(--text-muted)" }}>
+        No commands configured
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-1 px-1">
+    <div className="flex flex-col gap-0.5">
       {commands.map((cmd) => (
         <CommandItem
           key={cmd.name}

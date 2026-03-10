@@ -2,6 +2,7 @@ import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useUIStore } from "../../stores/useUIStore";
 import type { CommandState, CommandStatus } from "../../lib/types";
+import { Circle } from "lucide-react";
 
 const EMPTY_COMMANDS: CommandState[] = [];
 import ClaudeLogo from "../sidebar/icons/ClaudeLogo";
@@ -9,10 +10,10 @@ import CodexLogo from "../sidebar/icons/CodexLogo";
 import GeminiLogo from "../sidebar/icons/GeminiLogo";
 import GearIcon from "../sidebar/icons/GearIcon";
 
-const statusColors: Record<CommandStatus, string> = {
-  running: "bg-green-500",
-  stopped: "bg-gray-500",
-  crashed: "bg-red-500",
+const statusColor: Record<CommandStatus, string> = {
+  running: "var(--status-running)",
+  stopped: "var(--status-stopped)",
+  crashed: "var(--status-crashed)",
 };
 
 const assistantLogos: Record<string, React.ComponentType<{ size?: number }>> = {
@@ -68,25 +69,17 @@ export default function TabBar({
           return (
             <div
               key={tab.id}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-md cursor-pointer text-sm select-none shrink-0 border transition-colors ${
-                isActive
-                  ? "border-white/12 bg-white/8 text-white"
-                  : "border-transparent text-slate-300/70 hover:text-slate-100 hover:bg-white/5"
-              }`}
+              className={`tab ${isActive ? "active" : ""}`}
               onClick={() => handleSelectTab(tab.id)}
             >
               {AssistantLogo ? (
-                <span className="text-slate-300/70">
-                  <AssistantLogo size={12} />
-                </span>
+                <AssistantLogo size={12} />
               ) : tab.commandName ? (
-                <span
-                  className={`w-2 h-2 rounded-full ${statusColors[status]}`}
-                />
+                <Circle size={8} fill={statusColor[status]} stroke="none" />
               ) : null}
               <span className="truncate max-w-32">{tab.label}</span>
               <button
-                className="ml-1 text-slate-400/70 hover:text-white"
+                className="icon-btn ml-0.5"
                 onClick={(e) => {
                   e.stopPropagation();
                   onClose(tab.id);
@@ -100,19 +93,13 @@ export default function TabBar({
 
         {settingsTabOpen && (
           <div
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-md cursor-pointer text-sm select-none shrink-0 border transition-colors ${
-              settingsActive
-                ? "border-white/12 bg-white/8 text-white"
-                : "border-transparent text-slate-300/70 hover:text-slate-100 hover:bg-white/5"
-            }`}
+            className={`tab ${settingsActive ? "active" : ""}`}
             onClick={activateSettings}
           >
-            <span className="text-slate-300/70">
-              <GearIcon size={12} />
-            </span>
+            <GearIcon size={12} />
             <span>Settings</span>
             <button
-              className="ml-1 text-slate-400/70 hover:text-white"
+              className="icon-btn ml-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 closeSettingsTab();
@@ -124,14 +111,13 @@ export default function TabBar({
         )}
 
         <button
-          className="glass-button ml-1 rounded-md px-3 py-2 text-slate-300/72 hover:text-white text-sm shrink-0"
+          className="tab"
           onClick={onNewShell}
           title="New Terminal"
         >
           +
         </button>
       </div>
-
     </div>
   );
 }

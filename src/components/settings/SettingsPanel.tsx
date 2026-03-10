@@ -7,9 +7,7 @@ export default function SettingsPanel() {
 
   return (
     <div className="absolute inset-0 overflow-y-auto p-6">
-      <h2 className="text-sm font-medium text-white/60 uppercase tracking-wider mb-4">
-        Theme
-      </h2>
+      <h2 className="section-label !p-0 mb-4">Theme</h2>
 
       <div className="flex flex-wrap gap-3">
         {THEME_LIST.map((t) => {
@@ -18,11 +16,8 @@ export default function SettingsPanel() {
             <button
               key={t.id}
               onClick={() => setTheme(t.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition-all cursor-pointer ${
-                active
-                  ? "border-white/20 bg-white/8"
-                  : "border-white/8 bg-white/3 hover:border-white/14 hover:bg-white/5"
-              }`}
+              className={`list-item ${active ? "active" : ""}`}
+              style={{ padding: "10px 16px", gap: "12px" }}
             >
               <div
                 className="shrink-0 rounded-full"
@@ -36,11 +31,7 @@ export default function SettingsPanel() {
                   outlineOffset: 2,
                 }}
               />
-              <span
-                className={`text-sm ${active ? "text-white" : "text-slate-300/70"}`}
-              >
-                {t.name}
-              </span>
+              <span>{t.name}</span>
             </button>
           );
         })}

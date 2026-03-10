@@ -1,42 +1,34 @@
 import type { RepoInfo } from "../../lib/types";
+import { Folder, FolderOpen, CircleSmall } from "lucide-react";
 
 interface ProjectItemProps {
   repo: RepoInfo;
   isActive: boolean;
+  isExpanded: boolean;
+  activity?: { terminalCount: number; runningCount: number };
   onClick: () => void;
-  onRemove: () => void;
 }
 
 export default function ProjectItem({
   repo,
   isActive,
+  isExpanded,
+  activity,
   onClick,
-  onRemove,
 }: ProjectItemProps) {
+  const hasActivity = activity && (activity.terminalCount > 0 || activity.runningCount > 0);
+
   return (
     <div
-      className={`group w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] border transition-colors cursor-pointer ${
-        isActive
-          ? "border-white/14 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-          : "border-transparent text-slate-300/72 hover:bg-white/6 hover:text-slate-100"
-      } ${!repo.valid ? "opacity-50" : ""}`}
+      className={`list-item ${isActive ? "active" : ""} ${!repo.valid ? "opacity-50" : ""}`}
       onClick={onClick}
       title={repo.path}
     >
-      <span className="truncate flex-1">{repo.name}</span>
-      {isActive && (
-        <span className="w-1.5 h-1.5 rounded-full bg-sky-300 shrink-0" />
+      {isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
+      <span className="truncate flex-1 font-medium">{repo.name}</span>
+      {!isExpanded && hasActivity && (
+        <CircleSmall size={14} className="shrink-0" fill="var(--status-running)" stroke="none" />
       )}
-      <button
-        className="text-slate-400/50 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs shrink-0"
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove();
-        }}
-        title="Remove project"
-      >
-        ×
-      </button>
     </div>
   );
 }

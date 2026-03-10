@@ -26,9 +26,9 @@ const EMPTY_COMMANDS: CommandState[] = [];
 export default function AppShell() {
   useThemeApplicator();
 
-  const { repos, activeRepoPath, fetchRepos, openRepo, addRepo, removeRepo } =
+  const { repos, activeRepoPath, fetchRepos, openRepo, addRepo } =
     useRepoStore();
-  const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab, killProjectPtys } =
+  const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab } =
     usePty();
   const restoreAttemptedRef = useRef(false);
   const terminalContainerRef = useRef<HTMLDivElement>(null);
@@ -108,16 +108,6 @@ export default function AppShell() {
       useCommandStore.getState().loadCommands(canonicalPath, config.commands);
     },
     [addRepo],
-  );
-
-  const handleRemoveProject = useCallback(
-    async (repoPath: string) => {
-      await killProjectPtys(repoPath);
-      useTerminalStore.getState().removeProject(repoPath);
-      useCommandStore.getState().removeProject(repoPath);
-      await removeRepo(repoPath);
-    },
-    [killProjectPtys, removeRepo],
   );
 
   const handleStartCommand = useCallback(
@@ -223,10 +213,8 @@ export default function AppShell() {
           commands={commands}
           onSelectRepo={handleSelectRepo}
           onAddProject={handleAddProject}
-          onRemoveProject={handleRemoveProject}
           onLaunchAssistant={handleLaunchAssistant}
           onSelectTab={setActiveTab}
-          onCloseTab={closeTab}
           onNewShell={handleNewShell}
           onStartCommand={handleStartCommand}
           onStopCommand={stopCommand}

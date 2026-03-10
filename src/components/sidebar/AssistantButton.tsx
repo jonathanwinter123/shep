@@ -1,4 +1,5 @@
 import type { CodingAssistant } from "../../lib/types";
+import { CircleSmall } from "lucide-react";
 import ClaudeLogo from "./icons/ClaudeLogo";
 import CodexLogo from "./icons/CodexLogo";
 import GeminiLogo from "./icons/GeminiLogo";
@@ -11,27 +12,22 @@ const logoComponents: Record<string, React.ComponentType<{ size?: number }>> = {
 
 interface AssistantButtonProps {
   assistant: CodingAssistant;
+  isRunning?: boolean;
   onClick: () => void;
 }
 
 export default function AssistantButton({
   assistant,
+  isRunning = false,
   onClick,
 }: AssistantButtonProps) {
   const Logo = logoComponents[assistant.id];
 
   return (
-    <button
-      className="glass-button w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] text-slate-300/72 hover:text-slate-100"
-      onClick={onClick}
-      title={`Launch ${assistant.name}`}
-    >
-      {Logo && (
-        <span className="shrink-0 text-slate-300/72">
-          <Logo size={16} />
-        </span>
-      )}
-      <span className="truncate">{assistant.name}</span>
+    <button className="list-item w-full" onClick={onClick} title={`Launch ${assistant.name}`}>
+      {Logo && <Logo size={14} />}
+      <span className="truncate flex-1 text-left">{assistant.name}</span>
+      {isRunning && <CircleSmall size={14} className="shrink-0" fill="var(--status-running)" stroke="none" />}
     </button>
   );
 }
