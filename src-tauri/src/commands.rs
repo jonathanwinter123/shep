@@ -85,3 +85,21 @@ pub fn resize_pty(
 pub fn kill_pty(pty_id: u32, pty_manager: State<'_, PtyManager>) -> Result<(), String> {
     pty_manager.kill(pty_id)
 }
+
+// ── System commands ────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn get_username() -> String {
+    std::env::var("USER").unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn get_computer_name() -> String {
+    std::process::Command::new("scutil")
+        .args(["--get", "ComputerName"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default()
+}

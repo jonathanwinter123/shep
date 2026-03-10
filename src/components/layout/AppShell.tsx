@@ -3,12 +3,15 @@ import Sidebar from "../sidebar/Sidebar";
 import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
 import TerminalErrorBoundary from "../terminal/TerminalErrorBoundary";
+import SettingsPanel from "../settings/SettingsPanel";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
+import { useUIStore } from "../../stores/useUIStore";
 import { usePty } from "../../hooks/usePty";
 import { useThemeApplicator } from "../../hooks/useThemeApplicator";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
+import { getUsername, getComputerName } from "../../lib/tauri";
 
 import type { CommandState, TerminalTab } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
@@ -61,8 +64,12 @@ export default function AppShell() {
 
   const setActiveTab = useTerminalStore((s) => s.setActiveTab);
 
+  const settingsOpen = useUIStore((s) => s.settingsOpen);
+
   useEffect(() => {
     fetchRepos();
+    getUsername().then((name) => useUIStore.getState().setUsername(name));
+    getComputerName().then((name) => useUIStore.getState().setComputerName(name));
   }, [fetchRepos]);
 
   const handleSelectRepo = useCallback(
@@ -217,32 +224,38 @@ export default function AppShell() {
           />
 
           <div ref={terminalContainerRef} className="terminal-stage">
-            {tabs.length === 0 ? (
-              <div className="terminal-empty">
-                {activeRepoPath
-                  ? "Launch an assistant or open a terminal"
-                  : "Select or add a project to begin"}
-              </div>
-            ) : null}
-            {allTabs.map((tab) => (
-              <div
-                key={tab.id}
-                className="absolute inset-0"
-                style={{
-                  display:
-                    tab.repoPath === activeProjectPath && tab.id === activeTabId
-                      ? "block"
-                      : "none",
-                }}
-              >
-                <TerminalErrorBoundary>
-                  <TerminalView
-                    ptyId={tab.ptyId}
-                    visible={tab.repoPath === activeProjectPath && tab.id === activeTabId}
-                  />
-                </TerminalErrorBoundary>
-              </div>
-            ))}
+            {settingsOpen ? (
+              <SettingsPanel />
+            ) : (
+              <>
+                {tabs.length === 0 ? (
+                  <div className="terminal-empty">
+                    {activeRepoPath
+                      ? "Launch an assistant or open a terminal"
+                      : "Select or add a project to begin"}
+                  </div>
+                ) : null}
+                {allTabs.map((tab) => (
+                  <div
+                    key={tab.id}
+                    className="absolute inset-0"
+                    style={{
+                      display:
+                        tab.repoPath === activeProjectPath && tab.id === activeTabId
+                          ? "block"
+                          : "none",
+                    }}
+                  >
+                    <TerminalErrorBoundary>
+                      <TerminalView
+                        ptyId={tab.ptyId}
+                        visible={tab.repoPath === activeProjectPath && tab.id === activeTabId}
+                      />
+                    </TerminalErrorBoundary>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
       </div>

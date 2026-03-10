@@ -1,7 +1,7 @@
 import type { RepoInfo, TerminalTab, CommandState } from "../../lib/types";
 import SectionHeader from "./SectionHeader";
 import ProjectList from "./ProjectList";
-import ThemePicker from "./ThemePicker";
+import SidebarFooter from "./SidebarFooter";
 
 interface SidebarProps {
   repos: RepoInfo[];
@@ -60,7 +60,7 @@ export default function Sidebar({
       />
 
       <div className="flex-1" />
-      <ThemePicker />
+      <SidebarFooter />
     </div>
   );
 }

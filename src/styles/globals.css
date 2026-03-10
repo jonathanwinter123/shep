@@ -8,28 +8,28 @@ body,
 
 :root {
   color-scheme: dark;
-  --app-bg: #09111d;
-  --app-fg: #eef4ff;
-  --glass-panel: rgba(9, 15, 27, 0.56);
-  --glass-panel-strong: rgba(10, 18, 31, 0.78);
+  --app-bg: #1a1b26;
+  --app-fg: #a9b1d6;
+  --glass-panel: rgba(22, 22, 30, 0.56);
+  --glass-panel-strong: rgba(22, 22, 30, 0.78);
   --glass-panel-soft: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-border-strong: rgba(255, 255, 255, 0.18);
-  --glass-shadow: 0 24px 80px rgba(3, 8, 16, 0.48);
+  --glass-border: rgba(169, 177, 214, 0.12);
+  --glass-border-strong: rgba(169, 177, 214, 0.18);
+  --glass-shadow: 0 24px 80px rgba(16, 16, 22, 0.48);
   --glass-highlight: rgba(255, 255, 255, 0.2);
 
   /* Theme-driven vars (defaults = Tokyo Night) */
-  --bg-radial-1: rgba(120, 187, 255, 0.24);
-  --bg-radial-2: rgba(120, 255, 214, 0.14);
-  --bg-radial-3: rgba(255, 158, 119, 0.14);
-  --bg-linear-from: #07101b;
-  --bg-linear-mid: #0c1523;
-  --bg-linear-to: #09111d;
-  --ambient-orb-1: rgba(62, 142, 255, 0.24);
-  --ambient-orb-2: rgba(77, 245, 203, 0.16);
-  --ambient-orb-3: rgba(255, 145, 103, 0.14);
-  --frame-tint: rgba(6, 11, 19, 0.3);
-  --panel-tint: rgba(10, 17, 29, 0.52);
+  --bg-radial-1: rgba(122, 162, 247, 0.18);
+  --bg-radial-2: rgba(115, 218, 202, 0.10);
+  --bg-radial-3: rgba(187, 154, 247, 0.10);
+  --bg-linear-from: #16161e;
+  --bg-linear-mid: #1a1b26;
+  --bg-linear-to: #16161e;
+  --ambient-orb-1: rgba(122, 162, 247, 0.18);
+  --ambient-orb-2: rgba(115, 218, 202, 0.12);
+  --ambient-orb-3: rgba(187, 154, 247, 0.10);
+  --frame-tint: rgba(22, 22, 30, 0.3);
+  --panel-tint: rgba(26, 27, 38, 0.52);
 }
 
 body {

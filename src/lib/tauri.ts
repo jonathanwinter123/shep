@@ -63,3 +63,13 @@ export function resizePty(
 export function killPty(ptyId: number): Promise<void> {
   return invoke("kill_pty", { ptyId });
 }
+
+// ── System commands ────────────────────────────────────────────────
+
+export function getUsername(): Promise<string> {
+  return invoke("get_username");
+}
+
+export function getComputerName(): Promise<string> {
+  return invoke("get_computer_name");
+}
