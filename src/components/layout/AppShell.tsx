@@ -197,7 +197,15 @@ export default function AppShell() {
     <div className="app-shell">
       <div
         className="drag-region"
-        onMouseDown={() => getCurrentWindow().startDragging()}
+        onMouseDown={(e) => {
+          if (e.buttons === 1) {
+            if (e.detail === 2) {
+              getCurrentWindow().toggleMaximize();
+            } else {
+              getCurrentWindow().startDragging();
+            }
+          }
+        }}
       />
       <div className="app-shell__ambient app-shell__ambient--blue" />
       <div className="app-shell__ambient app-shell__ambient--mint" />
