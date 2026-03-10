@@ -29,12 +29,12 @@ const terminalCache = new Map<
   number,
   { term: Terminal; fitAddon: FitAddon; rendererAddon: WebglAddon | CanvasAddon | null }
 >();
+const TERMINAL_GLASS_RGB = "22, 24, 28";
 
 function createTerminalTheme(opacity: number) {
-  const alpha = Math.min(Math.max(opacity / 100, 0), 1);
-
+  const alpha = (opacity / 100) * 0.34;
   return {
-    background: `rgba(13, 19, 31, ${alpha})`,
+    background: `rgba(${TERMINAL_GLASS_RGB}, ${alpha})`,
     foreground: "#a9b1d6",
     cursor: "#c0caf5",
     selectionBackground: "#33467c",
@@ -185,6 +185,7 @@ export default function TerminalView({
     };
   }, [ptyId, visible, getOrCreateTerminal, fitAndResize]);
 
+  // Cleanup on unmount
   useEffect(() => {
     const cached = terminalCache.get(ptyId);
     if (!cached) return;
@@ -193,7 +194,6 @@ export default function TerminalView({
     cached.term.refresh(0, cached.term.rows - 1);
   }, [opacity, ptyId]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       const cached = terminalCache.get(ptyId);
@@ -215,17 +215,8 @@ export default function TerminalView({
         display: visible ? "block" : "none",
       }}
     >
-      <div
-        ref={containerRef}
-        className="terminal-surface"
-        style={{
-          background: `linear-gradient(180deg, rgba(21, 29, 45, ${
-            opacity / 100 * 0.62
-          }), rgba(10, 15, 24, ${opacity / 100 * 0.72})), rgba(13, 19, 31, ${
-            opacity / 100
-          })`,
-        }}
-      />
+      <div className="terminal-underlay" />
+      <div ref={containerRef} className="terminal-surface" />
     </div>
   );
 }
