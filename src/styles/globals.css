@@ -59,7 +59,7 @@ select {
   position: relative;
   height: 100vh;
   overflow: hidden;
-  padding: 38px 12px 12px;
+  padding: 42px 12px 12px;
 }
 
 .drag-region {
@@ -67,7 +67,7 @@ select {
   top: 0;
   left: 0;
   right: 0;
-  height: 38px;
+  height: 42px;
   z-index: 10;
 }
 
