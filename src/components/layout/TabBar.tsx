@@ -37,15 +37,18 @@ export default function TabBar({
   const activeTabId = projectTerminals?.activeTabId ?? null;
   const setActiveTab = useTerminalStore((s) => s.setActiveTab);
 
-  const settingsOpen = useUIStore((s) => s.settingsOpen);
-  const closeSettings = useUIStore((s) => s.closeSettings);
+  const settingsTabOpen = useUIStore((s) => s.settingsTabOpen);
+  const settingsActive = useUIStore((s) => s.settingsActive);
+  const activateSettings = useUIStore((s) => s.activateSettings);
+  const deactivateSettings = useUIStore((s) => s.deactivateSettings);
+  const closeSettingsTab = useUIStore((s) => s.closeSettingsTab);
 
   const commands = useCommandStore(
     (s) => (s.activeProjectPath ? s.projectCommands[s.activeProjectPath] ?? EMPTY_COMMANDS : EMPTY_COMMANDS),
   );
 
   const handleSelectTab = (tabId: string) => {
-    closeSettings();
+    deactivateSettings();
     setActiveTab(tabId);
   };
 
@@ -53,7 +56,7 @@ export default function TabBar({
     <div className="tab-bar">
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {tabs.map((tab) => {
-          const isActive = tab.id === activeTabId && !settingsOpen;
+          const isActive = tab.id === activeTabId && !settingsActive;
           const command = tab.commandName
             ? commands.find((c) => c.name === tab.commandName)
             : null;
@@ -95,8 +98,15 @@ export default function TabBar({
           );
         })}
 
-        {settingsOpen && (
-          <div className="flex items-center gap-1.5 px-3 py-2 rounded-md cursor-pointer text-sm select-none shrink-0 border transition-colors border-white/12 bg-white/8 text-white">
+        {settingsTabOpen && (
+          <div
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-md cursor-pointer text-sm select-none shrink-0 border transition-colors ${
+              settingsActive
+                ? "border-white/12 bg-white/8 text-white"
+                : "border-transparent text-slate-300/70 hover:text-slate-100 hover:bg-white/5"
+            }`}
+            onClick={activateSettings}
+          >
             <span className="text-slate-300/70">
               <GearIcon size={12} />
             </span>
@@ -105,7 +115,7 @@ export default function TabBar({
               className="ml-1 text-slate-400/70 hover:text-white"
               onClick={(e) => {
                 e.stopPropagation();
-                closeSettings();
+                closeSettingsTab();
               }}
             >
               ×

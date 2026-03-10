@@ -64,7 +64,7 @@ export default function AppShell() {
 
   const setActiveTab = useTerminalStore((s) => s.setActiveTab);
 
-  const settingsOpen = useUIStore((s) => s.settingsOpen);
+  const settingsActive = useUIStore((s) => s.settingsActive);
 
   useEffect(() => {
     fetchRepos();
@@ -224,38 +224,34 @@ export default function AppShell() {
           />
 
           <div ref={terminalContainerRef} className="terminal-stage">
-            {settingsOpen ? (
-              <SettingsPanel />
-            ) : (
-              <>
-                {tabs.length === 0 ? (
-                  <div className="terminal-empty">
-                    {activeRepoPath
-                      ? "Launch an assistant or open a terminal"
-                      : "Select or add a project to begin"}
-                  </div>
-                ) : null}
-                {allTabs.map((tab) => (
-                  <div
-                    key={tab.id}
-                    className="absolute inset-0"
-                    style={{
-                      display:
-                        tab.repoPath === activeProjectPath && tab.id === activeTabId
-                          ? "block"
-                          : "none",
-                    }}
-                  >
-                    <TerminalErrorBoundary>
-                      <TerminalView
-                        ptyId={tab.ptyId}
-                        visible={tab.repoPath === activeProjectPath && tab.id === activeTabId}
-                      />
-                    </TerminalErrorBoundary>
-                  </div>
-                ))}
-              </>
+            {settingsActive && <SettingsPanel />}
+
+            {!settingsActive && tabs.length === 0 && (
+              <div className="terminal-empty">
+                {activeRepoPath
+                  ? "Launch an assistant or open a terminal"
+                  : "Select or add a project to begin"}
+              </div>
             )}
+            {allTabs.map((tab) => (
+              <div
+                key={tab.id}
+                className="absolute inset-0"
+                style={{
+                  display:
+                    !settingsActive && tab.repoPath === activeProjectPath && tab.id === activeTabId
+                      ? "block"
+                      : "none",
+                }}
+              >
+                <TerminalErrorBoundary>
+                  <TerminalView
+                    ptyId={tab.ptyId}
+                    visible={!settingsActive && tab.repoPath === activeProjectPath && tab.id === activeTabId}
+                  />
+                </TerminalErrorBoundary>
+              </div>
+            ))}
           </div>
         </div>
       </div>

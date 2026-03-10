@@ -4,7 +4,7 @@ import GearIcon from "./icons/GearIcon";
 export default function SidebarFooter() {
   const username = useUIStore((s) => s.username);
   const computerName = useUIStore((s) => s.computerName);
-  const settingsOpen = useUIStore((s) => s.settingsOpen);
+  const settingsTabOpen = useUIStore((s) => s.settingsTabOpen);
   const toggleSettings = useUIStore((s) => s.toggleSettings);
 
   const initial = username ? username[0].toUpperCase() : "?";
@@ -26,7 +26,7 @@ export default function SidebarFooter() {
         onClick={toggleSettings}
         title="Settings"
         className={`glass-button rounded-md p-1.5 transition-colors ${
-          settingsOpen
+          settingsTabOpen
             ? "text-white bg-white/10"
             : "text-slate-400/70 hover:text-white"
         }`}
