@@ -30,18 +30,16 @@ const terminalCache = new Map<
   { term: Terminal; fitAddon: FitAddon; rendererAddon: WebglAddon | CanvasAddon | null }
 >();
 
-// Glass panel color target — matches the sidebar's composited glass-panel
-// appearance (rgba(10,17,29,0.52) over the app background with highlights).
-const GLASS_R = 20, GLASS_G = 28, GLASS_B = 44;
+// Terminal glass background — uses the same base color as --glass-panel.
+// The alpha is driven by the opacity slider so the backdrop-filter glass
+// effect on .terminal-underlay shows through.
+const TERMINAL_GLASS_RGB = "10, 17, 29";
 
-function createTerminalTheme(opacity: number) {
-  // Opacity slider blends between black (0%) and the glass panel color (100%)
-  const t = opacity / 100;
-  const r = Math.round(GLASS_R * t);
-  const g = Math.round(GLASS_G * t);
-  const b = Math.round(GLASS_B * t);
+function createTerminalTheme(_opacity: number) {
   return {
-    background: `rgb(${r}, ${g}, ${b})`,
+    // Fully transparent — the glass appearance comes from the CSS
+    // .terminal-underlay layer (same styling as .glass-panel on the sidebar).
+    background: "transparent",
     foreground: "#a9b1d6",
     cursor: "#c0caf5",
     selectionBackground: "#33467c",
@@ -83,9 +81,9 @@ export default function TerminalView({
       fontSize: TERMINAL_FONT_SIZE,
       fontFamily: TERMINAL_FONT_FAMILY,
       lineHeight: TERMINAL_LINE_HEIGHT,
-      reflowCursorLine: true,
       theme: createTerminalTheme(opacity),
       scrollback: 10000,
+      allowTransparency: true,
       allowProposedApi: true,
     });
 
@@ -96,22 +94,12 @@ export default function TerminalView({
     term.unicode.activeVersion = "11";
     term.loadAddon(new WebLinksAddon());
 
-    let rendererAddon: WebglAddon | CanvasAddon | null = null;
-    try {
-      rendererAddon = new WebglAddon();
-      term.loadAddon(rendererAddon);
-    } catch (error) {
-      console.warn("Falling back to canvas terminal renderer", error);
-      rendererAddon = new CanvasAddon();
-      term.loadAddon(rendererAddon);
-    }
-
     // Send input to PTY
     term.onData((data) => {
       writePty(ptyId, data).catch(console.error);
     });
 
-    const entry = { term, fitAddon, rendererAddon };
+    const entry = { term, fitAddon, rendererAddon: null as WebglAddon | CanvasAddon | null };
     terminalCache.set(ptyId, entry);
     return entry;
   }, [opacity, ptyId]);
@@ -146,6 +134,27 @@ export default function TerminalView({
     if (!mountedRef.current) {
       term.open(containerRef.current);
       mountedRef.current = true;
+
+      // Load renderer addon after open() so it can access the DOM.
+      // Canvas addon handles alpha compositing correctly for glass transparency.
+      // Fall back to WebGL if Canvas fails.
+      const cached = terminalCache.get(ptyId);
+      if (cached && !cached.rendererAddon) {
+        try {
+          const canvas = new CanvasAddon();
+          term.loadAddon(canvas);
+          cached.rendererAddon = canvas;
+        } catch (err) {
+          console.warn("Canvas renderer failed, trying WebGL:", err);
+          try {
+            const webgl = new WebglAddon();
+            term.loadAddon(webgl);
+            cached.rendererAddon = webgl;
+          } catch (err2) {
+            console.warn("No accelerated renderer available:", err2);
+          }
+        }
+      }
     }
 
     const attachTerminal = async () => {
@@ -221,6 +230,7 @@ export default function TerminalView({
         display: visible ? "block" : "none",
       }}
     >
+      <div className="terminal-underlay" />
       <div ref={containerRef} className="terminal-surface" />
     </div>
   );

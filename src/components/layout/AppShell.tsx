@@ -2,6 +2,7 @@ import { useEffect, useCallback, useRef, useMemo, useState } from "react";
 import Sidebar from "../sidebar/Sidebar";
 import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
+import TerminalErrorBoundary from "../terminal/TerminalErrorBoundary";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -246,11 +247,13 @@ export default function AppShell() {
                       : "none",
                 }}
               >
-                <TerminalView
-                  ptyId={tab.ptyId}
-                  visible={tab.repoPath === activeProjectPath && tab.id === activeTabId}
-                  opacity={terminalOpacity}
-                />
+                <TerminalErrorBoundary>
+                  <TerminalView
+                    ptyId={tab.ptyId}
+                    visible={tab.repoPath === activeProjectPath && tab.id === activeTabId}
+                    opacity={terminalOpacity}
+                  />
+                </TerminalErrorBoundary>
               </div>
             ))}
           </div>
