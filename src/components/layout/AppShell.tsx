@@ -5,6 +5,7 @@ import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
 import TerminalErrorBoundary from "../terminal/TerminalErrorBoundary";
 import SettingsPanel from "../settings/SettingsPanel";
+import ShepLogo from "../sidebar/icons/ShepLogo";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -206,7 +207,9 @@ export default function AppShell() {
             }
           }
         }}
-      />
+      >
+        <span className="drag-region__logo"><ShepLogo size={18} /></span>
+      </div>
       <div className="app-shell__ambient app-shell__ambient--blue" />
       <div className="app-shell__ambient app-shell__ambient--mint" />
       <div className="app-shell__ambient app-shell__ambient--ember" />

@@ -69,6 +69,16 @@ select {
   right: 0;
   height: 42px;
   z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drag-region__logo {
+  pointer-events: none;
+  user-select: none;
+  color: rgba(255, 255, 255, 0.45);
+  display: flex;
 }
 
 .app-shell__ambient {
