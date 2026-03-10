@@ -142,9 +142,9 @@ select {
   flex: 1;
   min-height: 0;
   margin-top: 10px;
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
   background: transparent;
 }
 
@@ -154,11 +154,10 @@ select {
 
 .terminal-empty {
   position: absolute;
-  inset: 12px;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
   color: rgba(221, 231, 255, 0.46);
   font-size: 13px;
 }
