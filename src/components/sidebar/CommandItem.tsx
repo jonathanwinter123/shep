@@ -16,7 +16,7 @@ export default function CommandItem({
   const isRunning = command.status === "running";
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/5 transition-colors group">
+    <div className="group flex items-center gap-2 px-3 py-2 rounded-xl border border-transparent hover:border-white/8 hover:bg-white/6 transition-colors">
       <span
         className={`w-1.5 h-1.5 rounded-full shrink-0 ${
           isRunning
@@ -28,17 +28,17 @@ export default function CommandItem({
       />
 
       <button
-        className="flex-1 text-left text-[13px] text-gray-400 truncate hover:text-gray-200"
+        className="flex-1 text-left text-[13px] text-slate-300/72 truncate hover:text-slate-100"
         onClick={onFocus}
         title={command.command}
       >
         {command.name}
       </button>
 
-      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         {isRunning ? (
           <button
-            className="text-gray-500 hover:text-white transition-colors p-0.5"
+            className="glass-button rounded-md text-slate-300/64 hover:text-white transition-colors p-1"
             onClick={onStop}
             title="Stop"
           >
@@ -48,7 +48,7 @@ export default function CommandItem({
           </button>
         ) : (
           <button
-            className="text-gray-500 hover:text-white transition-colors p-0.5"
+            className="glass-button rounded-md text-slate-300/64 hover:text-white transition-colors p-1"
             onClick={onStart}
             title="Start"
           >

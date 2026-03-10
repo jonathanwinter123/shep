@@ -17,6 +17,7 @@ interface ProjectListProps {
   onRemoveProject: (repoPath: string) => void;
   onLaunchAssistant: (assistantId: string) => void;
   onSelectTab: (tabId: string) => void;
+  onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
   onStartCommand: (name: string) => void;
   onStopCommand: (name: string) => void;
@@ -34,6 +35,7 @@ export default function ProjectList({
   onRemoveProject,
   onLaunchAssistant,
   onSelectTab,
+  onCloseTab,
   onNewShell,
   onStartCommand,
   onStopCommand,
@@ -51,7 +53,7 @@ export default function ProjectList({
   };
 
   return (
-    <div className="flex flex-col gap-0.5 px-1">
+    <div className="flex flex-col gap-1 px-2 pb-2">
       {repos.map((repo) => (
         <div key={repo.path}>
           <ProjectItem
@@ -61,7 +63,7 @@ export default function ProjectList({
             onRemove={() => onRemoveProject(repo.path)}
           />
           {repo.path === activeRepoPath && (
-            <div className="ml-4 border-l border-white/10 pl-1">
+            <div className="mx-1 mt-2 border-t border-white/8 px-1 pb-2">
               <SectionHeader label="Coding Assistants" />
               <AssistantList onLaunch={onLaunchAssistant} />
 
@@ -70,6 +72,7 @@ export default function ProjectList({
                 tabs={tabs}
                 activeTabId={activeTabId}
                 onSelectTab={onSelectTab}
+                onCloseTab={onCloseTab}
                 onNewShell={onNewShell}
               />
 
@@ -85,7 +88,7 @@ export default function ProjectList({
         </div>
       ))}
       <button
-        className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] text-gray-500 hover:bg-white/5 hover:text-gray-300 transition-colors"
+        className="glass-button w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] text-slate-300/68 hover:text-slate-100"
         onClick={handleAddClick}
       >
         <span className="text-lg leading-none">+</span>

@@ -13,6 +13,7 @@ interface SidebarProps {
   onRemoveProject: (repoPath: string) => void;
   onLaunchAssistant: (assistantId: string) => void;
   onSelectTab: (tabId: string) => void;
+  onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
   onStartCommand: (name: string) => void;
   onStopCommand: (name: string) => void;
@@ -30,13 +31,14 @@ export default function Sidebar({
   onRemoveProject,
   onLaunchAssistant,
   onSelectTab,
+  onCloseTab,
   onNewShell,
   onStartCommand,
   onStopCommand,
   onFocusCommand,
 }: SidebarProps) {
   return (
-    <div className="w-56 bg-gray-800/50 border-r border-white/5 flex flex-col h-full overflow-y-auto">
+    <div className="w-72 shrink-0 flex flex-col h-full overflow-y-auto pr-4 mr-4 border-r border-white/8">
       <SectionHeader label="Projects" />
       <ProjectList
         repos={repos}
@@ -49,6 +51,7 @@ export default function Sidebar({
         onRemoveProject={onRemoveProject}
         onLaunchAssistant={onLaunchAssistant}
         onSelectTab={onSelectTab}
+        onCloseTab={onCloseTab}
         onNewShell={onNewShell}
         onStartCommand={onStartCommand}
         onStopCommand={onStopCommand}

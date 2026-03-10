@@ -22,12 +22,12 @@ export default function AssistantButton({
 
   return (
     <button
-      className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] text-gray-400 hover:bg-white/5 hover:text-gray-200 transition-colors"
+      className="glass-button w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] text-slate-300/72 hover:text-slate-100"
       onClick={onClick}
       title={`Launch ${assistant.name}`}
     >
       {Logo && (
-        <span className="shrink-0 text-gray-400">
+        <span className="shrink-0 text-slate-300/72">
           <Logo size={16} />
         </span>
       )}

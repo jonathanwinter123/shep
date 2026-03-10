@@ -21,6 +21,7 @@ import {
 interface TerminalViewProps {
   ptyId: number;
   visible: boolean;
+  opacity: number;
 }
 
 // Keep terminal instances alive across tab switches
@@ -29,7 +30,38 @@ const terminalCache = new Map<
   { term: Terminal; fitAddon: FitAddon; rendererAddon: WebglAddon | CanvasAddon | null }
 >();
 
-export default function TerminalView({ ptyId, visible }: TerminalViewProps) {
+function createTerminalTheme(opacity: number) {
+  const alpha = Math.min(Math.max(opacity / 100, 0), 1);
+
+  return {
+    background: `rgba(13, 19, 31, ${alpha})`,
+    foreground: "#a9b1d6",
+    cursor: "#c0caf5",
+    selectionBackground: "#33467c",
+    black: "#15161e",
+    red: "#f7768e",
+    green: "#9ece6a",
+    yellow: "#e0af68",
+    blue: "#7aa2f7",
+    magenta: "#bb9af7",
+    cyan: "#7dcfff",
+    white: "#a9b1d6",
+    brightBlack: "#414868",
+    brightRed: "#f7768e",
+    brightGreen: "#9ece6a",
+    brightYellow: "#e0af68",
+    brightBlue: "#7aa2f7",
+    brightMagenta: "#bb9af7",
+    brightCyan: "#7dcfff",
+    brightWhite: "#c0caf5",
+  };
+}
+
+export default function TerminalView({
+  ptyId,
+  visible,
+  opacity,
+}: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
   const attachedRef = useRef(false);
@@ -45,29 +77,9 @@ export default function TerminalView({ ptyId, visible }: TerminalViewProps) {
       fontFamily: TERMINAL_FONT_FAMILY,
       lineHeight: TERMINAL_LINE_HEIGHT,
       reflowCursorLine: true,
-      theme: {
-        background: "#1a1b26",
-        foreground: "#a9b1d6",
-        cursor: "#c0caf5",
-        selectionBackground: "#33467c",
-        black: "#15161e",
-        red: "#f7768e",
-        green: "#9ece6a",
-        yellow: "#e0af68",
-        blue: "#7aa2f7",
-        magenta: "#bb9af7",
-        cyan: "#7dcfff",
-        white: "#a9b1d6",
-        brightBlack: "#414868",
-        brightRed: "#f7768e",
-        brightGreen: "#9ece6a",
-        brightYellow: "#e0af68",
-        brightBlue: "#7aa2f7",
-        brightMagenta: "#bb9af7",
-        brightCyan: "#7dcfff",
-        brightWhite: "#c0caf5",
-      },
+      theme: createTerminalTheme(opacity),
       scrollback: 10000,
+      allowTransparency: true,
       allowProposedApi: true,
     });
 
@@ -96,7 +108,7 @@ export default function TerminalView({ ptyId, visible }: TerminalViewProps) {
     const entry = { term, fitAddon, rendererAddon };
     terminalCache.set(ptyId, entry);
     return entry;
-  }, [ptyId]);
+  }, [opacity, ptyId]);
 
   const fitAndResize = useCallback(async () => {
     const cached = terminalCache.get(ptyId);
@@ -173,6 +185,14 @@ export default function TerminalView({ ptyId, visible }: TerminalViewProps) {
     };
   }, [ptyId, visible, getOrCreateTerminal, fitAndResize]);
 
+  useEffect(() => {
+    const cached = terminalCache.get(ptyId);
+    if (!cached) return;
+
+    cached.term.options.theme = createTerminalTheme(opacity);
+    cached.term.refresh(0, cached.term.rows - 1);
+  }, [opacity, ptyId]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -190,12 +210,22 @@ export default function TerminalView({ ptyId, visible }: TerminalViewProps) {
 
   return (
     <div
-      ref={containerRef}
-      className="h-full w-full"
+      className="terminal-view"
       style={{
         display: visible ? "block" : "none",
-        backgroundColor: "#1a1b26",
       }}
-    />
+    >
+      <div
+        ref={containerRef}
+        className="terminal-surface"
+        style={{
+          background: `linear-gradient(180deg, rgba(21, 29, 45, ${
+            opacity / 100 * 0.62
+          }), rgba(10, 15, 24, ${opacity / 100 * 0.72})), rgba(13, 19, 31, ${
+            opacity / 100
+          })`,
+        }}
+      />
+    </div>
   );
 }

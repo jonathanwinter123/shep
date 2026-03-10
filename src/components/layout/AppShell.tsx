@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef, useMemo } from "react";
+import { useEffect, useCallback, useRef, useMemo, useState } from "react";
 import Sidebar from "../sidebar/Sidebar";
 import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
@@ -10,6 +10,7 @@ import { computeTerminalSize } from "../../lib/terminalMeasure";
 
 import type { CommandState, TerminalTab } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
+const TERMINAL_OPACITY_STORAGE_KEY = "shep:terminal-opacity";
 
 // Stable empty arrays to avoid infinite re-render loops with zustand v5's
 // useSyncExternalStore — selectors must return the same reference for the same state.
@@ -23,6 +24,11 @@ export default function AppShell() {
     usePty();
   const restoreAttemptedRef = useRef(false);
   const terminalContainerRef = useRef<HTMLDivElement>(null);
+  const [terminalOpacity, setTerminalOpacity] = useState(() => {
+    const stored = window.localStorage.getItem(TERMINAL_OPACITY_STORAGE_KEY);
+    const value = stored ? Number.parseInt(stored, 10) : 68;
+    return Number.isFinite(value) ? Math.min(Math.max(value, 0), 100) : 68;
+  });
 
   const getTerminalDimensions = useCallback(() => {
     const el = terminalContainerRef.current;
@@ -167,6 +173,13 @@ export default function AppShell() {
   }, [activeRepoPath]);
 
   useEffect(() => {
+    window.localStorage.setItem(
+      TERMINAL_OPACITY_STORAGE_KEY,
+      String(terminalOpacity),
+    );
+  }, [terminalOpacity]);
+
+  useEffect(() => {
     if (restoreAttemptedRef.current || activeRepoPath || repos.length === 0) return;
 
     restoreAttemptedRef.current = true;
@@ -182,52 +195,65 @@ export default function AppShell() {
   }, [repos, activeRepoPath, handleSelectRepo]);
 
   return (
-    <div className="h-screen flex bg-[#1a1b26] text-white overflow-hidden">
-      <Sidebar
-        repos={repos}
-        activeRepoPath={activeRepoPath}
-        tabs={tabs}
-        activeTabId={activeTabId}
-        commands={commands}
-        onSelectRepo={handleSelectRepo}
-        onAddProject={handleAddProject}
-        onRemoveProject={handleRemoveProject}
-        onLaunchAssistant={handleLaunchAssistant}
-        onSelectTab={setActiveTab}
-        onNewShell={handleNewShell}
-        onStartCommand={handleStartCommand}
-        onStopCommand={stopCommand}
-        onFocusCommand={handleFocusCommand}
-      />
+    <div className="app-shell">
+      <div className="app-shell__ambient app-shell__ambient--blue" />
+      <div className="app-shell__ambient app-shell__ambient--mint" />
+      <div className="app-shell__ambient app-shell__ambient--ember" />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <TabBar onClose={closeTab} onNewShell={handleNewShell} />
+      <div className="app-shell__frame">
+        <Sidebar
+          repos={repos}
+          activeRepoPath={activeRepoPath}
+          tabs={tabs}
+          activeTabId={activeTabId}
+          commands={commands}
+          onSelectRepo={handleSelectRepo}
+          onAddProject={handleAddProject}
+          onRemoveProject={handleRemoveProject}
+          onLaunchAssistant={handleLaunchAssistant}
+          onSelectTab={setActiveTab}
+          onCloseTab={closeTab}
+          onNewShell={handleNewShell}
+          onStartCommand={handleStartCommand}
+          onStopCommand={stopCommand}
+          onFocusCommand={handleFocusCommand}
+        />
 
-        <div ref={terminalContainerRef} className="flex-1 relative">
-          {tabs.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-              {activeRepoPath
-                ? "Launch an assistant or open a terminal"
-                : "Select or add a project to begin"}
-            </div>
-          ) : null}
-          {allTabs.map((tab) => (
-            <div
-              key={tab.id}
-              className="absolute inset-0"
-              style={{
-                display:
-                  tab.repoPath === activeProjectPath && tab.id === activeTabId
-                    ? "block"
-                    : "none",
-              }}
-            >
-              <TerminalView
-                ptyId={tab.ptyId}
-                visible={tab.repoPath === activeProjectPath && tab.id === activeTabId}
-              />
-            </div>
-          ))}
+        <div className="workspace-panel">
+          <TabBar
+            onClose={closeTab}
+            onNewShell={handleNewShell}
+            terminalOpacity={terminalOpacity}
+            onTerminalOpacityChange={setTerminalOpacity}
+          />
+
+          <div ref={terminalContainerRef} className="terminal-stage">
+            {tabs.length === 0 ? (
+              <div className="terminal-empty">
+                {activeRepoPath
+                  ? "Launch an assistant or open a terminal"
+                  : "Select or add a project to begin"}
+              </div>
+            ) : null}
+            {allTabs.map((tab) => (
+              <div
+                key={tab.id}
+                className="absolute inset-0"
+                style={{
+                  display:
+                    tab.repoPath === activeProjectPath && tab.id === activeTabId
+                      ? "block"
+                      : "none",
+                }}
+              >
+                <TerminalView
+                  ptyId={tab.ptyId}
+                  visible={tab.repoPath === activeProjectPath && tab.id === activeTabId}
+                  opacity={terminalOpacity}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
