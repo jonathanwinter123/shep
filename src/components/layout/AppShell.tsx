@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef, useMemo, useState } from "react";
+import { useEffect, useCallback, useRef, useMemo } from "react";
 import Sidebar from "../sidebar/Sidebar";
 import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
@@ -11,7 +11,6 @@ import { computeTerminalSize } from "../../lib/terminalMeasure";
 
 import type { CommandState, TerminalTab } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
-const TERMINAL_OPACITY_STORAGE_KEY = "shep:terminal-opacity";
 
 // Stable empty arrays to avoid infinite re-render loops with zustand v5's
 // useSyncExternalStore — selectors must return the same reference for the same state.
@@ -25,11 +24,6 @@ export default function AppShell() {
     usePty();
   const restoreAttemptedRef = useRef(false);
   const terminalContainerRef = useRef<HTMLDivElement>(null);
-  const [terminalOpacity, setTerminalOpacity] = useState(() => {
-    const stored = window.localStorage.getItem(TERMINAL_OPACITY_STORAGE_KEY);
-    const value = stored ? Number.parseInt(stored, 10) : 68;
-    return Number.isFinite(value) ? Math.min(Math.max(value, 0), 100) : 68;
-  });
 
   const getTerminalDimensions = useCallback(() => {
     const el = terminalContainerRef.current;
@@ -174,13 +168,6 @@ export default function AppShell() {
   }, [activeRepoPath]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      TERMINAL_OPACITY_STORAGE_KEY,
-      String(terminalOpacity),
-    );
-  }, [terminalOpacity]);
-
-  useEffect(() => {
     if (restoreAttemptedRef.current || activeRepoPath || repos.length === 0) return;
 
     restoreAttemptedRef.current = true;
@@ -224,8 +211,6 @@ export default function AppShell() {
           <TabBar
             onClose={closeTab}
             onNewShell={handleNewShell}
-            terminalOpacity={terminalOpacity}
-            onTerminalOpacityChange={setTerminalOpacity}
           />
 
           <div ref={terminalContainerRef} className="terminal-stage">
@@ -251,7 +236,6 @@ export default function AppShell() {
                   <TerminalView
                     ptyId={tab.ptyId}
                     visible={tab.repoPath === activeProjectPath && tab.id === activeTabId}
-                    opacity={terminalOpacity}
                   />
                 </TerminalErrorBoundary>
               </div>

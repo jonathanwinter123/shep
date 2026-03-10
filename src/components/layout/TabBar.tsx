@@ -22,15 +22,11 @@ const assistantLogos: Record<string, React.ComponentType<{ size?: number }>> = {
 interface TabBarProps {
   onClose: (tabId: string) => void;
   onNewShell: () => void;
-  terminalOpacity: number;
-  onTerminalOpacityChange: (value: number) => void;
 }
 
 export default function TabBar({
   onClose,
   onNewShell,
-  terminalOpacity,
-  onTerminalOpacityChange,
 }: TabBarProps) {
   const projectTerminals = useTerminalStore(
     (s) => (s.activeProjectPath ? s.projectState[s.activeProjectPath] : null),
@@ -97,21 +93,6 @@ export default function TabBar({
         </button>
       </div>
 
-      <label className="tab-bar__control shrink-0">
-        <span className="tab-bar__control-label">Glass</span>
-        <input
-          className="tab-bar__slider"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          value={terminalOpacity}
-          onChange={(event) =>
-            onTerminalOpacityChange(Number.parseInt(event.target.value, 10))
-          }
-        />
-        <span className="tab-bar__control-value">{terminalOpacity}%</span>
-      </label>
     </div>
   );
 }

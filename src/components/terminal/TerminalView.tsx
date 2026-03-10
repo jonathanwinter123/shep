@@ -21,7 +21,6 @@ import {
 interface TerminalViewProps {
   ptyId: number;
   visible: boolean;
-  opacity: number;
 }
 
 // Keep terminal instances alive across tab switches
@@ -30,15 +29,10 @@ const terminalCache = new Map<
   { term: Terminal; fitAddon: FitAddon; rendererAddon: WebglAddon | CanvasAddon | null }
 >();
 
-// Terminal glass background — uses the same base color as --glass-panel.
-// The alpha is driven by the opacity slider so the backdrop-filter glass
-// effect on .terminal-underlay shows through.
-const TERMINAL_GLASS_RGB = "10, 17, 29";
-
-function createTerminalTheme(_opacity: number) {
+function createTerminalTheme() {
   return {
     // Fully transparent — the glass appearance comes from the CSS
-    // .terminal-underlay layer (same styling as .glass-panel on the sidebar).
+    // .terminal-underlay layer (same as the sidebar's glass-panel).
     background: "transparent",
     foreground: "#a9b1d6",
     cursor: "#c0caf5",
@@ -65,7 +59,6 @@ function createTerminalTheme(_opacity: number) {
 export default function TerminalView({
   ptyId,
   visible,
-  opacity,
 }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
@@ -81,7 +74,7 @@ export default function TerminalView({
       fontSize: TERMINAL_FONT_SIZE,
       fontFamily: TERMINAL_FONT_FAMILY,
       lineHeight: TERMINAL_LINE_HEIGHT,
-      theme: createTerminalTheme(opacity),
+      theme: createTerminalTheme(),
       scrollback: 10000,
       allowTransparency: true,
       allowProposedApi: true,
@@ -102,7 +95,7 @@ export default function TerminalView({
     const entry = { term, fitAddon, rendererAddon: null as WebglAddon | CanvasAddon | null };
     terminalCache.set(ptyId, entry);
     return entry;
-  }, [opacity, ptyId]);
+  }, [ptyId]);
 
   const fitAndResize = useCallback(async () => {
     const cached = terminalCache.get(ptyId);
@@ -200,14 +193,6 @@ export default function TerminalView({
     };
   }, [ptyId, visible, getOrCreateTerminal, fitAndResize]);
 
-  // Update theme when opacity changes
-  useEffect(() => {
-    const cached = terminalCache.get(ptyId);
-    if (!cached) return;
-
-    cached.term.options.theme = createTerminalTheme(opacity);
-    cached.term.refresh(0, cached.term.rows - 1);
-  }, [opacity, ptyId]);
 
   useEffect(() => {
     return () => {

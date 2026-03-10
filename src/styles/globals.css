@@ -209,31 +209,3 @@ select {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.tab-bar__control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-left: 12px;
-  color: rgba(226, 232, 240, 0.76);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.tab-bar__control-label {
-  color: rgba(226, 232, 240, 0.56);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 10px;
-}
-
-.tab-bar__control-value {
-  min-width: 36px;
-  color: rgba(255, 255, 255, 0.88);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.tab-bar__slider {
-  width: 110px;
-  accent-color: rgba(190, 220, 255, 0.9);
-}
