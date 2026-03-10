@@ -29,12 +29,19 @@ const terminalCache = new Map<
   number,
   { term: Terminal; fitAddon: FitAddon; rendererAddon: WebglAddon | CanvasAddon | null }
 >();
-const TERMINAL_GLASS_RGB = "22, 24, 28";
+
+// Glass panel color target — matches the sidebar's composited glass-panel
+// appearance (rgba(10,17,29,0.52) over the app background with highlights).
+const GLASS_R = 20, GLASS_G = 28, GLASS_B = 44;
 
 function createTerminalTheme(opacity: number) {
-  const alpha = (opacity / 100) * 0.34;
+  // Opacity slider blends between black (0%) and the glass panel color (100%)
+  const t = opacity / 100;
+  const r = Math.round(GLASS_R * t);
+  const g = Math.round(GLASS_G * t);
+  const b = Math.round(GLASS_B * t);
   return {
-    background: `rgba(${TERMINAL_GLASS_RGB}, ${alpha})`,
+    background: `rgb(${r}, ${g}, ${b})`,
     foreground: "#a9b1d6",
     cursor: "#c0caf5",
     selectionBackground: "#33467c",
@@ -79,7 +86,6 @@ export default function TerminalView({
       reflowCursorLine: true,
       theme: createTerminalTheme(opacity),
       scrollback: 10000,
-      allowTransparency: true,
       allowProposedApi: true,
     });
 
@@ -185,7 +191,7 @@ export default function TerminalView({
     };
   }, [ptyId, visible, getOrCreateTerminal, fitAndResize]);
 
-  // Cleanup on unmount
+  // Update theme when opacity changes
   useEffect(() => {
     const cached = terminalCache.get(ptyId);
     if (!cached) return;
@@ -215,7 +221,6 @@ export default function TerminalView({
         display: visible ? "block" : "none",
       }}
     >
-      <div className="terminal-underlay" />
       <div ref={containerRef} className="terminal-surface" />
     </div>
   );
