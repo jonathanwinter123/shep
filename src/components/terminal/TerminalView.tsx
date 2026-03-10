@@ -17,6 +17,8 @@ import {
   TERMINAL_FONT_SIZE,
   TERMINAL_LINE_HEIGHT,
 } from "../../lib/terminalConfig";
+import { createTerminalTheme } from "./terminalTheme";
+import { useThemeStore } from "../../stores/useThemeStore";
 
 interface TerminalViewProps {
   ptyId: number;
@@ -24,37 +26,10 @@ interface TerminalViewProps {
 }
 
 // Keep terminal instances alive across tab switches
-const terminalCache = new Map<
+export const terminalCache = new Map<
   number,
   { term: Terminal; fitAddon: FitAddon; rendererAddon: WebglAddon | CanvasAddon | null }
 >();
-
-function createTerminalTheme() {
-  return {
-    // Fully transparent — the glass appearance comes from the CSS
-    // .terminal-underlay layer (same as the sidebar's glass-panel).
-    background: "transparent",
-    foreground: "#a9b1d6",
-    cursor: "#c0caf5",
-    selectionBackground: "#33467c",
-    black: "#15161e",
-    red: "#f7768e",
-    green: "#9ece6a",
-    yellow: "#e0af68",
-    blue: "#7aa2f7",
-    magenta: "#bb9af7",
-    cyan: "#7dcfff",
-    white: "#a9b1d6",
-    brightBlack: "#414868",
-    brightRed: "#f7768e",
-    brightGreen: "#9ece6a",
-    brightYellow: "#e0af68",
-    brightBlue: "#7aa2f7",
-    brightMagenta: "#bb9af7",
-    brightCyan: "#7dcfff",
-    brightWhite: "#c0caf5",
-  };
-}
 
 export default function TerminalView({
   ptyId,
@@ -74,7 +49,7 @@ export default function TerminalView({
       fontSize: TERMINAL_FONT_SIZE,
       fontFamily: TERMINAL_FONT_FAMILY,
       lineHeight: TERMINAL_LINE_HEIGHT,
-      theme: createTerminalTheme(),
+      theme: createTerminalTheme(useThemeStore.getState().theme),
       scrollback: 10000,
       allowTransparency: true,
       allowProposedApi: true,

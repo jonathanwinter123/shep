@@ -7,6 +7,7 @@ import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { usePty } from "../../hooks/usePty";
+import { useThemeApplicator } from "../../hooks/useThemeApplicator";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
 
 import type { CommandState, TerminalTab } from "../../lib/types";
@@ -18,6 +19,8 @@ const EMPTY_TABS: TerminalTab[] = [];
 const EMPTY_COMMANDS: CommandState[] = [];
 
 export default function AppShell() {
+  useThemeApplicator();
+
   const { repos, activeRepoPath, fetchRepos, openRepo, addRepo, removeRepo } =
     useRepoStore();
   const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab, killProjectPtys } =
