@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useRef, useMemo } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import Sidebar from "../sidebar/Sidebar";
 import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
@@ -194,6 +195,10 @@ export default function AppShell() {
 
   return (
     <div className="app-shell">
+      <div
+        className="drag-region"
+        onMouseDown={() => getCurrentWindow().startDragging()}
+      />
       <div className="app-shell__ambient app-shell__ambient--blue" />
       <div className="app-shell__ambient app-shell__ambient--mint" />
       <div className="app-shell__ambient app-shell__ambient--ember" />
