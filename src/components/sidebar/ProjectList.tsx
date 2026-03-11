@@ -16,7 +16,7 @@ interface ProjectListProps {
   projectActivity: Record<string, { terminalCount: number; runningCount: number }>;
   onSelectRepo: (repoPath: string) => void;
   onAddProject: (repoPath: string) => void;
-  onLaunchAssistant: (assistantId: string) => void;
+  onNewAssistant: () => void;
   onSelectTab: (tabId: string) => void;
   onNewShell: () => void;
   onStartCommand: (name: string) => void;
@@ -33,7 +33,7 @@ export default function ProjectList({
   projectActivity,
   onSelectRepo,
   onAddProject,
-  onLaunchAssistant,
+  onNewAssistant,
   onSelectTab,
   onNewShell,
   onStartCommand,
@@ -66,8 +66,8 @@ export default function ProjectList({
     }
   };
 
-  const runningAssistantIds = useMemo(
-    () => tabs.filter((t) => t.assistantId).map((t) => t.assistantId!),
+  const assistantTabs = useMemo(
+    () => tabs.filter((t) => t.assistantId !== null),
     [tabs],
   );
 
@@ -101,39 +101,58 @@ export default function ProjectList({
             />
             {isExpanded && (
               <div className="mt-1 mb-2">
-                <CollapsibleSection
-                  label="AI Assistants"
-                  badge={runningAssistantIds.length || null}
-                >
-                  <AssistantList
-                    onLaunch={onLaunchAssistant}
-                    runningAssistantIds={runningAssistantIds}
-                  />
-                </CollapsibleSection>
+                {/* Quick-add actions */}
+                <div className="flex flex-col gap-0.5 pl-4 mb-1">
+                  <button className="list-item w-full opacity-50 hover:opacity-100" onClick={onNewAssistant}>
+                    <span>+</span>
+                    <span>New AI Assistant</span>
+                  </button>
+                  <button className="list-item w-full opacity-50 hover:opacity-100" onClick={onNewShell}>
+                    <span>+</span>
+                    <span>New Terminal</span>
+                  </button>
+                </div>
 
-                <CollapsibleSection
-                  label="Terminals"
-                  badge={shellTabs.length || null}
-                >
-                  <TerminalList
-                    tabs={shellTabs}
-                    activeTabId={activeTabId}
-                    onSelectTab={onSelectTab}
-                    onNewShell={onNewShell}
-                  />
-                </CollapsibleSection>
+                {/* Sections — only shown when populated */}
+                {assistantTabs.length > 0 && (
+                  <CollapsibleSection
+                    label="AI Assistants"
+                    badge={assistantTabs.length}
+                  >
+                    <AssistantList
+                      assistantTabs={assistantTabs}
+                      activeTabId={activeTabId}
+                      onSelectTab={onSelectTab}
+                    />
+                  </CollapsibleSection>
+                )}
 
-                <CollapsibleSection
-                  label="Commands"
-                  badge={commandsBadge}
-                >
-                  <CommandList
-                    commands={commands}
-                    onStart={onStartCommand}
-                    onStop={onStopCommand}
-                    onFocus={onFocusCommand}
-                  />
-                </CollapsibleSection>
+                {shellTabs.length > 0 && (
+                  <CollapsibleSection
+                    label="Terminals"
+                    badge={shellTabs.length}
+                  >
+                    <TerminalList
+                      tabs={shellTabs}
+                      activeTabId={activeTabId}
+                      onSelectTab={onSelectTab}
+                    />
+                  </CollapsibleSection>
+                )}
+
+                {commands.length > 0 && (
+                  <CollapsibleSection
+                    label="Commands"
+                    badge={commandsBadge}
+                  >
+                    <CommandList
+                      commands={commands}
+                      onStart={onStartCommand}
+                      onStop={onStopCommand}
+                      onFocus={onFocusCommand}
+                    />
+                  </CollapsibleSection>
+                )}
               </div>
             )}
           </div>

@@ -51,8 +51,18 @@ pub struct CommandConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssistantConfig {
+    pub id: String,
+    pub name: String,
+    pub command: String,
+    pub yolo_flag: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceConfig {
     pub name: String,
     #[serde(default)]
     pub commands: Vec<CommandConfig>,
+    #[serde(default)]
+    pub assistants: Vec<AssistantConfig>,
 }

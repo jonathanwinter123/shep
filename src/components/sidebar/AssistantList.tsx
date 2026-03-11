@@ -1,20 +1,25 @@
-import { CODING_ASSISTANTS } from "./constants";
+import type { TerminalTab } from "../../lib/types";
 import AssistantButton from "./AssistantButton";
 
 interface AssistantListProps {
-  onLaunch: (assistantId: string) => void;
-  runningAssistantIds: string[];
+  assistantTabs: TerminalTab[];
+  activeTabId: string | null;
+  onSelectTab: (tabId: string) => void;
 }
 
-export default function AssistantList({ onLaunch, runningAssistantIds }: AssistantListProps) {
+export default function AssistantList({
+  assistantTabs,
+  activeTabId,
+  onSelectTab,
+}: AssistantListProps) {
   return (
     <div className="flex flex-col gap-0.5">
-      {CODING_ASSISTANTS.map((assistant) => (
+      {assistantTabs.map((tab) => (
         <AssistantButton
-          key={assistant.id}
-          assistant={assistant}
-          isRunning={runningAssistantIds.includes(assistant.id)}
-          onClick={() => onLaunch(assistant.id)}
+          key={tab.id}
+          tab={tab}
+          isActive={tab.id === activeTabId}
+          onClick={() => onSelectTab(tab.id)}
         />
       ))}
     </div>

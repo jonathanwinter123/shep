@@ -5,6 +5,7 @@ import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
 import TerminalErrorBoundary from "../terminal/TerminalErrorBoundary";
 import SettingsPanel from "../settings/SettingsPanel";
+import SessionLauncher from "../session/SessionLauncher";
 import ShepLogo from "../sidebar/icons/ShepLogo";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
@@ -15,7 +16,7 @@ import { useThemeApplicator } from "../../hooks/useThemeApplicator";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
 import { getUsername, getComputerName } from "../../lib/tauri";
 
-import type { CommandState, TerminalTab } from "../../lib/types";
+import type { CommandState, TerminalTab, SessionMode } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
 
 // Stable empty arrays to avoid infinite re-render loops with zustand v5's
@@ -67,6 +68,7 @@ export default function AppShell() {
   const setActiveTab = useTerminalStore((s) => s.setActiveTab);
 
   const settingsActive = useUIStore((s) => s.settingsActive);
+  const launcherActive = useUIStore((s) => s.launcherActive);
 
   useEffect(() => {
     fetchRepos();
@@ -149,10 +151,15 @@ export default function AppShell() {
     [setActiveTab, handleStartCommand],
   );
 
-  const handleLaunchAssistant = useCallback(
-    (assistantId: string) => {
+  const handleNewAssistant = useCallback(() => {
+    useUIStore.getState().openLauncher();
+  }, []);
+
+  const handleStartSession = useCallback(
+    (assistantId: string, mode: SessionMode, worktreePath: string | null) => {
       const { cols, rows } = getTerminalDimensions();
-      launchAssistant(assistantId, cols, rows);
+      launchAssistant(assistantId, cols, rows, mode, worktreePath);
+      useUIStore.getState().closeLauncher();
     },
     [launchAssistant, getTerminalDimensions],
   );
@@ -184,6 +191,8 @@ export default function AppShell() {
     }
   }, [repos, activeRepoPath, handleSelectRepo]);
 
+  const showOverlay = settingsActive || launcherActive;
+
   return (
     <div className="app-shell">
       <div
@@ -213,7 +222,7 @@ export default function AppShell() {
           commands={commands}
           onSelectRepo={handleSelectRepo}
           onAddProject={handleAddProject}
-          onLaunchAssistant={handleLaunchAssistant}
+          onNewAssistant={handleNewAssistant}
           onSelectTab={setActiveTab}
           onNewShell={handleNewShell}
           onStartCommand={handleStartCommand}
@@ -229,8 +238,9 @@ export default function AppShell() {
 
           <div ref={terminalContainerRef} className="terminal-stage">
             {settingsActive && <SettingsPanel />}
+            {launcherActive && <SessionLauncher onStartSession={handleStartSession} />}
 
-            {!settingsActive && tabs.length === 0 && (
+            {!showOverlay && tabs.length === 0 && (
               <div className="terminal-empty">
                 {activeRepoPath
                   ? "Launch an assistant or open a terminal"
@@ -243,7 +253,7 @@ export default function AppShell() {
                 className="absolute inset-0"
                 style={{
                   display:
-                    !settingsActive && tab.repoPath === activeProjectPath && tab.id === activeTabId
+                    !showOverlay && tab.repoPath === activeProjectPath && tab.id === activeTabId
                       ? "block"
                       : "none",
                 }}
@@ -251,7 +261,7 @@ export default function AppShell() {
                 <TerminalErrorBoundary>
                   <TerminalView
                     ptyId={tab.ptyId}
-                    visible={!settingsActive && tab.repoPath === activeProjectPath && tab.id === activeTabId}
+                    visible={!showOverlay && tab.repoPath === activeProjectPath && tab.id === activeTabId}
                   />
                 </TerminalErrorBoundary>
               </div>

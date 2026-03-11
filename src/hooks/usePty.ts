@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { spawnPty, killPty } from "../lib/tauri";
-import type { PtyOutput, CommandConfig } from "../lib/types";
+import { spawnPty, killPty, gitRemoveWorktree, gitCurrentBranch } from "../lib/tauri";
+import type { PtyOutput, CommandConfig, SessionMode } from "../lib/types";
 import { useCommandStore } from "../stores/useCommandStore";
 import { useTerminalStore, nextTabId } from "../stores/useTerminalStore";
 import { useRepoStore } from "../stores/useRepoStore";
@@ -144,6 +144,9 @@ export function usePty() {
             repoPath: activeRepoPath,
             commandName,
             assistantId: null,
+            sessionMode: null,
+            worktreePath: null,
+            branch: null,
           });
         }
 
@@ -210,6 +213,9 @@ export function usePty() {
           repoPath: activeRepoPath,
           commandName: null,
           assistantId: null,
+          sessionMode: null,
+          worktreePath: null,
+          branch: null,
         });
 
         return ptyId;
@@ -221,30 +227,50 @@ export function usePty() {
   );
 
   const launchAssistant = useCallback(
-    async (assistantId: string, cols: number, rows: number) => {
+    async (
+      assistantId: string,
+      cols: number,
+      rows: number,
+      mode: SessionMode = "standard",
+      worktreePath: string | null = null,
+    ) => {
       if (!activeRepoPath) return;
       const assistant = CODING_ASSISTANTS.find((a) => a.id === assistantId);
       if (!assistant) return;
 
+      let command = assistant.command;
+      if (mode === "yolo" && assistant.yoloFlag) {
+        command = `${command} ${assistant.yoloFlag}`;
+      }
+
+      const cwd = worktreePath ?? activeRepoPath;
+
       try {
+        // Fetch current branch for display
+        const branch = await gitCurrentBranch(cwd).catch(() => null);
+
         const ptyId = await spawnSession(
-          assistant.command,
+          command,
           {},
           cols,
           rows,
           null,
-          activeRepoPath,
+          cwd,
         );
         if (!ptyId) return;
 
+        const modeLabel = mode === "yolo" ? " (YOLO)" : "";
         const id = nextTabId();
         addTab({
           id,
-          label: assistant.name,
+          label: `${assistant.name}${modeLabel}`,
           ptyId,
           repoPath: activeRepoPath,
           commandName: null,
           assistantId,
+          sessionMode: mode,
+          worktreePath,
+          branch,
         });
 
         return ptyId;
@@ -270,6 +296,13 @@ export function usePty() {
       if (tab.commandName) {
         setCommandStatus(tab.commandName, "stopped");
         setCommandPtyId(tab.commandName, null);
+      }
+
+      // Clean up worktree for YOLO sessions
+      if (tab.worktreePath) {
+        await gitRemoveWorktree(tab.repoPath, tab.worktreePath).catch((e) => {
+          console.warn("Failed to remove worktree:", e);
+        });
       }
 
       removeTab(tabId);

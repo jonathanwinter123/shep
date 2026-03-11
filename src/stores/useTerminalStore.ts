@@ -14,6 +14,7 @@ interface TerminalStore {
   addTab: (tab: TerminalTab) => void;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
+  updateTab: (id: string, patch: Partial<TerminalTab>) => void;
   findTabByCommand: (commandName: string) => TerminalTab | undefined;
   findTabByPtyId: (ptyId: number) => TerminalTab | undefined;
 }
@@ -109,6 +110,23 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
         projectState: {
           ...state.projectState,
           [path]: { ...current, activeTabId: id },
+        },
+      };
+    });
+  },
+
+  updateTab: (id: string, patch: Partial<TerminalTab>) => {
+    set((state) => {
+      const path = state.activeProjectPath;
+      if (!path) return state;
+      const current = state.projectState[path] ?? emptyState();
+      const tabs = current.tabs.map((t) =>
+        t.id === id ? { ...t, ...patch } : t,
+      );
+      return {
+        projectState: {
+          ...state.projectState,
+          [path]: { ...current, tabs },
         },
       };
     });

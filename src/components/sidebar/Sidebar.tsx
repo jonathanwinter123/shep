@@ -14,7 +14,7 @@ interface SidebarProps {
   commands: CommandState[];
   onSelectRepo: (repoPath: string) => void;
   onAddProject: (repoPath: string) => void;
-  onLaunchAssistant: (assistantId: string) => void;
+  onNewAssistant: () => void;
   onSelectTab: (tabId: string) => void;
   onNewShell: () => void;
   onStartCommand: (name: string) => void;
@@ -30,7 +30,7 @@ export default function Sidebar({
   commands,
   onSelectRepo,
   onAddProject,
-  onLaunchAssistant,
+  onNewAssistant,
   onSelectTab,
   onNewShell,
   onStartCommand,
@@ -65,7 +65,7 @@ export default function Sidebar({
         projectActivity={projectActivity}
         onSelectRepo={onSelectRepo}
         onAddProject={onAddProject}
-        onLaunchAssistant={onLaunchAssistant}
+        onNewAssistant={onNewAssistant}
         onSelectTab={onSelectTab}
         onNewShell={onNewShell}
         onStartCommand={onStartCommand}

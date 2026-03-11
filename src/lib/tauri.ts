@@ -64,6 +64,35 @@ export function killPty(ptyId: number): Promise<void> {
   return invoke("kill_pty", { ptyId });
 }
 
+// ── Git commands ──────────────────────────────────────────────────
+
+export function isGitRepo(path: string): Promise<boolean> {
+  return invoke("is_git_repo", { path });
+}
+
+export function gitCurrentBranch(path: string): Promise<string> {
+  return invoke("git_current_branch", { path });
+}
+
+export function gitListBranches(path: string): Promise<string[]> {
+  return invoke("git_list_branches", { path });
+}
+
+export function gitCreateWorktree(
+  repoPath: string,
+  worktreePath: string,
+  branchName: string,
+): Promise<void> {
+  return invoke("git_create_worktree", { repoPath, worktreePath, branchName });
+}
+
+export function gitRemoveWorktree(
+  repoPath: string,
+  worktreePath: string,
+): Promise<void> {
+  return invoke("git_remove_worktree", { repoPath, worktreePath });
+}
+
 // ── System commands ────────────────────────────────────────────────
 
 export function getUsername(): Promise<string> {

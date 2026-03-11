@@ -109,6 +109,28 @@ select {
   color: var(--text-primary);
 }
 
+/* Branch tag (text-only pill) */
+.branch-tag {
+  padding: 0 6px;
+  border-radius: 9999px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Assistant item — reveal refresh on hover */
+.assistant-item .assistant-item__refresh {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.assistant-item:hover .assistant-item__refresh {
+  opacity: 0.5;
+}
+.assistant-item .assistant-item__refresh:hover {
+  opacity: 1;
+}
+
 /* Tab (tab bar items) */
 .tab {
   display: flex;

@@ -44,12 +44,18 @@ export default function TabBar({
   const deactivateSettings = useUIStore((s) => s.deactivateSettings);
   const closeSettingsTab = useUIStore((s) => s.closeSettingsTab);
 
+  const launcherOpen = useUIStore((s) => s.launcherOpen);
+  const launcherActive = useUIStore((s) => s.launcherActive);
+  const activateLauncher = useUIStore((s) => s.activateLauncher);
+  const closeLauncher = useUIStore((s) => s.closeLauncher);
+
   const commands = useCommandStore(
     (s) => (s.activeProjectPath ? s.projectCommands[s.activeProjectPath] ?? EMPTY_COMMANDS : EMPTY_COMMANDS),
   );
 
   const handleSelectTab = (tabId: string) => {
     deactivateSettings();
+    useUIStore.getState().deactivateLauncher();
     setActiveTab(tabId);
   };
 
@@ -57,7 +63,7 @@ export default function TabBar({
     <div className="tab-bar">
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {tabs.map((tab) => {
-          const isActive = tab.id === activeTabId && !settingsActive;
+          const isActive = tab.id === activeTabId && !settingsActive && !launcherActive;
           const command = tab.commandName
             ? commands.find((c) => c.name === tab.commandName)
             : null;
@@ -90,6 +96,25 @@ export default function TabBar({
             </div>
           );
         })}
+
+        {launcherOpen && (
+          <div
+            className={`tab ${launcherActive ? "active" : ""}`}
+            onClick={activateLauncher}
+          >
+            <span>+</span>
+            <span>New Session</span>
+            <button
+              className="icon-btn ml-0.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeLauncher();
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {settingsTabOpen && (
           <div

@@ -202,6 +202,7 @@ pub fn migrate_old_projects() -> Result<(), String> {
                 name
             },
             commands,
+            assistants: Vec::new(),
         };
 
         // Write to repo's .shep/workspace.yml
@@ -252,6 +253,7 @@ fn load_or_create_workspace(repo_path: &str) -> Result<WorkspaceConfig, String> 
         let config = WorkspaceConfig {
             name,
             commands: Vec::new(),
+            assistants: Vec::new(),
         };
 
         save_repo_workspace(repo_path, &config)?;

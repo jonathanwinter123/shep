@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use tauri::ipc::Channel;
 use tauri::State;
 
+use crate::git;
 use crate::pty::manager::PtyManager;
 use crate::pty::session::PtyOutput;
 use crate::workspace::config::{RepoInfo, WorkspaceConfig};
@@ -84,6 +85,37 @@ pub fn resize_pty(
 #[tauri::command]
 pub fn kill_pty(pty_id: u32, pty_manager: State<'_, PtyManager>) -> Result<(), String> {
     pty_manager.kill(pty_id)
+}
+
+// ── Git commands ──────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn is_git_repo(path: &str) -> bool {
+    git::is_git_repo(path)
+}
+
+#[tauri::command]
+pub fn git_current_branch(path: &str) -> Result<String, String> {
+    git::current_branch(path)
+}
+
+#[tauri::command]
+pub fn git_list_branches(path: &str) -> Result<Vec<String>, String> {
+    git::list_branches(path)
+}
+
+#[tauri::command]
+pub fn git_create_worktree(
+    repo_path: &str,
+    worktree_path: &str,
+    branch_name: &str,
+) -> Result<(), String> {
+    git::create_worktree(repo_path, worktree_path, branch_name)
+}
+
+#[tauri::command]
+pub fn git_remove_worktree(repo_path: &str, worktree_path: &str) -> Result<(), String> {
+    git::remove_worktree(repo_path, worktree_path)
 }
 
 // ── System commands ────────────────────────────────────────────────

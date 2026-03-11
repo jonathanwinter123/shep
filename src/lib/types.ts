@@ -16,6 +16,7 @@ export interface CommandConfig {
 export interface WorkspaceConfig {
   name: string;
   commands: CommandConfig[];
+  assistants: AssistantConfig[];
 }
 
 // ── Runtime state types ─────────────────────────────────────────────
@@ -31,6 +32,8 @@ export interface CommandState {
   env: Record<string, string>;
 }
 
+export type SessionMode = "standard" | "yolo";
+
 export interface TerminalTab {
   id: string;
   label: string;
@@ -38,6 +41,9 @@ export interface TerminalTab {
   repoPath: string;
   commandName: string | null; // null = blank shell or assistant
   assistantId: string | null; // null = not an assistant tab
+  sessionMode: SessionMode | null; // null = not an assistant tab
+  worktreePath: string | null; // set for YOLO worktree sessions
+  branch: string | null; // git branch at launch (refreshable)
 }
 
 // ── Coding assistants ───────────────────────────────────────────────
@@ -46,6 +52,14 @@ export interface CodingAssistant {
   id: string;
   name: string;
   command: string;
+  yoloFlag: string | null;
+}
+
+export interface AssistantConfig {
+  id: string;
+  name: string;
+  command: string;
+  yoloFlag: string | null;
 }
 
 // ── PTY output ──────────────────────────────────────────────────────

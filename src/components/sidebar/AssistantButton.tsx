@@ -1,5 +1,8 @@
-import type { CodingAssistant } from "../../lib/types";
-import { CircleSmall } from "lucide-react";
+import { useCallback } from "react";
+import type { TerminalTab } from "../../lib/types";
+import { GitBranch, RefreshCw } from "lucide-react";
+import { gitCurrentBranch } from "../../lib/tauri";
+import { useTerminalStore } from "../../stores/useTerminalStore";
 import ClaudeLogo from "./icons/ClaudeLogo";
 import CodexLogo from "./icons/CodexLogo";
 import GeminiLogo from "./icons/GeminiLogo";
@@ -11,23 +14,55 @@ const logoComponents: Record<string, React.ComponentType<{ size?: number }>> = {
 };
 
 interface AssistantButtonProps {
-  assistant: CodingAssistant;
-  isRunning?: boolean;
+  tab: TerminalTab;
+  isActive: boolean;
   onClick: () => void;
 }
 
 export default function AssistantButton({
-  assistant,
-  isRunning = false,
+  tab,
+  isActive,
   onClick,
 }: AssistantButtonProps) {
-  const Logo = logoComponents[assistant.id];
+  const Logo = tab.assistantId ? logoComponents[tab.assistantId] : null;
+  const updateTab = useTerminalStore((s) => s.updateTab);
+
+  const handleRefreshBranch = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const cwd = tab.worktreePath ?? tab.repoPath;
+      const branch = await gitCurrentBranch(cwd).catch(() => null);
+      updateTab(tab.id, { branch });
+    },
+    [tab.id, tab.worktreePath, tab.repoPath, updateTab],
+  );
 
   return (
-    <button className="list-item w-full" onClick={onClick} title={`Launch ${assistant.name}`}>
-      {Logo && <Logo size={14} />}
-      <span className="truncate flex-1 text-left">{assistant.name}</span>
-      {isRunning && <CircleSmall size={14} className="shrink-0" fill="var(--status-running)" stroke="none" />}
-    </button>
+    <div>
+      <div
+        className={`list-item w-full ${isActive ? "active" : ""}`}
+        onClick={onClick}
+        title={tab.label}
+        role="button"
+      >
+        {Logo && <Logo size={14} />}
+        <span className="truncate flex-1 text-left">{tab.label}</span>
+      </div>
+      {isActive && tab.branch !== null && (
+        <div className="assistant-item flex items-center gap-2 pl-9 mt-0.5 min-w-0">
+          <GitBranch size={12} className="shrink-0 opacity-40" />
+          <span className="branch-tag truncate">{tab.branch}</span>
+          <div
+            className="assistant-item__refresh icon-btn shrink-0"
+            style={{ padding: 2 }}
+            onClick={handleRefreshBranch}
+            title="Refresh branch"
+            role="button"
+          >
+            <RefreshCw size={10} />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

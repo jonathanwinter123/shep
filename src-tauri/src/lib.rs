@@ -1,4 +1,5 @@
 mod commands;
+mod git;
 mod pty;
 mod workspace;
 
@@ -41,6 +42,11 @@ pub fn run() {
             commands::kill_pty,
             commands::get_username,
             commands::get_computer_name,
+            commands::is_git_repo,
+            commands::git_current_branch,
+            commands::git_list_branches,
+            commands::git_create_worktree,
+            commands::git_remove_worktree,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
