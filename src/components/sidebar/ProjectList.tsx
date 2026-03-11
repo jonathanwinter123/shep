@@ -18,6 +18,7 @@ interface ProjectListProps {
   onAddProject: (repoPath: string) => void;
   onNewAssistant: () => void;
   onSelectTab: (tabId: string) => void;
+  onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
   onStartCommand: (name: string) => void;
   onStopCommand: (name: string) => void;
@@ -35,6 +36,7 @@ export default function ProjectList({
   onAddProject,
   onNewAssistant,
   onSelectTab,
+  onCloseTab,
   onNewShell,
   onStartCommand,
   onStopCommand,
@@ -123,6 +125,7 @@ export default function ProjectList({
                       assistantTabs={assistantTabs}
                       activeTabId={activeTabId}
                       onSelectTab={onSelectTab}
+                      onCloseTab={onCloseTab}
                     />
                   </CollapsibleSection>
                 )}
@@ -136,6 +139,7 @@ export default function ProjectList({
                       tabs={shellTabs}
                       activeTabId={activeTabId}
                       onSelectTab={onSelectTab}
+                      onCloseTab={onCloseTab}
                     />
                   </CollapsibleSection>
                 )}

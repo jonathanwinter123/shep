@@ -241,6 +241,7 @@ export default function AppShell() {
           onAddProject={handleAddProject}
           onNewAssistant={handleNewAssistant}
           onSelectTab={setActiveTab}
+          onCloseTab={closeTab}
           onNewShell={handleNewShell}
           onStartCommand={handleStartCommand}
           onStopCommand={stopCommand}

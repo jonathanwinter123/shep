@@ -16,6 +16,7 @@ interface SidebarProps {
   onAddProject: (repoPath: string) => void;
   onNewAssistant: () => void;
   onSelectTab: (tabId: string) => void;
+  onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
   onStartCommand: (name: string) => void;
   onStopCommand: (name: string) => void;
@@ -32,6 +33,7 @@ export default function Sidebar({
   onAddProject,
   onNewAssistant,
   onSelectTab,
+  onCloseTab,
   onNewShell,
   onStartCommand,
   onStopCommand,
@@ -68,6 +70,7 @@ export default function Sidebar({
           onAddProject={onAddProject}
           onNewAssistant={onNewAssistant}
           onSelectTab={onSelectTab}
+          onCloseTab={onCloseTab}
           onNewShell={onNewShell}
           onStartCommand={onStartCommand}
           onStopCommand={onStopCommand}

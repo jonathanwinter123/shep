@@ -108,6 +108,13 @@ select {
 .list-item.active {
   color: var(--text-primary);
 }
+.sidebar-close-btn {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.sidebar-closable:hover .sidebar-close-btn {
+  opacity: 1;
+}
 
 /* Option card (form pickers, selectable cards) */
 .option-card {
