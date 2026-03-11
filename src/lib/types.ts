@@ -19,6 +19,12 @@ export interface WorkspaceConfig {
   assistants: AssistantConfig[];
 }
 
+export type PreferredEditor = "vscode" | "zed" | "cursor" | "sublime_text";
+
+export interface EditorSettings {
+  preferredEditor: PreferredEditor | null;
+}
+
 // ── Runtime state types ─────────────────────────────────────────────
 
 export type CommandStatus = "stopped" | "running" | "crashed";

@@ -7,6 +7,7 @@ import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
 import CommandList from "./CommandList";
 import GitStatusRow from "./GitStatusRow";
+import IdeLaunchRow from "./IdeLaunchRow";
 
 interface ProjectListProps {
   repos: RepoInfo[];
@@ -19,6 +20,7 @@ interface ProjectListProps {
   onAddProject: (repoPath: string) => void;
   onRemoveProject: (repoPath: string) => void;
   onNewAssistant: () => void;
+  onOpenInEditor: (repoPath: string) => void;
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
@@ -38,6 +40,7 @@ export default function ProjectList({
   onAddProject,
   onRemoveProject,
   onNewAssistant,
+  onOpenInEditor,
   onSelectTab,
   onCloseTab,
   onNewShell,
@@ -102,6 +105,7 @@ export default function ProjectList({
               isActive={isActive}
               isExpanded={isExpanded}
               activity={projectActivity[repo.path]}
+              onOpenInEditor={() => onOpenInEditor(repo.path)}
               onRemove={() => onRemoveProject(repo.path)}
               onClick={() => handleProjectClick(repo.path)}
             />
@@ -149,6 +153,10 @@ export default function ProjectList({
                 )}
 
                 <GitStatusRow repoPath={repo.path} />
+                <IdeLaunchRow
+                  repoPath={repo.path}
+                  onOpenInEditor={onOpenInEditor}
+                />
 
                 {commands.length > 0 && (
                   <CollapsibleSection

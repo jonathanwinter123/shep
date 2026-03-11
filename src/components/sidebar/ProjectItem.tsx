@@ -1,6 +1,16 @@
 import { useState, useCallback } from "react";
 import type { RepoInfo } from "../../lib/types";
-import { Folder, FolderOpen, CircleSmall, FolderOpen as FolderOpenIcon, Copy, Trash2 } from "lucide-react";
+import { getEditorLabel } from "../../lib/editors";
+import { useEditorStore } from "../../stores/useEditorStore";
+import {
+  Folder,
+  FolderOpen,
+  CircleSmall,
+  FolderOpen as FolderOpenIcon,
+  Copy,
+  Trash2,
+  SquareArrowOutUpRight,
+} from "lucide-react";
 import ContextMenu from "../shared/ContextMenu";
 import type { ContextMenuItem } from "../shared/ContextMenu";
 
@@ -11,6 +21,7 @@ interface ProjectItemProps {
   activity?: { terminalCount: number; runningCount: number };
   onClick: () => void;
   onRemove: () => void;
+  onOpenInEditor: () => void;
 }
 
 export default function ProjectItem({
@@ -20,10 +31,16 @@ export default function ProjectItem({
   activity,
   onClick,
   onRemove,
+  onOpenInEditor,
 }: ProjectItemProps) {
   const hasActivity = activity && (activity.terminalCount > 0 || activity.runningCount > 0);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const preferredEditor = useEditorStore((s) => s.settings.preferredEditor);
+  const preferredEditorLabel = getEditorLabel(preferredEditor);
+  const editorActionLabel = preferredEditorLabel
+    ? `Open in ${preferredEditorLabel}`
+    : "Set Editor Preference";
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -37,6 +54,11 @@ export default function ProjectItem({
   }, []);
 
   const menuItems: ContextMenuItem[] = [
+    {
+      label: editorActionLabel,
+      icon: <SquareArrowOutUpRight size={14} />,
+      onClick: onOpenInEditor,
+    },
     {
       label: "Open in Finder",
       icon: <FolderOpenIcon size={14} />,

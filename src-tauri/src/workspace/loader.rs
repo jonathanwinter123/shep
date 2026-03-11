@@ -1,7 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::config::{CommandConfig, GlobalConfig, RepoEntry, RepoInfo, WorkspaceConfig};
+use super::config::{
+    CommandConfig, EditorSettings, GlobalConfig, RepoEntry, RepoInfo, WorkspaceConfig,
+};
 
 // ── Paths ───────────────────────────────────────────────────────────
 
@@ -47,6 +49,16 @@ pub fn save_global_config(config: &GlobalConfig) -> Result<(), String> {
     let yaml =
         serde_yaml::to_string(config).map_err(|e| format!("Failed to serialize config: {e}"))?;
     fs::write(&path, yaml).map_err(|e| format!("Failed to write global config: {e}"))
+}
+
+pub fn load_editor_settings() -> Result<EditorSettings, String> {
+    Ok(load_global_config()?.editor)
+}
+
+pub fn save_editor_settings(settings: &EditorSettings) -> Result<(), String> {
+    let mut config = load_global_config()?;
+    config.editor = settings.clone();
+    save_global_config(&config)
 }
 
 // ── Repo operations ─────────────────────────────────────────────────

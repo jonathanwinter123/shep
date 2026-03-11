@@ -1,30 +1,56 @@
+import { CodeXml, GitBranch } from "lucide-react";
 import { useUIStore } from "../../stores/useUIStore";
-import { GitBranch } from "lucide-react";
 import GearIcon from "./icons/GearIcon";
 
-export default function SidebarFooter() {
+interface SidebarFooterProps {
+  activeRepoPath: string | null;
+  onOpenInEditor: (repoPath: string) => void;
+}
+
+export default function SidebarFooter({
+  activeRepoPath,
+  onOpenInEditor,
+}: SidebarFooterProps) {
   const settingsTabOpen = useUIStore((s) => s.settingsTabOpen);
   const toggleSettings = useUIStore((s) => s.toggleSettings);
   const gitPanelOpen = useUIStore((s) => s.gitPanelOpen);
   const toggleGitPanel = useUIStore((s) => s.toggleGitPanel);
+  const editorDisabled = !activeRepoPath;
+  const footerButtonClass = "tab !flex-1 !shrink !justify-center !gap-0.5 !px-2 !py-1.5 flex-col min-w-0";
 
   return (
-    <div className="flex items-center gap-3 px-2 py-1.5">
-      <button
-        onClick={toggleGitPanel}
-        className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-md cursor-pointer border-none bg-transparent transition-colors hover:bg-white/8 ${gitPanelOpen ? "!bg-white/10 text-white" : "text-white/50"}`}
-      >
-        <GitBranch size={24} />
-        <span className="text-[10px]">Git</span>
-      </button>
-      <div className="w-px h-6 bg-white/10" />
+    <div className="border-t border-white/8 px-2 pt-2 pb-1.5">
+      <div className="flex items-stretch gap-1">
       <button
         onClick={toggleSettings}
-        className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-md cursor-pointer border-none bg-transparent transition-colors hover:bg-white/8 ${settingsTabOpen ? "!bg-white/10 text-white" : "text-white/50"}`}
+        className={`${footerButtonClass} ${settingsTabOpen ? "active" : ""}`}
       >
-        <GearIcon size={24} />
+        <GearIcon size={20} />
         <span className="text-[10px]">Settings</span>
       </button>
+      <button
+        onClick={toggleGitPanel}
+        className={`${footerButtonClass} ${gitPanelOpen ? "active" : ""}`}
+      >
+        <GitBranch size={20} />
+        <span className="text-[10px]">Git</span>
+      </button>
+      <button
+        onClick={() => {
+          if (activeRepoPath) {
+            onOpenInEditor(activeRepoPath);
+          }
+        }}
+        disabled={editorDisabled}
+        className={`${footerButtonClass} ${
+          editorDisabled ? "opacity-40 cursor-default hover:!bg-transparent hover:!text-[var(--text-secondary)]" : ""
+        }`}
+        title="IDE"
+      >
+        <CodeXml size={20} />
+        <span className="text-[10px]">IDE</span>
+      </button>
+      </div>
     </div>
   );
 }

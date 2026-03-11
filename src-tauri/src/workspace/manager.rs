@@ -1,4 +1,4 @@
-use super::config::{RepoInfo, WorkspaceConfig};
+use super::config::{EditorSettings, RepoInfo, WorkspaceConfig};
 use super::loader;
 
 pub struct WorkspaceManager;
@@ -34,5 +34,13 @@ impl WorkspaceManager {
         config: &WorkspaceConfig,
     ) -> Result<(), String> {
         loader::save_repo_workspace(repo_path, config)
+    }
+
+    pub fn load_editor_settings(&self) -> Result<EditorSettings, String> {
+        loader::load_editor_settings()
+    }
+
+    pub fn save_editor_settings(&self, settings: &EditorSettings) -> Result<(), String> {
+        loader::save_editor_settings(settings)
     }
 }

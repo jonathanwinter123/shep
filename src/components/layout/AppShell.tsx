@@ -16,7 +16,8 @@ import { usePty } from "../../hooks/usePty";
 import { useThemeApplicator } from "../../hooks/useThemeApplicator";
 import { useGitPolling } from "../../hooks/useGitPolling";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
-import { getUsername, getComputerName } from "../../lib/tauri";
+import { getUsername, getComputerName, openInEditor } from "../../lib/tauri";
+import { useEditorStore } from "../../stores/useEditorStore";
 
 import type { CommandState, TerminalTab, SessionMode } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
@@ -87,12 +88,14 @@ export default function AppShell() {
   const settingsActive = useUIStore((s) => s.settingsActive);
   const gitPanelActive = useUIStore((s) => s.gitPanelActive);
   const launcherActive = useUIStore((s) => s.launcherActive);
+  const loadEditorSettings = useEditorStore((s) => s.loadSettings);
 
   useEffect(() => {
     fetchRepos();
+    void loadEditorSettings();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));
-  }, [fetchRepos]);
+  }, [fetchRepos, loadEditorSettings]);
 
   const handleSelectRepo = useCallback(
     async (repoPath: string) => {
@@ -199,6 +202,21 @@ export default function AppShell() {
     spawnBlankShell(cols, rows);
   }, [spawnBlankShell, getTerminalDimensions]);
 
+  const handleOpenInEditor = useCallback(async (repoPath: string) => {
+    const preferredEditor = useEditorStore.getState().settings.preferredEditor;
+    if (!preferredEditor) {
+      useUIStore.getState().openSettings();
+      return;
+    }
+
+    try {
+      await openInEditor(repoPath);
+    } catch (error) {
+      console.error("Failed to open editor:", error);
+      window.alert(String(error));
+    }
+  }, []);
+
   useEffect(() => {
     if (activeRepoPath) {
       restoreAttemptedRef.current = true;
@@ -254,6 +272,7 @@ export default function AppShell() {
           onAddProject={handleAddProject}
           onRemoveProject={handleRemoveProject}
           onNewAssistant={handleNewAssistant}
+          onOpenInEditor={handleOpenInEditor}
           onSelectTab={setActiveTab}
           onCloseTab={closeTab}
           onNewShell={handleNewShell}

@@ -16,6 +16,7 @@ interface SidebarProps {
   onAddProject: (repoPath: string) => void;
   onRemoveProject: (repoPath: string) => void;
   onNewAssistant: () => void;
+  onOpenInEditor: (repoPath: string) => void;
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
@@ -34,6 +35,7 @@ export default function Sidebar({
   onAddProject,
   onRemoveProject,
   onNewAssistant,
+  onOpenInEditor,
   onSelectTab,
   onCloseTab,
   onNewShell,
@@ -72,6 +74,7 @@ export default function Sidebar({
           onAddProject={onAddProject}
           onRemoveProject={onRemoveProject}
           onNewAssistant={onNewAssistant}
+          onOpenInEditor={onOpenInEditor}
           onSelectTab={onSelectTab}
           onCloseTab={onCloseTab}
           onNewShell={onNewShell}
@@ -80,7 +83,10 @@ export default function Sidebar({
           onFocusCommand={onFocusCommand}
         />
       </div>
-      <SidebarFooter />
+      <SidebarFooter
+        activeRepoPath={activeRepoPath}
+        onOpenInEditor={onOpenInEditor}
+      />
     </div>
   );
 }

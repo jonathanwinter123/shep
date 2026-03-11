@@ -1,5 +1,14 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
-import type { RepoInfo, WorkspaceConfig, PtyOutput, GitStatus, ChangedFile, WorktreeEntry } from "./types";
+import type {
+  RepoInfo,
+  WorkspaceConfig,
+  PtyOutput,
+  GitStatus,
+  ChangedFile,
+  WorktreeEntry,
+  EditorSettings,
+  PreferredEditor,
+} from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
 
@@ -24,6 +33,24 @@ export function saveWorkspace(
   config: WorkspaceConfig,
 ): Promise<void> {
   return invoke("save_workspace", { repoPath, config });
+}
+
+export function getEditorSettings(): Promise<EditorSettings> {
+  return invoke("get_editor_settings");
+}
+
+export function saveEditorSettings(settings: EditorSettings): Promise<void> {
+  return invoke("save_editor_settings", { settings });
+}
+
+export function openInEditor(
+  repoPath: string,
+  editorOverride?: PreferredEditor | null,
+): Promise<void> {
+  return invoke("open_in_editor", {
+    repoPath,
+    editorOverride: editorOverride ?? null,
+  });
 }
 
 // ── PTY commands ────────────────────────────────────────────────────
