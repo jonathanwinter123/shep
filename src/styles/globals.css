@@ -109,6 +109,65 @@ select {
   color: var(--text-primary);
 }
 
+/* Option card (form pickers, selectable cards) */
+.option-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.option-card:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+.option-card.selected {
+  background: var(--surface-active);
+  border-color: var(--border-active);
+  color: var(--text-primary);
+}
+.option-card:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Primary action button */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
+  font-weight: 500;
+  border: 1px solid var(--border-active);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.btn-primary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--glass-highlight);
+}
+.btn-primary:active {
+  transform: translateY(1px);
+}
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+
 /* Branch tag (text-only pill) */
 .branch-tag {
   padding: 0 6px;

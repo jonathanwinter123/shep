@@ -3,15 +3,7 @@ import type { TerminalTab } from "../../lib/types";
 import { GitBranch, RefreshCw } from "lucide-react";
 import { gitCurrentBranch } from "../../lib/tauri";
 import { useTerminalStore } from "../../stores/useTerminalStore";
-import ClaudeLogo from "./icons/ClaudeLogo";
-import CodexLogo from "./icons/CodexLogo";
-import GeminiLogo from "./icons/GeminiLogo";
-
-const logoComponents: Record<string, React.ComponentType<{ size?: number }>> = {
-  claude: ClaudeLogo,
-  codex: CodexLogo,
-  gemini: GeminiLogo,
-};
+import { assistantLogoSrc } from "../../lib/assistantLogos";
 
 interface AssistantButtonProps {
   tab: TerminalTab;
@@ -24,7 +16,7 @@ export default function AssistantButton({
   isActive,
   onClick,
 }: AssistantButtonProps) {
-  const Logo = tab.assistantId ? logoComponents[tab.assistantId] : null;
+  const logoUrl = tab.assistantId ? assistantLogoSrc[tab.assistantId] : null;
   const updateTab = useTerminalStore((s) => s.updateTab);
 
   const handleRefreshBranch = useCallback(
@@ -45,7 +37,7 @@ export default function AssistantButton({
         title={tab.label}
         role="button"
       >
-        {Logo && <Logo size={14} />}
+        {logoUrl && <img src={logoUrl} alt="" width={14} height={14} />}
         <span className="truncate flex-1 text-left">{tab.label}</span>
       </div>
       {isActive && tab.branch !== null && (

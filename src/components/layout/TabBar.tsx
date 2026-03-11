@@ -5,21 +5,13 @@ import type { CommandState, CommandStatus } from "../../lib/types";
 import { Circle } from "lucide-react";
 
 const EMPTY_COMMANDS: CommandState[] = [];
-import ClaudeLogo from "../sidebar/icons/ClaudeLogo";
-import CodexLogo from "../sidebar/icons/CodexLogo";
-import GeminiLogo from "../sidebar/icons/GeminiLogo";
 import GearIcon from "../sidebar/icons/GearIcon";
+import { assistantLogoSrc } from "../../lib/assistantLogos";
 
 const statusColor: Record<CommandStatus, string> = {
   running: "var(--status-running)",
   stopped: "var(--status-stopped)",
   crashed: "var(--status-crashed)",
-};
-
-const assistantLogos: Record<string, React.ComponentType<{ size?: number }>> = {
-  claude: ClaudeLogo,
-  codex: CodexLogo,
-  gemini: GeminiLogo,
 };
 
 interface TabBarProps {
@@ -68,8 +60,8 @@ export default function TabBar({
             ? commands.find((c) => c.name === tab.commandName)
             : null;
           const status = command?.status ?? "stopped";
-          const AssistantLogo = tab.assistantId
-            ? assistantLogos[tab.assistantId]
+          const logoUrl = tab.assistantId
+            ? assistantLogoSrc[tab.assistantId]
             : null;
 
           return (
@@ -78,8 +70,8 @@ export default function TabBar({
               className={`tab ${isActive ? "active" : ""}`}
               onClick={() => handleSelectTab(tab.id)}
             >
-              {AssistantLogo ? (
-                <AssistantLogo size={12} />
+              {logoUrl ? (
+                <img src={logoUrl} alt="" width={12} height={12} />
               ) : tab.commandName ? (
                 <Circle size={8} fill={statusColor[status]} stroke="none" />
               ) : null}
