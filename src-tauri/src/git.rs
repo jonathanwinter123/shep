@@ -165,3 +165,221 @@ pub fn remove_worktree(repo_path: &str, worktree_path: &str) -> Result<(), Strin
 
     Ok(())
 }
+
+// ── Changed files (porcelain v2 parsing) ────────────────────────────
+
+#[derive(serde::Serialize, Clone)]
+pub struct ChangedFile {
+    pub path: String,
+    pub status: String,
+    pub area: String,
+    pub old_path: Option<String>,
+}
+
+pub fn changed_files(path: &str) -> Result<Vec<ChangedFile>, String> {
+    let output = Command::new("git")
+        .args(["-C", path, "status", "--porcelain=v2", "-z"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut files = Vec::new();
+
+    // -z uses NUL as delimiter; split on NUL
+    let entries: Vec<&str> = stdout.split('\0').collect();
+    let mut i = 0;
+
+    while i < entries.len() {
+        let entry = entries[i];
+        if entry.is_empty() {
+            i += 1;
+            continue;
+        }
+
+        if entry.starts_with("1 ") {
+            // Ordinary changed entry: 1 XY sub mH mI mW hH hI path
+            let parts: Vec<&str> = entry.splitn(9, ' ').collect();
+            if parts.len() >= 9 {
+                let xy = parts[1].as_bytes();
+                let file_path = parts[8].to_string();
+
+                if xy[0] != b'.' {
+                    files.push(ChangedFile {
+                        path: file_path.clone(),
+                        status: status_letter(xy[0]),
+                        area: "staged".to_string(),
+                        old_path: None,
+                    });
+                }
+                if xy[1] != b'.' {
+                    files.push(ChangedFile {
+                        path: file_path,
+                        status: status_letter(xy[1]),
+                        area: "unstaged".to_string(),
+                        old_path: None,
+                    });
+                }
+            }
+            i += 1;
+        } else if entry.starts_with("2 ") {
+            // Rename/copy entry: 2 XY sub mH mI mW hH hI Xscore path\0origPath
+            let parts: Vec<&str> = entry.splitn(10, ' ').collect();
+            if parts.len() >= 10 {
+                let xy = parts[1].as_bytes();
+                let file_path = parts[9].to_string();
+                // The original path follows as the next NUL-delimited field
+                let old_path = entries.get(i + 1).map(|s| s.to_string());
+
+                if xy[0] != b'.' {
+                    files.push(ChangedFile {
+                        path: file_path.clone(),
+                        status: "R".to_string(),
+                        area: "staged".to_string(),
+                        old_path: old_path.clone(),
+                    });
+                }
+                if xy[1] != b'.' {
+                    files.push(ChangedFile {
+                        path: file_path,
+                        status: "R".to_string(),
+                        area: "unstaged".to_string(),
+                        old_path,
+                    });
+                }
+                i += 2; // skip the old_path entry
+            } else {
+                i += 1;
+            }
+        } else if entry.starts_with("u ") {
+            // Unmerged entry: u XY sub m1 m2 m3 mW h1 h2 h3 path
+            let parts: Vec<&str> = entry.splitn(11, ' ').collect();
+            if parts.len() >= 11 {
+                let file_path = parts[10].to_string();
+                files.push(ChangedFile {
+                    path: file_path.clone(),
+                    status: "U".to_string(),
+                    area: "unstaged".to_string(),
+                    old_path: None,
+                });
+            }
+            i += 1;
+        } else if entry.starts_with("? ") {
+            let file_path = entry[2..].to_string();
+            files.push(ChangedFile {
+                path: file_path,
+                status: "?".to_string(),
+                area: "untracked".to_string(),
+                old_path: None,
+            });
+            i += 1;
+        } else {
+            i += 1;
+        }
+    }
+
+    Ok(files)
+}
+
+fn status_letter(byte: u8) -> String {
+    match byte {
+        b'M' => "M",
+        b'A' => "A",
+        b'D' => "D",
+        b'R' => "R",
+        b'C' => "C",
+        b'T' => "T",
+        _ => "M",
+    }
+    .to_string()
+}
+
+pub fn file_diff(path: &str, file_path: &str, staged: bool) -> Result<String, String> {
+    let output = if staged {
+        Command::new("git")
+            .args(["-C", path, "diff", "--cached", "--", file_path])
+            .output()
+            .map_err(|e| e.to_string())?
+    } else {
+        // Try normal diff first
+        let result = Command::new("git")
+            .args(["-C", path, "diff", "--", file_path])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        if result.status.success() && result.stdout.is_empty() {
+            // Might be untracked — use diff against /dev/null
+            Command::new("git")
+                .args([
+                    "-C",
+                    path,
+                    "diff",
+                    "--no-index",
+                    "/dev/null",
+                    file_path,
+                ])
+                .output()
+                .map_err(|e| e.to_string())?
+        } else {
+            result
+        }
+    };
+
+    // --no-index returns exit code 1 for differences, which is normal
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+pub fn stage_file(path: &str, file_path: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["-C", path, "add", "--", file_path])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(())
+}
+
+pub fn unstage_file(path: &str, file_path: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["-C", path, "restore", "--staged", "--", file_path])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(())
+}
+
+pub fn switch_branch(path: &str, branch_name: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["-C", path, "switch", branch_name])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+
+    Ok(())
+}
+
+pub fn create_branch(path: &str, branch_name: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["-C", path, "switch", "-c", branch_name])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+
+    Ok(())
+}

@@ -48,6 +48,12 @@ pub fn run() {
             commands::git_create_worktree,
             commands::git_remove_worktree,
             commands::git_status,
+            commands::git_changed_files,
+            commands::git_file_diff,
+            commands::git_stage_file,
+            commands::git_unstage_file,
+            commands::git_switch_branch,
+            commands::git_create_branch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

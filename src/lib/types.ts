@@ -75,6 +75,15 @@ export interface GitStatus {
   behind: number;
 }
 
+// ── Git changed files ────────────────────────────────────────────────
+
+export interface ChangedFile {
+  path: string;
+  status: string;         // "M", "A", "D", "R", "?"
+  area: string;           // "staged", "unstaged", "untracked"
+  old_path: string | null;
+}
+
 // ── PTY output ──────────────────────────────────────────────────────
 
 export type PtyOutput =

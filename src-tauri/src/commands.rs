@@ -3,7 +3,7 @@ use tauri::ipc::Channel;
 use tauri::State;
 
 use crate::git;
-use crate::git::GitStatus;
+use crate::git::{ChangedFile, GitStatus};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::PtyOutput;
 use crate::workspace::config::{RepoInfo, WorkspaceConfig};
@@ -122,6 +122,36 @@ pub fn git_remove_worktree(repo_path: &str, worktree_path: &str) -> Result<(), S
 #[tauri::command]
 pub fn git_status(path: &str) -> GitStatus {
     git::status(path)
+}
+
+#[tauri::command]
+pub fn git_changed_files(path: &str) -> Result<Vec<ChangedFile>, String> {
+    git::changed_files(path)
+}
+
+#[tauri::command]
+pub fn git_file_diff(path: &str, file_path: &str, staged: bool) -> Result<String, String> {
+    git::file_diff(path, file_path, staged)
+}
+
+#[tauri::command]
+pub fn git_stage_file(path: &str, file_path: &str) -> Result<(), String> {
+    git::stage_file(path, file_path)
+}
+
+#[tauri::command]
+pub fn git_unstage_file(path: &str, file_path: &str) -> Result<(), String> {
+    git::unstage_file(path, file_path)
+}
+
+#[tauri::command]
+pub fn git_switch_branch(path: &str, branch_name: &str) -> Result<(), String> {
+    git::switch_branch(path, branch_name)
+}
+
+#[tauri::command]
+pub fn git_create_branch(path: &str, branch_name: &str) -> Result<(), String> {
+    git::create_branch(path, branch_name)
 }
 
 // ── System commands ────────────────────────────────────────────────
