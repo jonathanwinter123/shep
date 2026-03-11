@@ -16,6 +16,7 @@ interface ProjectListProps {
   projectActivity: Record<string, { terminalCount: number; runningCount: number }>;
   onSelectRepo: (repoPath: string) => void;
   onAddProject: (repoPath: string) => void;
+  onRemoveProject: (repoPath: string) => void;
   onNewAssistant: () => void;
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
@@ -34,6 +35,7 @@ export default function ProjectList({
   projectActivity,
   onSelectRepo,
   onAddProject,
+  onRemoveProject,
   onNewAssistant,
   onSelectTab,
   onCloseTab,
@@ -99,6 +101,7 @@ export default function ProjectList({
               isActive={isActive}
               isExpanded={isExpanded}
               activity={projectActivity[repo.path]}
+              onRemove={() => onRemoveProject(repo.path)}
               onClick={() => handleProjectClick(repo.path)}
             />
             {isExpanded && (

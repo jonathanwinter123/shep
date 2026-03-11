@@ -29,7 +29,7 @@ const EMPTY_COMMANDS: CommandState[] = [];
 export default function AppShell() {
   useThemeApplicator();
 
-  const { repos, activeRepoPath, fetchRepos, openRepo, addRepo } =
+  const { repos, activeRepoPath, fetchRepos, openRepo, addRepo, removeRepo } =
     useRepoStore();
   const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab } =
     usePty();
@@ -127,6 +127,18 @@ export default function AppShell() {
       useCommandStore.getState().loadCommands(canonicalPath, config.commands);
     },
     [addRepo],
+  );
+
+  const handleRemoveProject = useCallback(
+    async (repoPath: string) => {
+      await removeRepo(repoPath);
+      // If that was the active project, clear state
+      if (useRepoStore.getState().activeRepoPath === null) {
+        useTerminalStore.getState().switchProject("");
+        useCommandStore.getState().switchProject("");
+      }
+    },
+    [removeRepo],
   );
 
   const handleStartCommand = useCallback(
@@ -239,6 +251,7 @@ export default function AppShell() {
           commands={commands}
           onSelectRepo={handleSelectRepo}
           onAddProject={handleAddProject}
+          onRemoveProject={handleRemoveProject}
           onNewAssistant={handleNewAssistant}
           onSelectTab={setActiveTab}
           onCloseTab={closeTab}

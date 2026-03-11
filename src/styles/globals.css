@@ -51,6 +51,7 @@ body,
   /* Interactive surface */
   --surface-hover: rgba(255, 255, 255, 0.05);
   --surface-active: rgba(255, 255, 255, 0.06);
+  --surface-raised: rgba(30, 35, 44, 0.95);
   --border-hover: rgba(255, 255, 255, 0.08);
   --border-active: rgba(255, 255, 255, 0.12);
 
@@ -108,6 +109,50 @@ select {
 .list-item.active {
   color: var(--text-primary);
 }
+
+/* Context menu (right-click) */
+.context-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 180px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.context-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-body);
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+  text-align: left;
+  width: 100%;
+}
+.context-menu__item:hover {
+  background: var(--surface-active);
+  color: var(--text-primary);
+}
+.context-menu__item--danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: rgb(252, 129, 129);
+}
+.context-menu__icon {
+  display: flex;
+  align-items: center;
+  width: 16px;
+}
+
 .sidebar-close-btn {
   opacity: 0;
   transition: opacity 160ms ease;

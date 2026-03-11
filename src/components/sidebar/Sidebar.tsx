@@ -14,6 +14,7 @@ interface SidebarProps {
   commands: CommandState[];
   onSelectRepo: (repoPath: string) => void;
   onAddProject: (repoPath: string) => void;
+  onRemoveProject: (repoPath: string) => void;
   onNewAssistant: () => void;
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
@@ -31,6 +32,7 @@ export default function Sidebar({
   commands,
   onSelectRepo,
   onAddProject,
+  onRemoveProject,
   onNewAssistant,
   onSelectTab,
   onCloseTab,
@@ -56,7 +58,7 @@ export default function Sidebar({
   }, [repos, projectState, projectCommands]);
 
   return (
-    <div className="w-72 shrink-0 flex flex-col h-full pr-4 mr-4 border-r border-white/8">
+    <div className="w-72 shrink-0 flex flex-col h-full pr-4 mr-4 border-r border-white/8" onContextMenu={(e) => e.preventDefault()}>
       <div className="flex-1 overflow-y-auto min-h-0">
         <SectionHeader label="Projects" />
         <ProjectList
@@ -68,6 +70,7 @@ export default function Sidebar({
           projectActivity={projectActivity}
           onSelectRepo={onSelectRepo}
           onAddProject={onAddProject}
+          onRemoveProject={onRemoveProject}
           onNewAssistant={onNewAssistant}
           onSelectTab={onSelectTab}
           onCloseTab={onCloseTab}
