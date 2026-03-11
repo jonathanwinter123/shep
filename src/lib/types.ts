@@ -32,7 +32,7 @@ export interface CommandState {
   env: Record<string, string>;
 }
 
-export type SessionMode = "standard" | "yolo";
+export type SessionMode = "standard" | "worktree" | "yolo";
 
 export interface TerminalTab {
   id: string;

@@ -259,7 +259,8 @@ export function usePty() {
         );
         if (!ptyId) return;
 
-        const modeLabel = mode === "yolo" ? " (YOLO)" : "";
+        const modeLabels: Record<string, string> = { worktree: " (Worktree)", yolo: " (YOLO)" };
+        const modeLabel = modeLabels[mode] ?? "";
         const id = nextTabId();
         addTab({
           id,

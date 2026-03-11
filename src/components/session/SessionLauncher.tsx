@@ -62,6 +62,8 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
     return () => document.removeEventListener("mousedown", handleClick);
   }, [branchPickerOpen]);
 
+  const usesWorktree = mode === "worktree" || mode === "yolo";
+
   const handleStart = async () => {
     if (!selectedAssistant || !activeRepoPath) return;
     setLaunching(true);
@@ -69,8 +71,8 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
     try {
       let worktreePath: string | null = null;
 
-      if (mode === "yolo" && isGit) {
-        const branchSuffix = `yolo-${selectedAssistant.id}-${Date.now()}`;
+      if (usesWorktree && isGit) {
+        const branchSuffix = `${mode}-${selectedAssistant.id}-${Date.now()}`;
         worktreePath = `${activeRepoPath}/../.shep-worktrees/${branchSuffix}`;
         await gitCreateWorktree(activeRepoPath, worktreePath, branchSuffix);
       }
@@ -120,6 +122,14 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
             >
               Standard
             </button>
+            {isGit && (
+              <button
+                className={`option-card ${mode === "worktree" ? "selected" : ""}`}
+                onClick={() => setMode("worktree")}
+              >
+                Worktree
+              </button>
+            )}
             <button
               className={`option-card ${mode === "yolo" ? "selected" : ""}`}
               onClick={() => setMode("yolo")}
@@ -139,7 +149,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
       {selectedAssistant && isGit && (
         <div className="mb-6">
           <label className="section-label !p-0 mb-3 block text-xs opacity-50">Branch</label>
-          {mode === "yolo" ? (
+          {usesWorktree ? (
             <>
               <div className="relative max-w-md" ref={branchPickerRef}>
                 <button
