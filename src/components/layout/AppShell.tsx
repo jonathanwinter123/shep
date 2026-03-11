@@ -53,22 +53,23 @@ export default function AppShell() {
   const tabs = activeProjectTerminals?.tabs ?? EMPTY_TABS;
   const activeTabId = activeProjectTerminals?.activeTabId ?? null;
 
-  // Git status polling: project roots + active tab's worktree path
-  const activeTabWorktree = activeProjectTerminals
-    ? activeProjectTerminals.tabs.find((t) => t.id === activeProjectTerminals.activeTabId)?.worktreePath
-    : null;
-  const gitPollPaths = useMemo(() => {
-    const paths = repos.filter((r) => r.valid).map((r) => r.path);
-    if (activeTabWorktree && !paths.includes(activeTabWorktree)) {
-      paths.push(activeTabWorktree);
-    }
-    return paths;
-  }, [repos, activeTabWorktree]);
-  useGitPolling(gitPollPaths);
-
   // Derive allTabs via useMemo instead of a selector that returns a new array
   // every call — zustand v5 + useSyncExternalStore would infinite-loop otherwise.
   const projectState = useTerminalStore((s) => s.projectState);
+
+  // Git status polling: project roots + all active worktree paths
+  const gitPollPaths = useMemo(() => {
+    const paths = repos.filter((r) => r.valid).map((r) => r.path);
+    for (const state of Object.values(projectState)) {
+      for (const tab of state.tabs) {
+        if (tab.worktreePath && !paths.includes(tab.worktreePath)) {
+          paths.push(tab.worktreePath);
+        }
+      }
+    }
+    return paths;
+  }, [repos, projectState]);
+  useGitPolling(gitPollPaths);
   const allTabs = useMemo(() => {
     const all: TerminalTab[] = [];
     for (const project of Object.values(projectState)) {

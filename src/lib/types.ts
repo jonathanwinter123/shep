@@ -75,6 +75,14 @@ export interface GitStatus {
   behind: number;
 }
 
+// ── Git worktree ─────────────────────────────────────────────────────
+
+export interface WorktreeEntry {
+  path: string;
+  branch: string | null;
+  is_main: boolean;
+}
+
 // ── Git changed files ────────────────────────────────────────────────
 
 export interface ChangedFile {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChevronDown, Check, Plus } from "lucide-react";
+import { ChevronDown, Check, Plus, GitFork } from "lucide-react";
 import { gitListBranches, gitSwitchBranch, gitCreateBranch } from "../../lib/tauri";
 import { useGitStore } from "../../stores/useGitStore";
 
@@ -8,6 +8,10 @@ interface BranchDropdownProps {
   currentBranch: string;
   isWorktree: boolean;
   onBranchChanged: () => void;
+  /** Map of branch name → worktree path for branches checked out in worktrees */
+  worktreeMap?: Map<string, string>;
+  /** Called when user clicks a worktree branch to view it */
+  onViewWorktree?: (path: string) => void;
 }
 
 export default function BranchDropdown({
@@ -15,6 +19,8 @@ export default function BranchDropdown({
   currentBranch,
   isWorktree,
   onBranchChanged,
+  worktreeMap,
+  onViewWorktree,
 }: BranchDropdownProps) {
   const refreshStatus = useGitStore((s) => s.refreshStatus);
   const [open, setOpen] = useState(false);
@@ -94,6 +100,20 @@ export default function BranchDropdown({
     }
   }, [repoPath, newBranchName, refreshStatus, onBranchChanged]);
 
+  const handleClick = useCallback(
+    (branch: string) => {
+      const wtPath = worktreeMap?.get(branch);
+      if (wtPath && onViewWorktree) {
+        // Worktree branch — view it instead of switching
+        onViewWorktree(wtPath);
+        setOpen(false);
+      } else {
+        handleSwitch(branch);
+      }
+    },
+    [worktreeMap, onViewWorktree, handleSwitch],
+  );
+
   // Worktree sessions: branch is locked, show read-only
   if (isWorktree) {
     return (
@@ -131,19 +151,25 @@ export default function BranchDropdown({
           )}
 
           <div className="branch-dropdown__list">
-            {branches.map((b) => (
-              <button
-                key={b}
-                className={`list-item branch-dropdown__item${b === currentBranch ? " active" : ""}`}
-                disabled={switching}
-                onClick={() => handleSwitch(b)}
-              >
-                <span style={{ flex: 1, textAlign: "left" }}>{b}</span>
-                {b === currentBranch && (
-                  <Check size={12} style={{ opacity: 0.5, flexShrink: 0 }} />
-                )}
-              </button>
-            ))}
+            {branches.map((b) => {
+              const isWorktreeBranch = worktreeMap?.has(b) ?? false;
+              return (
+                <button
+                  key={b}
+                  className={`list-item branch-dropdown__item${b === currentBranch ? " active" : ""}`}
+                  disabled={switching}
+                  onClick={() => handleClick(b)}
+                >
+                  <span style={{ flex: 1, textAlign: "left" }}>{b}</span>
+                  {isWorktreeBranch && (
+                    <GitFork size={11} style={{ opacity: 0.4, flexShrink: 0 }} />
+                  )}
+                  {b === currentBranch && (
+                    <Check size={12} style={{ opacity: 0.5, flexShrink: 0 }} />
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           <div className="branch-dropdown__footer">

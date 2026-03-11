@@ -166,6 +166,60 @@ pub fn remove_worktree(repo_path: &str, worktree_path: &str) -> Result<(), Strin
     Ok(())
 }
 
+// ── Worktree listing ─────────────────────────────────────────────────
+
+#[derive(serde::Serialize, Clone)]
+pub struct WorktreeEntry {
+    pub path: String,
+    pub branch: Option<String>,
+    pub is_main: bool,
+}
+
+pub fn list_worktrees(path: &str) -> Result<Vec<WorktreeEntry>, String> {
+    let output = Command::new("git")
+        .args(["-C", path, "worktree", "list", "--porcelain"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut entries = Vec::new();
+    let mut current_path: Option<String> = None;
+    let mut current_branch: Option<String> = None;
+
+    for line in stdout.lines() {
+        if let Some(rest) = line.strip_prefix("worktree ") {
+            // Flush previous entry
+            if let Some(p) = current_path.take() {
+                entries.push(WorktreeEntry {
+                    path: p,
+                    branch: current_branch.take(),
+                    is_main: entries.is_empty(),
+                });
+            }
+            current_path = Some(rest.to_string());
+            current_branch = None;
+        } else if let Some(rest) = line.strip_prefix("branch refs/heads/") {
+            current_branch = Some(rest.to_string());
+        }
+        // We ignore HEAD, bare, detached, etc.
+    }
+
+    // Flush last entry
+    if let Some(p) = current_path.take() {
+        entries.push(WorktreeEntry {
+            path: p,
+            branch: current_branch.take(),
+            is_main: entries.is_empty(),
+        });
+    }
+
+    Ok(entries)
+}
+
 // ── Changed files (porcelain v2 parsing) ────────────────────────────
 
 #[derive(serde::Serialize, Clone)]
