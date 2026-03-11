@@ -97,6 +97,8 @@ impl PtySession {
             cmd.env(key, val);
         }
         cmd.env("TERM", "xterm-256color");
+        cmd.env("TERM_PROGRAM", "iTerm.app"); // Fix for CLI tools (like gemini-cli) assuming solid backgrounds
+        cmd.env("COLORTERM", "truecolor"); // Enable 24-bit color support
 
         let child = pair
             .slave
