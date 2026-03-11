@@ -54,26 +54,26 @@ export default function Sidebar({
   }, [repos, projectState, projectCommands]);
 
   return (
-    <div className="w-72 shrink-0 flex flex-col h-full overflow-y-auto pr-4 mr-4 border-r border-white/8">
-      <SectionHeader label="Projects" />
-      <ProjectList
-        repos={repos}
-        activeRepoPath={activeRepoPath}
-        tabs={tabs}
-        activeTabId={activeTabId}
-        commands={commands}
-        projectActivity={projectActivity}
-        onSelectRepo={onSelectRepo}
-        onAddProject={onAddProject}
-        onNewAssistant={onNewAssistant}
-        onSelectTab={onSelectTab}
-        onNewShell={onNewShell}
-        onStartCommand={onStartCommand}
-        onStopCommand={onStopCommand}
-        onFocusCommand={onFocusCommand}
-      />
-
-      <div className="flex-1" />
+    <div className="w-72 shrink-0 flex flex-col h-full pr-4 mr-4 border-r border-white/8">
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <SectionHeader label="Projects" />
+        <ProjectList
+          repos={repos}
+          activeRepoPath={activeRepoPath}
+          tabs={tabs}
+          activeTabId={activeTabId}
+          commands={commands}
+          projectActivity={projectActivity}
+          onSelectRepo={onSelectRepo}
+          onAddProject={onAddProject}
+          onNewAssistant={onNewAssistant}
+          onSelectTab={onSelectTab}
+          onNewShell={onNewShell}
+          onStartCommand={onStartCommand}
+          onStopCommand={onStopCommand}
+          onFocusCommand={onFocusCommand}
+        />
+      </div>
       <SidebarFooter />
     </div>
   );
