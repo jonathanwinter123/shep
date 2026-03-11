@@ -5,12 +5,14 @@ interface TerminalListProps {
   tabs: TerminalTab[];
   activeTabId: string | null;
   onSelectTab: (tabId: string) => void;
+  onCloseTab: (tabId: string) => void;
 }
 
 export default function TerminalList({
   tabs,
   activeTabId,
   onSelectTab,
+  onCloseTab,
 }: TerminalListProps) {
   return (
     <div className="flex flex-col gap-0.5">
@@ -20,6 +22,7 @@ export default function TerminalList({
           tab={tab}
           isActive={tab.id === activeTabId}
           onClick={() => onSelectTab(tab.id)}
+          onClose={() => onCloseTab(tab.id)}
         />
       ))}
     </div>

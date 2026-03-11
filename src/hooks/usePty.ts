@@ -259,12 +259,10 @@ export function usePty() {
         );
         if (!ptyId) return;
 
-        const modeLabels: Record<string, string> = { worktree: " (Worktree)", yolo: " (YOLO)" };
-        const modeLabel = modeLabels[mode] ?? "";
         const id = nextTabId();
         addTab({
           id,
-          label: `${assistant.name}${modeLabel}`,
+          label: assistant.name,
           ptyId,
           repoPath: activeRepoPath,
           commandName: null,

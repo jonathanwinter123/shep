@@ -36,6 +36,9 @@ pub fn run() {
             commands::unregister_repo,
             commands::load_workspace,
             commands::save_workspace,
+            commands::get_editor_settings,
+            commands::save_editor_settings,
+            commands::open_in_editor,
             commands::spawn_pty,
             commands::write_pty,
             commands::resize_pty,
@@ -47,6 +50,14 @@ pub fn run() {
             commands::git_list_branches,
             commands::git_create_worktree,
             commands::git_remove_worktree,
+            commands::git_list_worktrees,
+            commands::git_status,
+            commands::git_changed_files,
+            commands::git_file_diff,
+            commands::git_stage_file,
+            commands::git_unstage_file,
+            commands::git_switch_branch,
+            commands::git_create_branch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

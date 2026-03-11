@@ -1,5 +1,14 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
-import type { RepoInfo, WorkspaceConfig, PtyOutput } from "./types";
+import type {
+  RepoInfo,
+  WorkspaceConfig,
+  PtyOutput,
+  GitStatus,
+  ChangedFile,
+  WorktreeEntry,
+  EditorSettings,
+  PreferredEditor,
+} from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
 
@@ -24,6 +33,24 @@ export function saveWorkspace(
   config: WorkspaceConfig,
 ): Promise<void> {
   return invoke("save_workspace", { repoPath, config });
+}
+
+export function getEditorSettings(): Promise<EditorSettings> {
+  return invoke("get_editor_settings");
+}
+
+export function saveEditorSettings(settings: EditorSettings): Promise<void> {
+  return invoke("save_editor_settings", { settings });
+}
+
+export function openInEditor(
+  repoPath: string,
+  editorOverride?: PreferredEditor | null,
+): Promise<void> {
+  return invoke("open_in_editor", {
+    repoPath,
+    editorOverride: editorOverride ?? null,
+  });
 }
 
 // ── PTY commands ────────────────────────────────────────────────────
@@ -91,6 +118,38 @@ export function gitRemoveWorktree(
   worktreePath: string,
 ): Promise<void> {
   return invoke("git_remove_worktree", { repoPath, worktreePath });
+}
+
+export function gitListWorktrees(path: string): Promise<WorktreeEntry[]> {
+  return invoke("git_list_worktrees", { path });
+}
+
+export function gitStatus(path: string): Promise<GitStatus> {
+  return invoke("git_status", { path });
+}
+
+export function gitChangedFiles(path: string): Promise<ChangedFile[]> {
+  return invoke("git_changed_files", { path });
+}
+
+export function gitFileDiff(path: string, filePath: string, staged: boolean): Promise<string> {
+  return invoke("git_file_diff", { path, filePath, staged });
+}
+
+export function gitStageFile(path: string, filePath: string): Promise<void> {
+  return invoke("git_stage_file", { path, filePath });
+}
+
+export function gitUnstageFile(path: string, filePath: string): Promise<void> {
+  return invoke("git_unstage_file", { path, filePath });
+}
+
+export function gitSwitchBranch(path: string, branchName: string): Promise<void> {
+  return invoke("git_switch_branch", { path, branchName });
+}
+
+export function gitCreateBranch(path: string, branchName: string): Promise<void> {
+  return invoke("git_create_branch", { path, branchName });
 }
 
 // ── System commands ────────────────────────────────────────────────

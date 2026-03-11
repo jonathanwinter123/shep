@@ -6,6 +6,8 @@ import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
 import CommandList from "./CommandList";
+import GitStatusRow from "./GitStatusRow";
+import IdeLaunchRow from "./IdeLaunchRow";
 
 interface ProjectListProps {
   repos: RepoInfo[];
@@ -16,8 +18,11 @@ interface ProjectListProps {
   projectActivity: Record<string, { terminalCount: number; runningCount: number }>;
   onSelectRepo: (repoPath: string) => void;
   onAddProject: (repoPath: string) => void;
+  onRemoveProject: (repoPath: string) => void;
   onNewAssistant: () => void;
+  onOpenInEditor: (repoPath: string) => void;
   onSelectTab: (tabId: string) => void;
+  onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
   onStartCommand: (name: string) => void;
   onStopCommand: (name: string) => void;
@@ -33,8 +38,11 @@ export default function ProjectList({
   projectActivity,
   onSelectRepo,
   onAddProject,
+  onRemoveProject,
   onNewAssistant,
+  onOpenInEditor,
   onSelectTab,
+  onCloseTab,
   onNewShell,
   onStartCommand,
   onStopCommand,
@@ -97,6 +105,8 @@ export default function ProjectList({
               isActive={isActive}
               isExpanded={isExpanded}
               activity={projectActivity[repo.path]}
+              onOpenInEditor={() => onOpenInEditor(repo.path)}
+              onRemove={() => onRemoveProject(repo.path)}
               onClick={() => handleProjectClick(repo.path)}
             />
             {isExpanded && (
@@ -123,6 +133,7 @@ export default function ProjectList({
                       assistantTabs={assistantTabs}
                       activeTabId={activeTabId}
                       onSelectTab={onSelectTab}
+                      onCloseTab={onCloseTab}
                     />
                   </CollapsibleSection>
                 )}
@@ -136,9 +147,16 @@ export default function ProjectList({
                       tabs={shellTabs}
                       activeTabId={activeTabId}
                       onSelectTab={onSelectTab}
+                      onCloseTab={onCloseTab}
                     />
                   </CollapsibleSection>
                 )}
+
+                <GitStatusRow repoPath={repo.path} />
+                <IdeLaunchRow
+                  repoPath={repo.path}
+                  onOpenInEditor={onOpenInEditor}
+                />
 
                 {commands.length > 0 && (
                   <CollapsibleSection

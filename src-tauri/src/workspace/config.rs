@@ -9,6 +9,8 @@ pub struct GlobalConfig {
     pub version: u32,
     #[serde(default)]
     pub repos: Vec<RepoEntry>,
+    #[serde(default)]
+    pub editor: EditorSettings,
 }
 
 fn default_version() -> u32 {
@@ -20,8 +22,15 @@ impl Default for GlobalConfig {
         GlobalConfig {
             version: 1,
             repos: Vec::new(),
+            editor: EditorSettings::default(),
         }
     }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EditorSettings {
+    #[serde(default, rename = "preferredEditor")]
+    pub preferred_editor: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

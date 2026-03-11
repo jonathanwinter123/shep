@@ -19,6 +19,12 @@ export interface WorkspaceConfig {
   assistants: AssistantConfig[];
 }
 
+export type PreferredEditor = "vscode" | "zed" | "cursor" | "sublime_text";
+
+export interface EditorSettings {
+  preferredEditor: PreferredEditor | null;
+}
+
 // ── Runtime state types ─────────────────────────────────────────────
 
 export type CommandStatus = "stopped" | "running" | "crashed";
@@ -60,6 +66,36 @@ export interface AssistantConfig {
   name: string;
   command: string;
   yoloFlag: string | null;
+}
+
+// ── Git status ──────────────────────────────────────────────────────
+
+export interface GitStatus {
+  is_git_repo: boolean;
+  branch: string;
+  dirty: boolean;
+  staged: number;
+  unstaged: number;
+  untracked: number;
+  ahead: number;
+  behind: number;
+}
+
+// ── Git worktree ─────────────────────────────────────────────────────
+
+export interface WorktreeEntry {
+  path: string;
+  branch: string | null;
+  is_main: boolean;
+}
+
+// ── Git changed files ────────────────────────────────────────────────
+
+export interface ChangedFile {
+  path: string;
+  status: string;         // "M", "A", "D", "R", "?"
+  area: string;           // "staged", "unstaged", "untracked"
+  old_path: string | null;
 }
 
 // ── PTY output ──────────────────────────────────────────────────────

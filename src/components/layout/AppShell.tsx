@@ -5,6 +5,7 @@ import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
 import TerminalErrorBoundary from "../terminal/TerminalErrorBoundary";
 import SettingsPanel from "../settings/SettingsPanel";
+import GitPanel from "../git/GitPanel";
 import SessionLauncher from "../session/SessionLauncher";
 import ShepLogo from "../sidebar/icons/ShepLogo";
 import { useRepoStore } from "../../stores/useRepoStore";
@@ -13,8 +14,10 @@ import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { usePty } from "../../hooks/usePty";
 import { useThemeApplicator } from "../../hooks/useThemeApplicator";
+import { useGitPolling } from "../../hooks/useGitPolling";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
-import { getUsername, getComputerName } from "../../lib/tauri";
+import { getUsername, getComputerName, openInEditor } from "../../lib/tauri";
+import { useEditorStore } from "../../stores/useEditorStore";
 
 import type { CommandState, TerminalTab, SessionMode } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
@@ -27,10 +30,11 @@ const EMPTY_COMMANDS: CommandState[] = [];
 export default function AppShell() {
   useThemeApplicator();
 
-  const { repos, activeRepoPath, fetchRepos, openRepo, addRepo } =
+  const { repos, activeRepoPath, fetchRepos, openRepo, addRepo, removeRepo } =
     useRepoStore();
   const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab } =
     usePty();
+
   const restoreAttemptedRef = useRef(false);
   const terminalContainerRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +57,20 @@ export default function AppShell() {
   // Derive allTabs via useMemo instead of a selector that returns a new array
   // every call — zustand v5 + useSyncExternalStore would infinite-loop otherwise.
   const projectState = useTerminalStore((s) => s.projectState);
+
+  // Git status polling: project roots + all active worktree paths
+  const gitPollPaths = useMemo(() => {
+    const paths = repos.filter((r) => r.valid).map((r) => r.path);
+    for (const state of Object.values(projectState)) {
+      for (const tab of state.tabs) {
+        if (tab.worktreePath && !paths.includes(tab.worktreePath)) {
+          paths.push(tab.worktreePath);
+        }
+      }
+    }
+    return paths;
+  }, [repos, projectState]);
+  useGitPolling(gitPollPaths);
   const allTabs = useMemo(() => {
     const all: TerminalTab[] = [];
     for (const project of Object.values(projectState)) {
@@ -68,13 +86,16 @@ export default function AppShell() {
   const setActiveTab = useTerminalStore((s) => s.setActiveTab);
 
   const settingsActive = useUIStore((s) => s.settingsActive);
+  const gitPanelActive = useUIStore((s) => s.gitPanelActive);
   const launcherActive = useUIStore((s) => s.launcherActive);
+  const loadEditorSettings = useEditorStore((s) => s.loadSettings);
 
   useEffect(() => {
     fetchRepos();
+    void loadEditorSettings();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));
-  }, [fetchRepos]);
+  }, [fetchRepos, loadEditorSettings]);
 
   const handleSelectRepo = useCallback(
     async (repoPath: string) => {
@@ -110,6 +131,18 @@ export default function AppShell() {
       useCommandStore.getState().loadCommands(canonicalPath, config.commands);
     },
     [addRepo],
+  );
+
+  const handleRemoveProject = useCallback(
+    async (repoPath: string) => {
+      await removeRepo(repoPath);
+      // If that was the active project, clear state
+      if (useRepoStore.getState().activeRepoPath === null) {
+        useTerminalStore.getState().switchProject("");
+        useCommandStore.getState().switchProject("");
+      }
+    },
+    [removeRepo],
   );
 
   const handleStartCommand = useCallback(
@@ -169,6 +202,21 @@ export default function AppShell() {
     spawnBlankShell(cols, rows);
   }, [spawnBlankShell, getTerminalDimensions]);
 
+  const handleOpenInEditor = useCallback(async (repoPath: string) => {
+    const preferredEditor = useEditorStore.getState().settings.preferredEditor;
+    if (!preferredEditor) {
+      useUIStore.getState().openSettings();
+      return;
+    }
+
+    try {
+      await openInEditor(repoPath);
+    } catch (error) {
+      console.error("Failed to open editor:", error);
+      window.alert(String(error));
+    }
+  }, []);
+
   useEffect(() => {
     if (activeRepoPath) {
       restoreAttemptedRef.current = true;
@@ -191,7 +239,7 @@ export default function AppShell() {
     }
   }, [repos, activeRepoPath, handleSelectRepo]);
 
-  const showOverlay = settingsActive || launcherActive;
+  const showOverlay = settingsActive || gitPanelActive || launcherActive;
 
   return (
     <div className="app-shell">
@@ -222,8 +270,11 @@ export default function AppShell() {
           commands={commands}
           onSelectRepo={handleSelectRepo}
           onAddProject={handleAddProject}
+          onRemoveProject={handleRemoveProject}
           onNewAssistant={handleNewAssistant}
+          onOpenInEditor={handleOpenInEditor}
           onSelectTab={setActiveTab}
+          onCloseTab={closeTab}
           onNewShell={handleNewShell}
           onStartCommand={handleStartCommand}
           onStopCommand={stopCommand}
@@ -238,6 +289,7 @@ export default function AppShell() {
 
           <div ref={terminalContainerRef} className="terminal-stage">
             {settingsActive && <SettingsPanel />}
+            {gitPanelActive && <GitPanel />}
             {launcherActive && <SessionLauncher onStartSession={handleStartSession} />}
 
             {!showOverlay && tabs.length === 0 && (
