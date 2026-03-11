@@ -6,6 +6,7 @@ import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
 import CommandList from "./CommandList";
+import GitStatusRow from "./GitStatusRow";
 
 interface ProjectListProps {
   repos: RepoInfo[];
@@ -146,6 +147,8 @@ export default function ProjectList({
                     />
                   </CollapsibleSection>
                 )}
+
+                <GitStatusRow repoPath={repo.path} />
 
                 {commands.length > 0 && (
                   <CollapsibleSection
