@@ -13,6 +13,7 @@ import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { usePty } from "../../hooks/usePty";
 import { useThemeApplicator } from "../../hooks/useThemeApplicator";
+import { useGitPolling } from "../../hooks/useGitPolling";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
 import { getUsername, getComputerName } from "../../lib/tauri";
 
@@ -31,6 +32,7 @@ export default function AppShell() {
     useRepoStore();
   const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab } =
     usePty();
+
   const restoreAttemptedRef = useRef(false);
   const terminalContainerRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +51,19 @@ export default function AppShell() {
   );
   const tabs = activeProjectTerminals?.tabs ?? EMPTY_TABS;
   const activeTabId = activeProjectTerminals?.activeTabId ?? null;
+
+  // Git status polling: project roots + active tab's worktree path
+  const activeTabWorktree = activeProjectTerminals
+    ? activeProjectTerminals.tabs.find((t) => t.id === activeProjectTerminals.activeTabId)?.worktreePath
+    : null;
+  const gitPollPaths = useMemo(() => {
+    const paths = repos.filter((r) => r.valid).map((r) => r.path);
+    if (activeTabWorktree && !paths.includes(activeTabWorktree)) {
+      paths.push(activeTabWorktree);
+    }
+    return paths;
+  }, [repos, activeTabWorktree]);
+  useGitPolling(gitPollPaths);
 
   // Derive allTabs via useMemo instead of a selector that returns a new array
   // every call — zustand v5 + useSyncExternalStore would infinite-loop otherwise.

@@ -3,6 +3,7 @@ use tauri::ipc::Channel;
 use tauri::State;
 
 use crate::git;
+use crate::git::GitStatus;
 use crate::pty::manager::PtyManager;
 use crate::pty::session::PtyOutput;
 use crate::workspace::config::{RepoInfo, WorkspaceConfig};
@@ -116,6 +117,11 @@ pub fn git_create_worktree(
 #[tauri::command]
 pub fn git_remove_worktree(repo_path: &str, worktree_path: &str) -> Result<(), String> {
     git::remove_worktree(repo_path, worktree_path)
+}
+
+#[tauri::command]
+pub fn git_status(path: &str) -> GitStatus {
+    git::status(path)
 }
 
 // ── System commands ────────────────────────────────────────────────

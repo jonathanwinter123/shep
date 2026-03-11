@@ -62,6 +62,19 @@ export interface AssistantConfig {
   yoloFlag: string | null;
 }
 
+// ── Git status ──────────────────────────────────────────────────────
+
+export interface GitStatus {
+  is_git_repo: boolean;
+  branch: string;
+  dirty: boolean;
+  staged: number;
+  unstaged: number;
+  untracked: number;
+  ahead: number;
+  behind: number;
+}
+
 // ── PTY output ──────────────────────────────────────────────────────
 
 export type PtyOutput =

@@ -1,5 +1,93 @@
 use std::process::Command;
 
+#[derive(serde::Serialize, Clone)]
+pub struct GitStatus {
+    pub is_git_repo: bool,
+    pub branch: String,
+    pub dirty: bool,
+    pub staged: u32,
+    pub unstaged: u32,
+    pub untracked: u32,
+    pub ahead: u32,
+    pub behind: u32,
+}
+
+impl Default for GitStatus {
+    fn default() -> Self {
+        Self {
+            is_git_repo: false,
+            branch: String::new(),
+            dirty: false,
+            staged: 0,
+            unstaged: 0,
+            untracked: 0,
+            ahead: 0,
+            behind: 0,
+        }
+    }
+}
+
+pub fn status(path: &str) -> GitStatus {
+    let output = match Command::new("git")
+        .args(["-C", path, "status", "--porcelain=v2", "--branch"])
+        .output()
+    {
+        Ok(o) if o.status.success() => o,
+        _ => return GitStatus::default(),
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut branch = String::new();
+    let mut ahead: u32 = 0;
+    let mut behind: u32 = 0;
+    let mut staged: u32 = 0;
+    let mut unstaged: u32 = 0;
+    let mut untracked: u32 = 0;
+
+    for line in stdout.lines() {
+        if let Some(rest) = line.strip_prefix("# branch.head ") {
+            branch = rest.to_string();
+        } else if let Some(rest) = line.strip_prefix("# branch.ab ") {
+            // Format: +N -M
+            for token in rest.split_whitespace() {
+                if let Some(n) = token.strip_prefix('+') {
+                    ahead = n.parse().unwrap_or(0);
+                } else if let Some(n) = token.strip_prefix('-') {
+                    behind = n.parse().unwrap_or(0);
+                }
+            }
+        } else if line.starts_with("1 ") || line.starts_with("2 ") {
+            // Changed entry: XY columns at index 2..4
+            let xy: Vec<u8> = line.as_bytes().get(2..4).unwrap_or(&[b'.', b'.']).to_vec();
+            if xy[0] != b'.' {
+                staged += 1;
+            }
+            if xy[1] != b'.' {
+                unstaged += 1;
+            }
+        } else if line.starts_with("u ") {
+            // Unmerged entry — count as both
+            staged += 1;
+            unstaged += 1;
+        } else if line.starts_with("? ") {
+            untracked += 1;
+        }
+    }
+
+    let dirty = staged > 0 || unstaged > 0 || untracked > 0;
+
+    GitStatus {
+        is_git_repo: true,
+        branch,
+        dirty,
+        staged,
+        unstaged,
+        untracked,
+        ahead,
+        behind,
+    }
+}
+
 pub fn is_git_repo(path: &str) -> bool {
     Command::new("git")
         .args(["-C", path, "rev-parse", "--git-dir"])

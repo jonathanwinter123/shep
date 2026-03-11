@@ -1,8 +1,9 @@
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useUIStore } from "../../stores/useUIStore";
+import { useGitStore } from "../../stores/useGitStore";
 import type { CommandState, CommandStatus } from "../../lib/types";
-import { Circle } from "lucide-react";
+import { Circle, GitBranch } from "lucide-react";
 
 const EMPTY_COMMANDS: CommandState[] = [];
 import GearIcon from "../sidebar/icons/GearIcon";
@@ -44,6 +45,12 @@ export default function TabBar({
   const commands = useCommandStore(
     (s) => (s.activeProjectPath ? s.projectCommands[s.activeProjectPath] ?? EMPTY_COMMANDS : EMPTY_COMMANDS),
   );
+
+  // Git status for the active tab
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
+  const activeTabCwd = activeTab?.worktreePath ?? activeTab?.repoPath ?? null;
+  const projectGitStatus = useGitStore((s) => s.projectGitStatus);
+  const gitStatus = activeTabCwd ? projectGitStatus[activeTabCwd] : null;
 
   const handleSelectTab = (tabId: string) => {
     deactivateSettings();
@@ -135,6 +142,21 @@ export default function TabBar({
           +
         </button>
       </div>
+
+      {gitStatus?.is_git_repo && (
+        <div className="flex items-center gap-1.5 shrink-0 text-xs pl-3 border-l border-white/8">
+          <GitBranch size={12} />
+          <span className="truncate max-w-32">{gitStatus.branch}</span>
+          <span
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{
+              backgroundColor: gitStatus.dirty
+                ? "rgb(251, 191, 36)"
+                : "rgb(74, 222, 128)",
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

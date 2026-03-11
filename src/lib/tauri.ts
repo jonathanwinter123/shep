@@ -1,5 +1,5 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
-import type { RepoInfo, WorkspaceConfig, PtyOutput } from "./types";
+import type { RepoInfo, WorkspaceConfig, PtyOutput, GitStatus } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
 
@@ -91,6 +91,10 @@ export function gitRemoveWorktree(
   worktreePath: string,
 ): Promise<void> {
   return invoke("git_remove_worktree", { repoPath, worktreePath });
+}
+
+export function gitStatus(path: string): Promise<GitStatus> {
+  return invoke("git_status", { path });
 }
 
 // ── System commands ────────────────────────────────────────────────
