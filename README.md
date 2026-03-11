@@ -1,35 +1,56 @@
-# Shep — Terminal Workspace Manager
+# Shep
 
-Shep organizes your terminal sessions into project workspaces. Each project contains named tasks (dev servers, watchers, AI tools) that run in embedded terminals with autostart, status indicators, and tab management.
+**A terminal workspace for developers who run too many things at once.**
 
-## Quick Start
+Shep is a native macOS app that organizes your terminal sessions into project workspaces. Dev servers, test watchers, AI coding agents — instead of juggling 15 terminal tabs, Shep keeps everything in one place with autostart, status indicators, and one-click agent launches.
+
+<!-- TODO: Add screenshot -->
+<!-- ![Shep screenshot](docs/screenshot.png) -->
+
+## Download
+
+### GitHub Releases
+
+Grab the latest `.dmg` from the [Releases](https://github.com/stumptowndoug/shep/releases) page. Open it, drag Shep to Applications, done.
+
+### Build from Source
+
+If you'd rather build it yourself:
 
 ```bash
-# Install dependencies (first time only)
+git clone https://github.com/stumptowndoug/shep.git
+cd shep
 pnpm install
-
-# Run in development mode (recommended while building)
-pnpm tauri dev
+pnpm tauri build
 ```
 
-This opens the Shep window with hot reload — frontend changes appear instantly, Rust changes trigger a recompile.
+The built app lands in `src-tauri/target/release/bundle/macos/shep.app` and a ready-to-share DMG in `src-tauri/target/release/bundle/dmg/`.
 
-## Usage
+**Requirements for building:**
+- macOS with Xcode CLI tools
+- Node.js 20+
+- Rust (via [rustup](https://rustup.rs))
+- [pnpm](https://pnpm.io)
 
-### 1. Create a project
+## Features
 
-Click the **+** button next to the project dropdown in the sidebar. Enter a name and the working directory path (e.g., `/Users/you/projects/my-app`).
+- **Project workspaces** — register repos and define named tasks (dev server, tests, linters, etc.) that live together
+- **Autostart** — mark tasks to launch automatically when you open a project
+- **Status indicators** — see at a glance what's running, stopped, or crashed
+- **Tab management** — each task gets its own terminal tab, plus blank shells on demand
+- **AI agent launcher** — built-in support for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://github.com/openai/codex), and [Gemini CLI](https://github.com/google-gemini/gemini-cli) with standard, worktree, and autonomous modes
+- **Git worktree isolation** — spin up AI sessions in isolated worktrees so agents can go wild without touching your working branch
+- **Glass terminal rendering** — translucent terminal backgrounds with full 256-color and Unicode support
 
-### 2. Add tasks
+## Getting Started
 
-Edit the workspace config file directly:
+### 1. Add a project
 
-```bash
-# Open the config for your project
-open ~/.shep/projects/<project-name>/workspace.yml
-```
+Click **+** next to the project dropdown. Point it at a repo directory.
 
-Example `workspace.yml`:
+### 2. Configure tasks
+
+Shep creates a config at `~/.shep/projects/<project-name>/workspace.yml`. Edit it to define your tasks:
 
 ```yaml
 name: my-app
@@ -38,51 +59,66 @@ tasks:
   - name: dev server
     command: npm run dev
     autostart: true
-    env: {}
-  - name: claude
-    command: claude
-    autostart: true
-    env: {}
   - name: tests
     command: npm test -- --watch
     autostart: false
-    env: {}
+  - name: claude
+    command: claude
+    autostart: true
 ```
 
-### 3. Open the project
+### 3. Work
 
-Select your project from the dropdown. Tasks marked `autostart: true` launch automatically with green status dots. Click any task name to open its terminal tab.
+Select your project from the sidebar. Autostart tasks spin up immediately. Click any task to jump to its terminal. Hover for start/stop/restart controls.
 
-### Controls
+**Shortcuts:**
+- **+** in the tab bar opens a blank shell
+- **x** on a tab kills the process and closes it
+- Switching projects tears down old terminals and starts fresh
 
-- **Start/Stop/Restart** — hover over a task in the sidebar to reveal controls
-- **New Terminal** — click **+** in the tab bar for a blank shell
-- **Close tab** — click **×** on a tab (kills the PTY)
-- **Switch projects** — select from dropdown (cleans up old terminals)
+## AI Agents
 
-## Project Structure
+Shep has first-class support for CLI-based coding agents. The sidebar shows a dedicated Assistants section with three session modes:
 
-```
-src/                    React frontend (TypeScript + Tailwind)
-src-tauri/              Rust backend (Tauri v2 + portable-pty)
-~/.shep/projects/       Workspace configs (YAML)
-```
+| Mode | What it does |
+|------|-------------|
+| **Standard** | Runs the agent in your current repo directory |
+| **Worktree** | Creates an isolated git worktree so the agent works on a separate branch |
+| **YOLO** | Worktree + the agent's autonomous flag (e.g. `--dangerously-skip-permissions` for Claude) |
 
-## Building for Distribution
+Currently supports **Claude Code**, **Codex CLI**, and **Gemini CLI**. Adding more is just a config change.
+
+## Development
 
 ```bash
-pnpm tauri build
+pnpm install       # first time only
+pnpm tauri dev     # launches with hot reload
 ```
 
-Output:
-- `src-tauri/target/release/bundle/macos/shep.app`
-- `src-tauri/target/release/bundle/dmg/shep_0.1.0_aarch64.dmg`
+Frontend changes appear instantly. Rust changes trigger a recompile. The dev server runs at `localhost:5173`.
 
-To install: open the `.dmg` and drag Shep to Applications, or copy the `.app` directly.
+### Project Structure
 
-## Requirements
+```
+src/                    React frontend (TypeScript + Tailwind CSS)
+  components/           UI — layout, sidebar, terminal, settings
+  stores/               Zustand state management
+  hooks/                PTY lifecycle, theme application
+  lib/                  Types, Tauri IPC wrappers, config
 
-- macOS with Xcode CLI tools
-- Node.js 20+
-- Rust (installed via rustup)
-- pnpm
+src-tauri/              Rust backend (Tauri v2)
+  src/commands.rs       IPC command handlers
+  src/pty/              PTY process management (portable-pty)
+  src/workspace/        Config loading and workspace management
+  src/git.rs            Git operations and worktree support
+```
+
+### Tech Stack
+
+**Frontend:** React 19 , TypeScript, Zustand, Tailwind CSS, xterm.js, Vite
+**Backend:** Rust, Tauri 2, portable-pty
+**Build:** pnpm, Vite, Tauri CLI
+
+## License
+
+MIT
