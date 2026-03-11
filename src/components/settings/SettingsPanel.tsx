@@ -5,6 +5,7 @@ import { useEditorStore } from "../../stores/useEditorStore";
 import { useThemeStore } from "../../stores/useThemeStore";
 
 export default function SettingsPanel() {
+  const settingsOptionClass = "option-card w-44 justify-start";
   const themeId = useThemeStore((s) => s.themeId);
   const setTheme = useThemeStore((s) => s.setTheme);
   const settings = useEditorStore((s) => s.settings);
@@ -31,7 +32,7 @@ export default function SettingsPanel() {
             <button
               key={t.id}
               onClick={() => setTheme(t.id)}
-              className={`option-card min-w-44 ${active ? "selected" : ""}`}
+              className={`${settingsOptionClass} ${active ? "selected" : ""}`}
             >
               <div
                 className="shrink-0 rounded-full"
@@ -63,7 +64,7 @@ export default function SettingsPanel() {
             <button
               key={option.id}
               onClick={() => void setPreferredEditor(option.id)}
-              className={`option-card min-w-44 ${active ? "selected" : ""}`}
+              className={`${settingsOptionClass} ${active ? "selected" : ""}`}
             >
               <img
                 src={option.logoSrc}
