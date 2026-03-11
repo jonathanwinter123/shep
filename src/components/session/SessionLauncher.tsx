@@ -1,9 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import type { CodingAssistant, SessionMode } from "../../lib/types";
 import { CODING_ASSISTANTS } from "../sidebar/constants";
-import { isGitRepo, gitCurrentBranch, gitListBranches, gitSwitchBranch, gitCreateBranch, gitCreateWorktree } from "../../lib/tauri";
+import {
+  isGitRepo,
+  gitCurrentBranch,
+  gitInit,
+  gitListBranches,
+  gitSwitchBranch,
+  gitCreateBranch,
+  gitCreateWorktree,
+} from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
-import { ChevronDown, GitBranch, GitFork, HandMetal } from "lucide-react";
+import { ChevronDown, GitBranch, GitFork, HandMetal, Play } from "lucide-react";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 
 interface SessionLauncherProps {
@@ -34,14 +42,14 @@ function todayStamp(): string {
 
 /** Mode labels for display */
 const MODE_LABELS: Record<SessionMode, string> = {
-  standard: "Branch",
+  standard: "Standard",
   worktree: "Worktree",
   yolo: "YOLO",
 };
 
 /** Mode icons */
 const MODE_ICONS: Record<SessionMode, React.ReactNode> = {
-  standard: <GitBranch size={14} style={{ opacity: 0.5 }} />,
+  standard: <Play size={14} style={{ opacity: 0.5 }} />,
   worktree: <GitFork size={14} style={{ opacity: 0.5 }} />,
   yolo: <HandMetal size={14} style={{ opacity: 0.5 }} />,
 };
@@ -65,6 +73,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   const [branchPickerOpen, setBranchPickerOpen] = useState(false);
   const [branchName, setBranchName] = useState("");
   const [useCurrentBranch, setUseCurrentBranch] = useState(false);
+  const [initializeGitOnLaunch, setInitializeGitOnLaunch] = useState(false);
   const [launching, setLaunching] = useState(false);
   const branchPickerRef = useRef<HTMLDivElement>(null);
 
@@ -119,12 +128,24 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
     if (usesWorktree) setUseCurrentBranch(false);
   }, [usesWorktree]);
 
+  useEffect(() => {
+    if (isGit || mode !== "standard") {
+      setInitializeGitOnLaunch(false);
+    }
+  }, [isGit, mode]);
+
   const handleStart = async () => {
     if (!selectedAssistant || !activeRepoPath) return;
     setLaunching(true);
 
     try {
       let worktreePath: string | null = null;
+      let repoWasInitialized = false;
+
+      if (!isGit && mode === "standard" && initializeGitOnLaunch) {
+        await gitInit(activeRepoPath);
+        repoWasInitialized = true;
+      }
 
       if (usesWorktree && isGit) {
         // Worktree/YOLO: create worktree + branch
@@ -132,7 +153,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         const folderName = finalBranch.replace(/\//g, "-") + "-wt";
         worktreePath = `${activeRepoPath}/../.shep-worktrees/${folderName}`;
         await gitCreateWorktree(activeRepoPath, worktreePath, finalBranch);
-      } else if (isGit && !usesWorktree) {
+      } else if (isGit && !usesWorktree && !repoWasInitialized) {
         // Branch mode: switch to selected base branch if needed
         if (selectedBranch !== currentBranch) {
           await gitSwitchBranch(activeRepoPath, selectedBranch);
@@ -199,6 +220,26 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
               {selectedAssistant.name} does not support a YOLO/auto mode flag.
             </p>
           )}
+        </div>
+      )}
+
+      {selectedAssistant && !isGit && mode === "standard" && (
+        <div className="mb-6">
+          <label className="flex items-center gap-2 cursor-pointer text-xs">
+            <input
+              type="checkbox"
+              checked={initializeGitOnLaunch}
+              onChange={(e) => setInitializeGitOnLaunch(e.target.checked)}
+              style={{ accentColor: "var(--text-muted)" }}
+            />
+            <span style={{ color: "var(--text-muted)" }}>
+              Initialize Git repository before launch
+            </span>
+          </label>
+          <p className="text-xs opacity-40 mt-2 max-w-md">
+            Creates a local Git repo in this project before launching the assistant.
+            Worktrees still need an initial commit before they can be used.
+          </p>
         </div>
       )}
 

@@ -134,6 +134,11 @@ pub fn is_git_repo(path: &str) -> bool {
 }
 
 #[tauri::command]
+pub fn git_init(path: &str) -> Result<(), String> {
+    git::init_repo(path)
+}
+
+#[tauri::command]
 pub fn git_current_branch(path: &str) -> Result<String, String> {
     git::current_branch(path)
 }

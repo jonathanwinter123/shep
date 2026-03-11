@@ -46,6 +46,7 @@ pub fn run() {
             commands::get_username,
             commands::get_computer_name,
             commands::is_git_repo,
+            commands::git_init,
             commands::git_current_branch,
             commands::git_list_branches,
             commands::git_create_worktree,
