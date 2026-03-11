@@ -313,7 +313,7 @@ select {
   position: relative;
   height: 100vh;
   overflow: hidden;
-  padding: 42px 12px 12px;
+  padding: 42px 12px 6px;
 }
 
 .drag-region {
@@ -372,7 +372,7 @@ select {
   display: flex;
   gap: 0;
   height: 100%;
-  padding: 12px;
+  padding: 12px 12px 4px;
   border: 1px solid var(--glass-border);
   border-radius: 16px;
   background:

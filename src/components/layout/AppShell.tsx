@@ -5,6 +5,7 @@ import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
 import TerminalErrorBoundary from "../terminal/TerminalErrorBoundary";
 import SettingsPanel from "../settings/SettingsPanel";
+import GitPanel from "../git/GitPanel";
 import SessionLauncher from "../session/SessionLauncher";
 import ShepLogo from "../sidebar/icons/ShepLogo";
 import { useRepoStore } from "../../stores/useRepoStore";
@@ -83,6 +84,7 @@ export default function AppShell() {
   const setActiveTab = useTerminalStore((s) => s.setActiveTab);
 
   const settingsActive = useUIStore((s) => s.settingsActive);
+  const gitPanelActive = useUIStore((s) => s.gitPanelActive);
   const launcherActive = useUIStore((s) => s.launcherActive);
 
   useEffect(() => {
@@ -206,7 +208,7 @@ export default function AppShell() {
     }
   }, [repos, activeRepoPath, handleSelectRepo]);
 
-  const showOverlay = settingsActive || launcherActive;
+  const showOverlay = settingsActive || gitPanelActive || launcherActive;
 
   return (
     <div className="app-shell">
@@ -253,6 +255,7 @@ export default function AppShell() {
 
           <div ref={terminalContainerRef} className="terminal-stage">
             {settingsActive && <SettingsPanel />}
+            {gitPanelActive && <GitPanel />}
             {launcherActive && <SessionLauncher onStartSession={handleStartSession} />}
 
             {!showOverlay && tabs.length === 0 && (

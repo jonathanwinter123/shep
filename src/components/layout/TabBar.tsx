@@ -34,8 +34,13 @@ export default function TabBar({
   const settingsTabOpen = useUIStore((s) => s.settingsTabOpen);
   const settingsActive = useUIStore((s) => s.settingsActive);
   const activateSettings = useUIStore((s) => s.activateSettings);
-  const deactivateSettings = useUIStore((s) => s.deactivateSettings);
   const closeSettingsTab = useUIStore((s) => s.closeSettingsTab);
+
+  const gitPanelOpen = useUIStore((s) => s.gitPanelOpen);
+  const gitPanelActive = useUIStore((s) => s.gitPanelActive);
+  const activateGitPanel = useUIStore((s) => s.activateGitPanel);
+  const closeGitPanel = useUIStore((s) => s.closeGitPanel);
+  const openGitPanel = useUIStore((s) => s.openGitPanel);
 
   const launcherOpen = useUIStore((s) => s.launcherOpen);
   const launcherActive = useUIStore((s) => s.launcherActive);
@@ -52,9 +57,12 @@ export default function TabBar({
   const projectGitStatus = useGitStore((s) => s.projectGitStatus);
   const gitStatus = activeTabCwd ? projectGitStatus[activeTabCwd] : null;
 
+  const anyOverlay = settingsActive || launcherActive || gitPanelActive;
+
   const handleSelectTab = (tabId: string) => {
-    deactivateSettings();
+    useUIStore.getState().deactivateSettings();
     useUIStore.getState().deactivateLauncher();
+    useUIStore.getState().deactivateGitPanel();
     setActiveTab(tabId);
   };
 
@@ -62,7 +70,7 @@ export default function TabBar({
     <div className="tab-bar">
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {tabs.map((tab) => {
-          const isActive = tab.id === activeTabId && !settingsActive && !launcherActive;
+          const isActive = tab.id === activeTabId && !anyOverlay;
           const command = tab.commandName
             ? commands.find((c) => c.name === tab.commandName)
             : null;
@@ -115,6 +123,25 @@ export default function TabBar({
           </div>
         )}
 
+        {gitPanelOpen && (
+          <div
+            className={`tab ${gitPanelActive ? "active" : ""}`}
+            onClick={activateGitPanel}
+          >
+            <GitBranch size={12} />
+            <span>Git</span>
+            <button
+              className="icon-btn ml-0.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeGitPanel();
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {settingsTabOpen && (
           <div
             className={`tab ${settingsActive ? "active" : ""}`}
@@ -144,7 +171,11 @@ export default function TabBar({
       </div>
 
       {gitStatus?.is_git_repo && (
-        <div className="flex items-center gap-1.5 shrink-0 text-xs pl-3 border-l border-white/8">
+        <div
+          className="flex items-center gap-1.5 shrink-0 text-xs pl-3 border-l border-white/8 cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={openGitPanel}
+          title="Open Git panel"
+        >
           <GitBranch size={12} />
           <span className="truncate max-w-32">{gitStatus.branch}</span>
           <span
