@@ -90,7 +90,7 @@ impl PtySession {
         let mut cmd = CommandBuilder::new("/bin/zsh");
         cmd.arg("-l");
         cmd.arg("-c");
-        cmd.arg(command);
+        cmd.arg(format!("source ~/.zshrc 2>/dev/null; {command}"));
         cmd.cwd(cwd);
 
         for (key, val) in &env {
