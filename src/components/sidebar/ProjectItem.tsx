@@ -5,7 +5,6 @@ import { useEditorStore } from "../../stores/useEditorStore";
 import {
   Folder,
   FolderOpen,
-  CircleSmall,
   FolderOpen as FolderOpenIcon,
   Copy,
   Trash2,
@@ -105,7 +104,7 @@ export default function ProjectItem({
         {isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
         <span className="truncate flex-1 font-medium">{repo.name}</span>
         {!isExpanded && hasActivity && (
-          <CircleSmall size={14} className="shrink-0" fill={dotColor} stroke="none" />
+          <span className="sidebar-status-dot" style={{ background: dotColor }} />
         )}
       </div>
       {menu && (

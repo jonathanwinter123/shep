@@ -24,10 +24,7 @@ export default function GitStatusRow({ repoPath }: GitStatusRowProps) {
       <GitBranch size={14} className="shrink-0" />
       <span className="truncate">{status.branch || "HEAD"}</span>
       {status.dirty && (
-        <>
-          <span className="badge">{changeCount}</span>
-          <span className="git-dirty-dot" />
-        </>
+        <span className="badge">{changeCount}</span>
       )}
       {hasRemoteDelta && (
         <span className="badge">
@@ -36,6 +33,7 @@ export default function GitStatusRow({ repoPath }: GitStatusRowProps) {
           {status.behind > 0 && `↓${status.behind}`}
         </span>
       )}
+      {status.dirty && <span className="sidebar-status-dot sidebar-status-dot--attention" />}
     </button>
   );
 }

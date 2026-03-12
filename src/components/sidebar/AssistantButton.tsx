@@ -10,10 +10,10 @@ interface AssistantButtonProps {
 }
 
 function dotClass(activity: TabActivity | undefined): string {
-  if (!activity) return "tab-status-dot--idle";
-  if (!activity.alive) return activity.exitCode === 0 ? "tab-status-dot--idle" : "tab-status-dot--exited";
-  if (activity.active) return "tab-status-dot--active";
-  return "tab-status-dot--idle";
+  if (!activity) return "sidebar-status-dot--idle";
+  if (!activity.alive) return activity.exitCode === 0 ? "sidebar-status-dot--idle" : "sidebar-status-dot--exited";
+  if (activity.active) return "sidebar-status-dot--active";
+  return "sidebar-status-dot--idle";
 }
 
 export default function AssistantButton({
@@ -34,7 +34,7 @@ export default function AssistantButton({
     >
       {logoUrl && <img src={logoUrl} alt="" width={14} height={14} />}
       <span className="truncate text-left">{tab.label}</span>
-      <span className={`tab-status-dot ${dotClass(activity)}`} />
+      <span className={`sidebar-status-dot ${dotClass(activity)}`} />
       <button
         className="icon-btn sidebar-close-btn"
         onClick={(e) => {

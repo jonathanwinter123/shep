@@ -93,6 +93,7 @@ select {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   padding: 4px 8px;
   min-height: 28px;
   border-radius: var(--radius-sm);
@@ -154,7 +155,12 @@ select {
   width: 16px;
 }
 
+.sidebar-closable {
+  position: relative;
+}
 .sidebar-close-btn {
+  position: absolute;
+  right: 4px;
   opacity: 0;
   transition: opacity 160ms ease;
 }
@@ -162,8 +168,8 @@ select {
   opacity: 1;
 }
 
-/* Tab activity indicators */
-.tab-status-dot {
+/* Sidebar status dots — unified right-aligned indicator */
+.sidebar-status-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -171,25 +177,16 @@ select {
   margin-left: auto;
   transition: background 300ms ease;
 }
-.tab-status-dot--idle {
+.sidebar-status-dot--idle {
   background: rgba(255, 255, 255, 0.25);
 }
-.tab-status-dot--active {
+.sidebar-status-dot--active {
   background: rgb(74, 222, 128);  /* green-400 */
 }
-.tab-status-dot--exited {
+.sidebar-status-dot--exited {
   background: var(--status-crashed);
 }
-.sidebar-closable:hover .tab-status-dot {
-  display: none;
-}
-
-/* Git dirty indicator */
-.git-dirty-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.sidebar-status-dot--attention {
   background: var(--status-attention);
 }
 
