@@ -8,7 +8,7 @@ interface GitStatusRowProps {
 
 export default function GitStatusRow({ repoPath }: GitStatusRowProps) {
   const status = useGitStore((s) => s.projectGitStatus[repoPath]);
-  const gitPanelOpen = useUIStore((s) => s.gitPanelOpen);
+  const gitPanelActive = useUIStore((s) => s.gitPanelActive);
   const toggleGitPanel = useUIStore((s) => s.toggleGitPanel);
 
   if (!status?.is_git_repo) return null;
@@ -19,7 +19,7 @@ export default function GitStatusRow({ repoPath }: GitStatusRowProps) {
   return (
     <button
       onClick={toggleGitPanel}
-      className={`section-toggle ${gitPanelOpen ? "!text-[var(--text-primary)] !bg-white/6" : ""}`}
+      className={`section-toggle ${gitPanelActive ? "!text-[var(--text-primary)] !bg-white/6" : ""}`}
     >
       <GitBranch size={14} className="shrink-0" />
       <span className="truncate">{status.branch || "HEAD"}</span>

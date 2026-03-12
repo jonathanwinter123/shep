@@ -386,7 +386,7 @@ export default function AppShell() {
           repos={repos}
           activeRepoPath={activeRepoPath}
           tabs={tabs}
-          activeTabId={activeTabId}
+          activeTabId={showOverlay ? null : activeTabId}
           commands={commands}
           onSelectRepo={handleSelectRepo}
           onAddProject={handleAddProject}

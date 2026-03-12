@@ -110,6 +110,7 @@ select {
 }
 .list-item.active {
   color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* Context menu (right-click) */
