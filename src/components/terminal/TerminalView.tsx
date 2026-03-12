@@ -141,6 +141,7 @@ export default function TerminalView({
       window.setTimeout(() => {
         if (disposed) return;
         void fitAndResize();
+        term.focus();
       }, 100);
 
       if ("fonts" in document) {
