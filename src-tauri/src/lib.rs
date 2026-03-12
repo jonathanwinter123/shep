@@ -10,6 +10,7 @@ use workspace::manager::WorkspaceManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let _ = fix_path_env::fix();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(PtyManager::new())
