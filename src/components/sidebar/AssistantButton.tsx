@@ -1,11 +1,19 @@
-import type { TerminalTab } from "../../lib/types";
+import type { TerminalTab, TabActivity } from "../../lib/types";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { useTerminalStore } from "../../stores/useTerminalStore";
 
 interface AssistantButtonProps {
   tab: TerminalTab;
   isActive: boolean;
   onClick: () => void;
   onClose: () => void;
+}
+
+function dotClass(activity: TabActivity | undefined): string {
+  if (!activity) return "sidebar-status-dot--idle";
+  if (!activity.alive) return activity.exitCode === 0 ? "sidebar-status-dot--idle" : "sidebar-status-dot--exited";
+  if (activity.active) return "sidebar-status-dot--active";
+  return "sidebar-status-dot--idle";
 }
 
 export default function AssistantButton({
@@ -15,6 +23,7 @@ export default function AssistantButton({
   onClose,
 }: AssistantButtonProps) {
   const logoUrl = tab.assistantId ? assistantLogoSrc[tab.assistantId] : null;
+  const activity: TabActivity | undefined = useTerminalStore((s) => s.tabActivity[tab.ptyId]);
 
   return (
     <div
@@ -25,6 +34,7 @@ export default function AssistantButton({
     >
       {logoUrl && <img src={logoUrl} alt="" width={14} height={14} />}
       <span className="truncate text-left">{tab.label}</span>
+      <span className={`sidebar-status-dot ${dotClass(activity)}`} />
       <button
         className="icon-btn sidebar-close-btn"
         onClick={(e) => {

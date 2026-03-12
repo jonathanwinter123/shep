@@ -1,19 +1,9 @@
 import { useTerminalStore } from "../../stores/useTerminalStore";
-import { useCommandStore } from "../../stores/useCommandStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { useGitStore } from "../../stores/useGitStore";
-import type { CommandState, CommandStatus } from "../../lib/types";
-import { Circle, GitBranch, Terminal } from "lucide-react";
-
-const EMPTY_COMMANDS: CommandState[] = [];
+import { GitBranch, Terminal } from "lucide-react";
 import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
-
-const statusColor: Record<CommandStatus, string> = {
-  running: "var(--status-running)",
-  stopped: "var(--status-stopped)",
-  crashed: "var(--status-crashed)",
-};
 
 interface TabBarProps {
   onClose: (tabId: string) => void;
@@ -52,10 +42,6 @@ export default function TabBar({
   const activateCommandsPanel = useUIStore((s) => s.activateCommandsPanel);
   const closeCommandsPanel = useUIStore((s) => s.closeCommandsPanel);
 
-  const commands = useCommandStore(
-    (s) => (s.activeProjectPath ? s.projectCommands[s.activeProjectPath] ?? EMPTY_COMMANDS : EMPTY_COMMANDS),
-  );
-
   // Git status for the active tab
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
   const activeTabCwd = activeTab?.worktreePath ?? activeTab?.repoPath ?? null;
@@ -77,10 +63,6 @@ export default function TabBar({
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId && !anyOverlay;
-          const command = tab.commandName
-            ? commands.find((c) => c.name === tab.commandName)
-            : null;
-          const status = command?.status ?? "stopped";
           const logoUrl = tab.assistantId
             ? assistantLogoSrc[tab.assistantId]
             : null;
@@ -93,8 +75,6 @@ export default function TabBar({
             >
               {logoUrl ? (
                 <img src={logoUrl} alt="" width={12} height={12} />
-              ) : tab.commandName ? (
-                <Circle size={8} fill={statusColor[status]} stroke="none" />
               ) : null}
               <span className="truncate max-w-32">{tab.label}</span>
               <button

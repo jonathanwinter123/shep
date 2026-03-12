@@ -5,7 +5,6 @@ import { useEditorStore } from "../../stores/useEditorStore";
 import {
   Folder,
   FolderOpen,
-  CircleSmall,
   FolderOpen as FolderOpenIcon,
   Copy,
   Trash2,
@@ -18,7 +17,7 @@ interface ProjectItemProps {
   repo: RepoInfo;
   isActive: boolean;
   isExpanded: boolean;
-  activity?: { terminalCount: number; runningCount: number };
+  activity?: { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean };
   onClick: () => void;
   onRemove: () => void;
   onOpenInEditor: () => void;
@@ -34,6 +33,11 @@ export default function ProjectItem({
   onOpenInEditor,
 }: ProjectItemProps) {
   const hasActivity = activity && (activity.terminalCount > 0 || activity.runningCount > 0);
+  const dotColor = activity?.hasCrash
+    ? "var(--status-crashed)"
+    : activity?.hasAttention
+      ? "var(--status-attention)"
+      : "var(--status-running)";
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const preferredEditor = useEditorStore((s) => s.settings.preferredEditor);
@@ -92,7 +96,7 @@ export default function ProjectItem({
   return (
     <>
       <div
-        className={`list-item ${isActive ? "active" : ""} ${!repo.valid ? "opacity-50" : ""}`}
+        className={`list-item ${isActive ? "project-active" : ""} ${!repo.valid ? "opacity-50" : ""}`}
         onClick={onClick}
         onContextMenu={handleContextMenu}
         title={repo.path}
@@ -100,7 +104,7 @@ export default function ProjectItem({
         {isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
         <span className="truncate flex-1 font-medium">{repo.name}</span>
         {!isExpanded && hasActivity && (
-          <CircleSmall size={14} className="shrink-0" fill="var(--status-running)" stroke="none" />
+          <span className="sidebar-status-dot" style={{ background: dotColor }} />
         )}
       </div>
       {menu && (

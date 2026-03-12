@@ -126,6 +126,22 @@ pub fn kill_pty(pty_id: u32, pty_manager: State<'_, PtyManager>) -> Result<(), S
     pty_manager.kill(pty_id)
 }
 
+// ── App lifecycle commands ────────────────────────────────────────
+
+#[tauri::command]
+pub fn get_pty_session_count(pty_manager: State<'_, PtyManager>) -> usize {
+    pty_manager.session_count()
+}
+
+#[tauri::command]
+pub fn shutdown_and_quit(app: tauri::AppHandle, pty_manager: State<'_, PtyManager>) {
+    if !pty_manager.begin_shutdown() {
+        return;
+    }
+    pty_manager.kill_all();
+    app.exit(0);
+}
+
 // ── Git commands ──────────────────────────────────────────────────
 
 #[tauri::command]

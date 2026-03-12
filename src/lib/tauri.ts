@@ -91,6 +91,12 @@ export function killPty(ptyId: number): Promise<void> {
   return invoke("kill_pty", { ptyId });
 }
 
+// ── App lifecycle commands ────────────────────────────────────────
+
+export function shutdownAndQuit(): Promise<void> {
+  return invoke("shutdown_and_quit");
+}
+
 // ── Git commands ──────────────────────────────────────────────────
 
 export function isGitRepo(path: string): Promise<boolean> {
