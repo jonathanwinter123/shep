@@ -5,9 +5,9 @@ import ProjectItem from "./ProjectItem";
 import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
-import CommandList from "./CommandList";
 import GitStatusRow from "./GitStatusRow";
 import IdeLaunchRow from "./IdeLaunchRow";
+import CommandsRow from "./CommandsRow";
 
 interface ProjectListProps {
   repos: RepoInfo[];
@@ -24,9 +24,6 @@ interface ProjectListProps {
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
-  onStartCommand: (name: string) => void;
-  onStopCommand: (name: string) => void;
-  onFocusCommand: (name: string) => void;
 }
 
 export default function ProjectList({
@@ -44,9 +41,6 @@ export default function ProjectList({
   onSelectTab,
   onCloseTab,
   onNewShell,
-  onStartCommand,
-  onStopCommand,
-  onFocusCommand,
 }: ProjectListProps) {
   const [expandedPath, setExpandedPath] = useState<string | null>(activeRepoPath);
 
@@ -84,14 +78,7 @@ export default function ProjectList({
     [tabs],
   );
 
-  const runningCommandCount = useMemo(
-    () => commands.filter((c) => c.status === "running").length,
-    [commands],
-  );
-
-  const commandsBadge = commands.length > 0
-    ? `${runningCommandCount} / ${commands.length}`
-    : null;
+  const commandsBadge = String(commands.length);
 
   return (
     <div className="flex flex-col gap-0.5 px-2 pb-2">
@@ -154,19 +141,7 @@ export default function ProjectList({
                   onOpenInEditor={onOpenInEditor}
                 />
 
-                {commands.length > 0 && (
-                  <CollapsibleSection
-                    label="Commands"
-                    badge={commandsBadge}
-                  >
-                    <CommandList
-                      commands={commands}
-                      onStart={onStartCommand}
-                      onStop={onStopCommand}
-                      onFocus={onFocusCommand}
-                    />
-                  </CollapsibleSection>
-                )}
+                <CommandsRow badge={commandsBadge} />
               </div>
             )}
           </div>

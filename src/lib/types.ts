@@ -11,6 +11,7 @@ export interface CommandConfig {
   command: string;
   autostart: boolean;
   env: Record<string, string>;
+  cwd: string | null;
 }
 
 export interface WorkspaceConfig {
@@ -36,6 +37,7 @@ export interface CommandState {
   ptyId: number | null;
   autostart: boolean;
   env: Record<string, string>;
+  cwd: string | null;
 }
 
 export type SessionMode = "standard" | "worktree" | "yolo";

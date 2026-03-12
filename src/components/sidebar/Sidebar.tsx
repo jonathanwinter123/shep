@@ -20,9 +20,6 @@ interface SidebarProps {
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
-  onStartCommand: (name: string) => void;
-  onStopCommand: (name: string) => void;
-  onFocusCommand: (name: string) => void;
 }
 
 export default function Sidebar({
@@ -39,9 +36,6 @@ export default function Sidebar({
   onSelectTab,
   onCloseTab,
   onNewShell,
-  onStartCommand,
-  onStopCommand,
-  onFocusCommand,
 }: SidebarProps) {
   const projectState = useTerminalStore((s) => s.projectState);
   const projectCommands = useCommandStore((s) => s.projectCommands);
@@ -78,9 +72,6 @@ export default function Sidebar({
           onSelectTab={onSelectTab}
           onCloseTab={onCloseTab}
           onNewShell={onNewShell}
-          onStartCommand={onStartCommand}
-          onStopCommand={onStopCommand}
-          onFocusCommand={onFocusCommand}
         />
       </div>
       <SidebarFooter

@@ -3,7 +3,7 @@ import { useCommandStore } from "../../stores/useCommandStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { useGitStore } from "../../stores/useGitStore";
 import type { CommandState, CommandStatus } from "../../lib/types";
-import { Circle, GitBranch } from "lucide-react";
+import { Circle, GitBranch, Terminal } from "lucide-react";
 
 const EMPTY_COMMANDS: CommandState[] = [];
 import GearIcon from "../sidebar/icons/GearIcon";
@@ -47,6 +47,11 @@ export default function TabBar({
   const activateLauncher = useUIStore((s) => s.activateLauncher);
   const closeLauncher = useUIStore((s) => s.closeLauncher);
 
+  const commandsPanelOpen = useUIStore((s) => s.commandsPanelOpen);
+  const commandsPanelActive = useUIStore((s) => s.commandsPanelActive);
+  const activateCommandsPanel = useUIStore((s) => s.activateCommandsPanel);
+  const closeCommandsPanel = useUIStore((s) => s.closeCommandsPanel);
+
   const commands = useCommandStore(
     (s) => (s.activeProjectPath ? s.projectCommands[s.activeProjectPath] ?? EMPTY_COMMANDS : EMPTY_COMMANDS),
   );
@@ -57,12 +62,13 @@ export default function TabBar({
   const projectGitStatus = useGitStore((s) => s.projectGitStatus);
   const gitStatus = activeTabCwd ? projectGitStatus[activeTabCwd] : null;
 
-  const anyOverlay = settingsActive || launcherActive || gitPanelActive;
+  const anyOverlay = settingsActive || launcherActive || gitPanelActive || commandsPanelActive;
 
   const handleSelectTab = (tabId: string) => {
     useUIStore.getState().deactivateSettings();
     useUIStore.getState().deactivateLauncher();
     useUIStore.getState().deactivateGitPanel();
+    useUIStore.getState().deactivateCommandsPanel();
     setActiveTab(tabId);
   };
 
@@ -135,6 +141,25 @@ export default function TabBar({
               onClick={(e) => {
                 e.stopPropagation();
                 closeGitPanel();
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {commandsPanelOpen && (
+          <div
+            className={`tab ${commandsPanelActive ? "active" : ""}`}
+            onClick={activateCommandsPanel}
+          >
+            <Terminal size={12} />
+            <span>Commands</span>
+            <button
+              className="icon-btn ml-0.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeCommandsPanel();
               }}
             >
               ×

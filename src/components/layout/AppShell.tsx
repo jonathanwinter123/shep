@@ -6,6 +6,7 @@ import TerminalView from "../terminal/TerminalView";
 import TerminalErrorBoundary from "../terminal/TerminalErrorBoundary";
 import SettingsPanel from "../settings/SettingsPanel";
 import GitPanel from "../git/GitPanel";
+import CommandsPanel from "../commands/CommandsPanel";
 import SessionLauncher from "../session/SessionLauncher";
 import ShepLogo from "../sidebar/icons/ShepLogo";
 import { useRepoStore } from "../../stores/useRepoStore";
@@ -16,10 +17,10 @@ import { usePty } from "../../hooks/usePty";
 import { useThemeApplicator } from "../../hooks/useThemeApplicator";
 import { useGitPolling } from "../../hooks/useGitPolling";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
-import { getUsername, getComputerName, openInEditor } from "../../lib/tauri";
+import { getUsername, getComputerName, openInEditor, saveWorkspace } from "../../lib/tauri";
 import { useEditorStore } from "../../stores/useEditorStore";
 
-import type { CommandState, TerminalTab, SessionMode } from "../../lib/types";
+import type { CommandConfig, CommandState, TerminalTab, SessionMode, WorkspaceConfig } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
 
 // Stable empty arrays to avoid infinite re-render loops with zustand v5's
@@ -27,11 +28,27 @@ const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
 const EMPTY_TABS: TerminalTab[] = [];
 const EMPTY_COMMANDS: CommandState[] = [];
 
+function toCommandConfig(command: CommandState): CommandConfig {
+  return {
+    name: command.name,
+    command: command.command,
+    autostart: command.autostart,
+    env: command.env,
+    cwd: command.cwd,
+  };
+}
+
+function fallbackWorkspaceName(repoPath: string) {
+  return repoPath.split("/").filter(Boolean).pop() ?? "Project";
+}
+
 export default function AppShell() {
   useThemeApplicator();
 
   const { repos, activeRepoPath, fetchRepos, openRepo, addRepo, removeRepo } =
     useRepoStore();
+  const activeConfig = useRepoStore((s) => s.activeConfig);
+  const setActiveConfig = useRepoStore((s) => s.setActiveConfig);
   const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab } =
     usePty();
 
@@ -85,8 +102,32 @@ export default function AppShell() {
 
   const setActiveTab = useTerminalStore((s) => s.setActiveTab);
 
+  const persistWorkspaceCommands = useCallback(
+    async (nextCommands: CommandConfig[]) => {
+      if (!activeRepoPath) return null;
+
+      const nextConfig: WorkspaceConfig = {
+        name: activeConfig?.name ?? fallbackWorkspaceName(activeRepoPath),
+        assistants: activeConfig?.assistants ?? [],
+        commands: nextCommands,
+      };
+
+      try {
+        await saveWorkspace(activeRepoPath, nextConfig);
+        setActiveConfig(nextConfig);
+        return nextConfig;
+      } catch (error) {
+        console.error("Failed to save workspace commands:", error);
+        window.alert(String(error));
+        return null;
+      }
+    },
+    [activeConfig, activeRepoPath, setActiveConfig],
+  );
+
   const settingsActive = useUIStore((s) => s.settingsActive);
   const gitPanelActive = useUIStore((s) => s.gitPanelActive);
+  const commandsPanelActive = useUIStore((s) => s.commandsPanelActive);
   const launcherActive = useUIStore((s) => s.launcherActive);
   const loadEditorSettings = useEditorStore((s) => s.loadSettings);
 
@@ -159,6 +200,7 @@ export default function AppShell() {
             command: cmd.command,
             autostart: cmd.autostart,
             env: cmd.env,
+            cwd: cmd.cwd,
           },
           cols,
           rows,
@@ -168,21 +210,13 @@ export default function AppShell() {
     [startCommand, getTerminalDimensions],
   );
 
-  const handleFocusCommand = useCallback(
-    (name: string) => {
-      const state = useTerminalStore.getState();
-      const path = state.activeProjectPath;
-      if (!path) return;
-      const projectTabs = state.projectState[path]?.tabs ?? [];
-      const tab = projectTabs.find((t) => t.commandName === name);
-      if (tab) {
-        setActiveTab(tab.id);
-      } else {
-        handleStartCommand(name);
-      }
-    },
-    [setActiveTab, handleStartCommand],
-  );
+  const handleSelectSidebarTab = useCallback((tabId: string) => {
+    useUIStore.getState().deactivateSettings();
+    useUIStore.getState().deactivateGitPanel();
+    useUIStore.getState().deactivateCommandsPanel();
+    useUIStore.getState().deactivateLauncher();
+    setActiveTab(tabId);
+  }, [setActiveTab]);
 
   const handleNewAssistant = useCallback(() => {
     useUIStore.getState().openLauncher();
@@ -201,6 +235,67 @@ export default function AppShell() {
     const { cols, rows } = getTerminalDimensions();
     spawnBlankShell(cols, rows);
   }, [spawnBlankShell, getTerminalDimensions]);
+
+  const handleCreateCommand = useCallback(
+    async (command: CommandConfig) => {
+      if (!activeRepoPath) return false;
+      const nextCommands = [...commands.map(toCommandConfig), command];
+      const saved = await persistWorkspaceCommands(nextCommands);
+      if (!saved) return false;
+      useCommandStore.getState().addCommandForProject(activeRepoPath, command);
+      return true;
+    },
+    [activeRepoPath, commands, persistWorkspaceCommands],
+  );
+
+  const handleUpdateCommand = useCallback(
+    async (previousName: string, command: CommandConfig) => {
+      if (!activeRepoPath) return false;
+      const nextCommands = commands.map((existing) =>
+        existing.name === previousName ? command : toCommandConfig(existing),
+      );
+      const saved = await persistWorkspaceCommands(nextCommands);
+      if (!saved) return false;
+      await stopCommand(previousName);
+      useCommandStore.getState().updateCommandForProject(
+        activeRepoPath,
+        previousName,
+        command,
+      );
+      return true;
+    },
+    [activeRepoPath, commands, persistWorkspaceCommands, stopCommand],
+  );
+
+  const handleDeleteCommand = useCallback(
+    async (name: string) => {
+      if (!activeRepoPath) return;
+      const nextCommands = commands
+        .filter((command) => command.name !== name)
+        .map(toCommandConfig);
+      const saved = await persistWorkspaceCommands(nextCommands);
+      if (!saved) return;
+      await stopCommand(name);
+      useCommandStore.getState().removeCommandForProject(activeRepoPath, name);
+    },
+    [activeRepoPath, commands, persistWorkspaceCommands, stopCommand],
+  );
+
+  const handleStartAllCommands = useCallback(async () => {
+    for (const command of commands) {
+      if (command.status !== "running") {
+        handleStartCommand(command.name);
+      }
+    }
+  }, [commands, handleStartCommand]);
+
+  const handleStopAllCommands = useCallback(async () => {
+    for (const command of commands) {
+      if (command.status === "running") {
+        await stopCommand(command.name);
+      }
+    }
+  }, [commands, stopCommand]);
 
   const handleOpenInEditor = useCallback(async (repoPath: string) => {
     const preferredEditor = useEditorStore.getState().settings.preferredEditor;
@@ -239,7 +334,7 @@ export default function AppShell() {
     }
   }, [repos, activeRepoPath, handleSelectRepo]);
 
-  const showOverlay = settingsActive || gitPanelActive || launcherActive;
+  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive;
 
   return (
     <div className="app-shell">
@@ -273,12 +368,9 @@ export default function AppShell() {
           onRemoveProject={handleRemoveProject}
           onNewAssistant={handleNewAssistant}
           onOpenInEditor={handleOpenInEditor}
-          onSelectTab={setActiveTab}
+          onSelectTab={handleSelectSidebarTab}
           onCloseTab={closeTab}
           onNewShell={handleNewShell}
-          onStartCommand={handleStartCommand}
-          onStopCommand={stopCommand}
-          onFocusCommand={handleFocusCommand}
         />
 
         <div className="workspace-panel">
@@ -290,6 +382,18 @@ export default function AppShell() {
           <div ref={terminalContainerRef} className="terminal-stage">
             {settingsActive && <SettingsPanel />}
             {gitPanelActive && <GitPanel />}
+            {commandsPanelActive && (
+              <CommandsPanel
+                commands={commands}
+                onStartCommand={handleStartCommand}
+                onStopCommand={stopCommand}
+                onCreateCommand={handleCreateCommand}
+                onUpdateCommand={handleUpdateCommand}
+                onDeleteCommand={handleDeleteCommand}
+                onStartAllCommands={handleStartAllCommands}
+                onStopAllCommands={handleStopAllCommands}
+              />
+            )}
             {launcherActive && <SessionLauncher onStartSession={handleStartSession} />}
 
             {!showOverlay && tabs.length === 0 && (
