@@ -300,6 +300,181 @@ select {
   color: var(--text-secondary);
 }
 
+/* ── Tree guide lines (VS Code-style) ─────────────────── */
+
+.tree-branch {
+  position: relative;
+  padding-left: 16px;
+}
+
+.tree-node {
+  position: relative;
+}
+
+/* Hide empty tree-nodes (e.g. when child component returns null) */
+.tree-node:empty {
+  display: none;
+}
+
+/* Vertical line segment */
+.tree-node::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+/* Horizontal connector at midpoint (14px = half of 28px min-height) */
+.tree-node::after {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 14px;
+  width: 12px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+/* First child: vertical line starts at connector midpoint */
+.tree-node:first-child::before {
+  top: 14px;
+}
+
+/* Last child: vertical line stops at connector midpoint */
+.tree-node:last-child::before {
+  height: 14px;
+  bottom: auto;
+}
+
+/* Only child: no vertical line */
+.tree-node:only-child::before {
+  display: none;
+}
+
+/* Reduce left padding so items sit close to connector end */
+.tree-node > .list-item,
+.tree-node > .section-toggle {
+  padding-left: 8px;
+}
+
+.command-item__status {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.command-item__preview {
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+}
+
+.command-empty-state {
+  padding: 6px 8px;
+  color: var(--text-muted);
+}
+
+.command-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.command-form__input {
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-hover);
+  outline: none;
+}
+
+.command-form__input:focus {
+  border-color: var(--border-active);
+}
+
+.command-form__input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.command-form__input--code {
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+}
+
+.command-form__textarea {
+  resize: vertical;
+  min-height: 72px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-hover);
+  outline: none;
+}
+
+.command-form__textarea:focus {
+  border-color: var(--border-active);
+}
+
+.command-form__textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.command-form__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.command-form__checkbox input {
+  margin: 0;
+}
+
+.command-form__error {
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: rgb(252, 165, 165);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.command-form__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.command-form__text-btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.command-form__text-btn:hover {
+  color: var(--text-primary);
+}
+
 /* Badge / count pill */
 .badge {
   font-size: var(--text-badge);
@@ -587,6 +762,214 @@ select {
   min-width: 0;
   overflow: auto;
   scrollbar-color: rgba(185, 208, 255, 0.24) transparent;
+}
+
+/* ── Commands Panel ────────────────────────────────────── */
+
+.commands-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.commands-panel--empty {
+  align-items: center;
+  justify-content: center;
+  color: rgba(221, 231, 255, 0.46);
+  font-size: var(--text-body);
+}
+
+.commands-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0 12px;
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+
+.commands-panel__title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.commands-panel__title-block {
+  min-width: 0;
+}
+
+.commands-panel__title {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.commands-panel__subtitle {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.commands-panel__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.commands-panel__header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.commands-panel__header-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.commands-panel__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.commands-panel__row-shell {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.commands-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  transition: background 160ms ease, border-color 160ms ease;
+  flex-wrap: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.commands-panel__row:hover,
+.commands-panel__row.is-new {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.commands-panel__row-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.commands-panel__simple-list {
+  flex: 1;
+  min-height: 0;
+  padding: 18px 0;
+  overflow-y: auto;
+  scrollbar-color: rgba(185, 208, 255, 0.24) transparent;
+}
+
+.commands-panel__input {
+  height: 34px;
+  min-width: 0;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-hover);
+  outline: none;
+}
+
+.commands-panel__input:focus {
+  border-color: var(--border-active);
+}
+
+.commands-panel__input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.commands-panel__input--command {
+  flex: 1;
+  min-width: 0;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+}
+
+.commands-panel__auto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.commands-panel__auto input {
+  margin: 0;
+}
+
+.commands-panel__auto-help {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  opacity: 0.7;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: help;
+}
+
+.commands-panel__row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.commands-panel__action {
+  opacity: 0.72;
+}
+
+.commands-panel__action:hover {
+  opacity: 1;
+}
+
+.commands-panel__row-error {
+  width: 100%;
+  font-size: 11px;
+  color: rgb(252, 165, 165);
+}
+
+.commands-panel__delete {
+  width: 32px;
+  height: 32px;
+  align-self: center;
+  opacity: 0.62;
+}
+
+.commands-panel__delete:hover {
+  opacity: 1;
+}
+
+.commands-panel__empty-inline {
+  padding: 18px 12px;
+  color: var(--text-muted);
 }
 
 .file-status-badge {

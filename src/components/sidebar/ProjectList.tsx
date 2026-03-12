@@ -1,13 +1,13 @@
 import { useMemo, useState, useEffect } from "react";
 import type { RepoInfo, TerminalTab, CommandState } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
+import { Sparkles, SquareTerminal } from "lucide-react";
 import ProjectItem from "./ProjectItem";
 import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
-import CommandList from "./CommandList";
 import GitStatusRow from "./GitStatusRow";
-import IdeLaunchRow from "./IdeLaunchRow";
+import CommandsRow from "./CommandsRow";
 
 interface ProjectListProps {
   repos: RepoInfo[];
@@ -24,9 +24,6 @@ interface ProjectListProps {
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
-  onStartCommand: (name: string) => void;
-  onStopCommand: (name: string) => void;
-  onFocusCommand: (name: string) => void;
 }
 
 export default function ProjectList({
@@ -44,9 +41,6 @@ export default function ProjectList({
   onSelectTab,
   onCloseTab,
   onNewShell,
-  onStartCommand,
-  onStopCommand,
-  onFocusCommand,
 }: ProjectListProps) {
   const [expandedPath, setExpandedPath] = useState<string | null>(activeRepoPath);
 
@@ -84,14 +78,7 @@ export default function ProjectList({
     [tabs],
   );
 
-  const runningCommandCount = useMemo(
-    () => commands.filter((c) => c.status === "running").length,
-    [commands],
-  );
-
-  const commandsBadge = commands.length > 0
-    ? `${runningCommandCount} / ${commands.length}`
-    : null;
+  const commandsBadge = String(commands.length);
 
   return (
     <div className="flex flex-col gap-0.5 px-2 pb-2">
@@ -110,67 +97,39 @@ export default function ProjectList({
               onClick={() => handleProjectClick(repo.path)}
             />
             {isExpanded && (
-              <div className="mt-1 mb-2">
-                {/* Quick-add actions */}
-                <div className="flex flex-col gap-0.5 pl-4 mb-1">
-                  <button className="list-item w-full opacity-50 hover:opacity-100" onClick={onNewAssistant}>
-                    <span>+</span>
-                    <span>New AI Assistant</span>
-                  </button>
-                  <button className="list-item w-full opacity-50 hover:opacity-100" onClick={onNewShell}>
-                    <span>+</span>
-                    <span>New Terminal</span>
-                  </button>
-                </div>
+              <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
+                <CollapsibleSection
+                  label="AI Assistants"
+                  icon={<Sparkles size={14} />}
+                  badge={assistantTabs.length || null}
+                  hasItems={assistantTabs.length > 0}
+                  onAdd={onNewAssistant}
+                >
+                  <AssistantList
+                    assistantTabs={assistantTabs}
+                    activeTabId={activeTabId}
+                    onSelectTab={onSelectTab}
+                    onCloseTab={onCloseTab}
+                  />
+                </CollapsibleSection>
 
-                {/* Sections — only shown when populated */}
-                {assistantTabs.length > 0 && (
-                  <CollapsibleSection
-                    label="AI Assistants"
-                    badge={assistantTabs.length}
-                  >
-                    <AssistantList
-                      assistantTabs={assistantTabs}
-                      activeTabId={activeTabId}
-                      onSelectTab={onSelectTab}
-                      onCloseTab={onCloseTab}
-                    />
-                  </CollapsibleSection>
-                )}
+                <CollapsibleSection
+                  label="Terminals"
+                  icon={<SquareTerminal size={14} />}
+                  badge={shellTabs.length || null}
+                  hasItems={shellTabs.length > 0}
+                  onAdd={onNewShell}
+                >
+                  <TerminalList
+                    tabs={shellTabs}
+                    activeTabId={activeTabId}
+                    onSelectTab={onSelectTab}
+                    onCloseTab={onCloseTab}
+                  />
+                </CollapsibleSection>
 
-                {shellTabs.length > 0 && (
-                  <CollapsibleSection
-                    label="Terminals"
-                    badge={shellTabs.length}
-                  >
-                    <TerminalList
-                      tabs={shellTabs}
-                      activeTabId={activeTabId}
-                      onSelectTab={onSelectTab}
-                      onCloseTab={onCloseTab}
-                    />
-                  </CollapsibleSection>
-                )}
-
+                <CommandsRow badge={commandsBadge} />
                 <GitStatusRow repoPath={repo.path} />
-                <IdeLaunchRow
-                  repoPath={repo.path}
-                  onOpenInEditor={onOpenInEditor}
-                />
-
-                {commands.length > 0 && (
-                  <CollapsibleSection
-                    label="Commands"
-                    badge={commandsBadge}
-                  >
-                    <CommandList
-                      commands={commands}
-                      onStart={onStartCommand}
-                      onStop={onStopCommand}
-                      onFocus={onFocusCommand}
-                    />
-                  </CollapsibleSection>
-                )}
               </div>
             )}
           </div>

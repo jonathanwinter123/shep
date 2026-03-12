@@ -96,6 +96,33 @@ pub fn is_git_repo(path: &str) -> bool {
         .unwrap_or(false)
 }
 
+pub fn init_repo(path: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["-C", path, "init", "-b", "main"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if stderr.contains("unknown switch `b'") || stderr.contains("unknown option `b'") {
+        let fallback = Command::new("git")
+            .args(["-C", path, "init"])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        if fallback.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&fallback.stderr).to_string())
+        }
+    } else {
+        Err(stderr)
+    }
+}
+
 pub fn current_branch(path: &str) -> Result<String, String> {
     let output = Command::new("git")
         .args(["-C", path, "branch", "--show-current"])

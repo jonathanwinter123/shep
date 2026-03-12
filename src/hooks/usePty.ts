@@ -51,6 +51,13 @@ function writeToPty(ptyId: number, data: string) {
   }
 }
 
+function resolveCommandCwd(repoPath: string, commandCwd: string | null) {
+  const trimmed = commandCwd?.trim();
+  if (!trimmed) return repoPath;
+  const relativePath = trimmed.replace(/^\.?\//, "").replace(/^\/+/, "");
+  return `${repoPath}/${relativePath}`;
+}
+
 export function usePty() {
   const activeRepoPath = useRepoStore((s) => s.activeRepoPath);
   const {
@@ -125,7 +132,7 @@ export function usePty() {
           cols,
           rows,
           commandName,
-          activeRepoPath,
+          resolveCommandCwd(activeRepoPath, command.cwd ?? null),
         );
         if (!ptyId) return;
 
@@ -170,16 +177,21 @@ export function usePty() {
     async (commandName: string) => {
       const path = useCommandStore.getState().activeProjectPath;
       if (!path) return;
+      const state = useTerminalStore.getState();
       const commands = useCommandStore.getState().projectCommands[path] ?? [];
       const command = commands.find((c) => c.name === commandName);
+      const tab = state.projectState[path]?.tabs.find((t) => t.commandName === commandName);
       if (command?.ptyId) {
         await killPty(command.ptyId).catch(() => {});
         unregisterTerminal(command.ptyId);
       }
+      if (tab) {
+        removeTab(tab.id);
+      }
       setCommandStatus(commandName, "stopped");
       setCommandPtyId(commandName, null);
     },
-    [setCommandStatus, setCommandPtyId],
+    [setCommandStatus, setCommandPtyId, removeTab],
   );
 
   const restartCommand = useCallback(

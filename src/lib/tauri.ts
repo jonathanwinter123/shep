@@ -97,6 +97,10 @@ export function isGitRepo(path: string): Promise<boolean> {
   return invoke("is_git_repo", { path });
 }
 
+export function gitInit(path: string): Promise<void> {
+  return invoke("git_init", { path });
+}
+
 export function gitCurrentBranch(path: string): Promise<string> {
   return invoke("git_current_branch", { path });
 }
@@ -160,4 +164,8 @@ export function getUsername(): Promise<string> {
 
 export function getComputerName(): Promise<string> {
   return invoke("get_computer_name");
+}
+
+export function checkCommandExists(command: string): Promise<boolean> {
+  return invoke("check_command_exists", { command });
 }

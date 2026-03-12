@@ -10,6 +10,7 @@ use workspace::manager::WorkspaceManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let _ = fix_path_env::fix();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(PtyManager::new())
@@ -46,6 +47,7 @@ pub fn run() {
             commands::get_username,
             commands::get_computer_name,
             commands::is_git_repo,
+            commands::git_init,
             commands::git_current_branch,
             commands::git_list_branches,
             commands::git_create_worktree,
@@ -58,6 +60,7 @@ pub fn run() {
             commands::git_unstage_file,
             commands::git_switch_branch,
             commands::git_create_branch,
+            commands::check_command_exists,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

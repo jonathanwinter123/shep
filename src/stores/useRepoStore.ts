@@ -15,6 +15,7 @@ interface RepoStore {
   openRepo: (repoPath: string) => Promise<WorkspaceConfig>;
   addRepo: (repoPath: string) => Promise<WorkspaceConfig>;
   removeRepo: (repoPath: string) => Promise<void>;
+  setActiveConfig: (config: WorkspaceConfig | null) => void;
   clearRepo: () => void;
 }
 
@@ -52,6 +53,10 @@ export const useRepoStore = create<RepoStore>((set, get) => ({
       repos,
       ...(isActive ? { activeRepoPath: null, activeConfig: null } : {}),
     });
+  },
+
+  setActiveConfig: (config: WorkspaceConfig | null) => {
+    set({ activeConfig: config });
   },
 
   clearRepo: () => {

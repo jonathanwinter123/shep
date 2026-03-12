@@ -15,16 +15,17 @@ export default function TerminalList({
   onCloseTab,
 }: TerminalListProps) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <>
       {tabs.map((tab) => (
-        <TerminalItem
-          key={tab.id}
-          tab={tab}
-          isActive={tab.id === activeTabId}
-          onClick={() => onSelectTab(tab.id)}
-          onClose={() => onCloseTab(tab.id)}
-        />
+        <div key={tab.id} className="tree-node">
+          <TerminalItem
+            tab={tab}
+            isActive={tab.id === activeTabId}
+            onClick={() => onSelectTab(tab.id)}
+            onClose={() => onCloseTab(tab.id)}
+          />
+        </div>
       ))}
-    </div>
+    </>
   );
 }

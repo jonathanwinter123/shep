@@ -134,6 +134,11 @@ pub fn is_git_repo(path: &str) -> bool {
 }
 
 #[tauri::command]
+pub fn git_init(path: &str) -> Result<(), String> {
+    git::init_repo(path)
+}
+
+#[tauri::command]
 pub fn git_current_branch(path: &str) -> Result<String, String> {
     git::current_branch(path)
 }
@@ -213,6 +218,15 @@ pub fn get_computer_name() -> String {
         .and_then(|o| String::from_utf8(o.stdout).ok())
         .map(|s| s.trim().to_string())
         .unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn check_command_exists(command: &str) -> bool {
+    Command::new("which")
+        .arg(command)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 fn open_path_in_editor(repo_path: &str, editor_id: &str) -> Result<(), String> {

@@ -1,10 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import type { CodingAssistant, SessionMode } from "../../lib/types";
 import { CODING_ASSISTANTS } from "../sidebar/constants";
-import { isGitRepo, gitCurrentBranch, gitListBranches, gitSwitchBranch, gitCreateBranch, gitCreateWorktree } from "../../lib/tauri";
+import {
+  isGitRepo,
+  gitCurrentBranch,
+  gitInit,
+  gitListBranches,
+  gitSwitchBranch,
+  gitCreateBranch,
+  gitCreateWorktree,
+  checkCommandExists,
+} from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
-import { ChevronDown, GitBranch, GitFork, HandMetal } from "lucide-react";
+import { ChevronDown, GitBranch, GitFork, HandMetal, Play } from "lucide-react";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { ASSISTANT_INSTALL_URLS } from "../sidebar/constants";
 
 interface SessionLauncherProps {
   onStartSession: (
@@ -34,14 +44,14 @@ function todayStamp(): string {
 
 /** Mode labels for display */
 const MODE_LABELS: Record<SessionMode, string> = {
-  standard: "Branch",
+  standard: "Standard",
   worktree: "Worktree",
   yolo: "YOLO",
 };
 
 /** Mode icons */
 const MODE_ICONS: Record<SessionMode, React.ReactNode> = {
-  standard: <GitBranch size={14} style={{ opacity: 0.5 }} />,
+  standard: <Play size={14} style={{ opacity: 0.5 }} />,
   worktree: <GitFork size={14} style={{ opacity: 0.5 }} />,
   yolo: <HandMetal size={14} style={{ opacity: 0.5 }} />,
 };
@@ -57,6 +67,8 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   const activeRepoPath = useRepoStore((s) => s.activeRepoPath);
 
   const [selectedAssistant, setSelectedAssistant] = useState<CodingAssistant | null>(null);
+  const [available, setAvailable] = useState<Record<string, boolean>>({});
+  const [installPopover, setInstallPopover] = useState<string | null>(null);
   const [mode, setMode] = useState<SessionMode>("standard");
   const [isGit, setIsGit] = useState(false);
   const [currentBranch, setCurrentBranch] = useState<string>("");
@@ -65,8 +77,24 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   const [branchPickerOpen, setBranchPickerOpen] = useState(false);
   const [branchName, setBranchName] = useState("");
   const [useCurrentBranch, setUseCurrentBranch] = useState(false);
+  const [initializeGitOnLaunch, setInitializeGitOnLaunch] = useState(false);
   const [launching, setLaunching] = useState(false);
   const branchPickerRef = useRef<HTMLDivElement>(null);
+
+  // Check which assistants are installed
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const results: Record<string, boolean> = {};
+      await Promise.all(
+        CODING_ASSISTANTS.map(async (a) => {
+          results[a.id] = await checkCommandExists(a.command).catch(() => false);
+        }),
+      );
+      if (!cancelled) setAvailable(results);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!activeRepoPath) return;
@@ -91,6 +119,18 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
 
     return () => { cancelled = true; };
   }, [activeRepoPath]);
+
+  // Close install popover on outside click
+  useEffect(() => {
+    if (!installPopover) return;
+    const handleClick = () => setInstallPopover(null);
+    // Delay to avoid closing immediately from the same click
+    const timer = setTimeout(() => document.addEventListener("mousedown", handleClick), 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [installPopover]);
 
   useEffect(() => {
     if (!branchPickerOpen) return;
@@ -119,12 +159,24 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
     if (usesWorktree) setUseCurrentBranch(false);
   }, [usesWorktree]);
 
+  useEffect(() => {
+    if (isGit || mode !== "standard") {
+      setInitializeGitOnLaunch(false);
+    }
+  }, [isGit, mode]);
+
   const handleStart = async () => {
     if (!selectedAssistant || !activeRepoPath) return;
     setLaunching(true);
 
     try {
       let worktreePath: string | null = null;
+      let repoWasInitialized = false;
+
+      if (!isGit && mode === "standard" && initializeGitOnLaunch) {
+        await gitInit(activeRepoPath);
+        repoWasInitialized = true;
+      }
 
       if (usesWorktree && isGit) {
         // Worktree/YOLO: create worktree + branch
@@ -132,7 +184,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         const folderName = finalBranch.replace(/\//g, "-") + "-wt";
         worktreePath = `${activeRepoPath}/../.shep-worktrees/${folderName}`;
         await gitCreateWorktree(activeRepoPath, worktreePath, finalBranch);
-      } else if (isGit && !usesWorktree) {
+      } else if (isGit && !usesWorktree && !repoWasInitialized) {
         // Branch mode: switch to selected base branch if needed
         if (selectedBranch !== currentBranch) {
           await gitSwitchBranch(activeRepoPath, selectedBranch);
@@ -164,15 +216,50 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
           {CODING_ASSISTANTS.map((assistant) => {
             const logoUrl = assistantLogoSrc[assistant.id];
             const isSelected = selectedAssistant?.id === assistant.id;
+            const isAvailable = available[assistant.id] !== false;
+            const installUrl = ASSISTANT_INSTALL_URLS[assistant.id];
+            const showPopover = installPopover === assistant.id;
             return (
-              <button
-                key={assistant.id}
-                className={`option-card ${isSelected ? "selected" : ""}`}
-                onClick={() => setSelectedAssistant(assistant)}
-              >
-                {logoUrl && <img src={logoUrl} alt="" width={18} height={18} />}
-                <span>{assistant.name}</span>
-              </button>
+              <div key={assistant.id} className="relative">
+                <button
+                  className={`option-card ${isSelected ? "selected" : ""} ${!isAvailable ? "opacity-40" : ""}`}
+                  onClick={() => {
+                    if (isAvailable) {
+                      setSelectedAssistant(assistant);
+                      setInstallPopover(null);
+                    } else {
+                      setInstallPopover(showPopover ? null : assistant.id);
+                    }
+                  }}
+                >
+                  {logoUrl && <img src={logoUrl} alt="" width={18} height={18} style={!isAvailable ? { filter: "grayscale(1)" } : undefined} />}
+                  <span>{assistant.name}</span>
+                </button>
+                {showPopover && installUrl && (
+                  <div
+                    className="absolute left-0 top-full mt-2 z-50 rounded-lg p-3"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{
+                      background: "var(--glass-panel-strong)",
+                      border: "1px solid var(--glass-border-strong)",
+                      backdropFilter: "blur(24px) saturate(155%)",
+                      WebkitBackdropFilter: "blur(24px) saturate(155%)",
+                      boxShadow: "0 14px 36px rgba(0, 0, 0, 0.28)",
+                      minWidth: 200,
+                    }}
+                  >
+                    <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+                      <strong>{assistant.name}</strong> is not installed on this system.
+                    </p>
+                    <code
+                      className="block text-xs mt-1 px-2 py-1 rounded select-all cursor-text"
+                      style={{ background: "rgba(255,255,255,0.06)", color: "rgb(122, 162, 247)" }}
+                    >
+                      {installUrl}
+                    </code>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
@@ -199,6 +286,26 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
               {selectedAssistant.name} does not support a YOLO/auto mode flag.
             </p>
           )}
+        </div>
+      )}
+
+      {selectedAssistant && !isGit && mode === "standard" && (
+        <div className="mb-6">
+          <label className="flex items-center gap-2 cursor-pointer text-xs">
+            <input
+              type="checkbox"
+              checked={initializeGitOnLaunch}
+              onChange={(e) => setInitializeGitOnLaunch(e.target.checked)}
+              style={{ accentColor: "var(--text-muted)" }}
+            />
+            <span style={{ color: "var(--text-muted)" }}>
+              Initialize Git repository before launch
+            </span>
+          </label>
+          <p className="text-xs opacity-40 mt-2 max-w-md">
+            Creates a local Git repo in this project before launching the assistant.
+            Worktrees still need an initial commit before they can be used.
+          </p>
         </div>
       )}
 
