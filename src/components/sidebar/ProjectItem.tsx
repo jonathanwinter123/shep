@@ -96,7 +96,7 @@ export default function ProjectItem({
   return (
     <>
       <div
-        className={`list-item ${isActive ? "active" : ""} ${!repo.valid ? "opacity-50" : ""}`}
+        className={`list-item ${isActive ? "project-active" : ""} ${!repo.valid ? "opacity-50" : ""}`}
         onClick={onClick}
         onContextMenu={handleContextMenu}
         title={repo.path}

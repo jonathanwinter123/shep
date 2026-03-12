@@ -90,6 +90,7 @@ select {
 
 /* Interactive list item (sidebar rows, tree items) — highlight only, no border */
 .list-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -111,6 +112,19 @@ select {
 .list-item.active {
   color: var(--text-primary);
   background: rgba(255, 255, 255, 0.06);
+}
+.list-item.project-active {
+  color: var(--text-primary);
+}
+.list-item.project-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.4);
 }
 
 /* Context menu (right-click) */
@@ -156,9 +170,6 @@ select {
   width: 16px;
 }
 
-.sidebar-closable {
-  position: relative;
-}
 .sidebar-close-btn {
   position: absolute;
   right: 4px;
