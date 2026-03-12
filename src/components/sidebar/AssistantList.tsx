@@ -15,16 +15,17 @@ export default function AssistantList({
   onCloseTab,
 }: AssistantListProps) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <>
       {assistantTabs.map((tab) => (
-        <AssistantButton
-          key={tab.id}
-          tab={tab}
-          isActive={tab.id === activeTabId}
-          onClick={() => onSelectTab(tab.id)}
-          onClose={() => onCloseTab(tab.id)}
-        />
+        <div key={tab.id} className="tree-node">
+          <AssistantButton
+            tab={tab}
+            isActive={tab.id === activeTabId}
+            onClick={() => onSelectTab(tab.id)}
+            onClose={() => onCloseTab(tab.id)}
+          />
+        </div>
       ))}
-    </div>
+    </>
   );
 }

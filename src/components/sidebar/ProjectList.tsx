@@ -110,20 +110,16 @@ export default function ProjectList({
               onClick={() => handleProjectClick(repo.path)}
             />
             {isExpanded && (
-              <div className="mt-1 mb-2">
-                {/* Quick-add actions */}
-                <div className="flex flex-col gap-0.5 pl-4 mb-1">
-                  <button className="list-item w-full opacity-50 hover:opacity-100" onClick={onNewAssistant}>
-                    <span>+</span>
-                    <span>New AI Assistant</span>
-                  </button>
-                  <button className="list-item w-full opacity-50 hover:opacity-100" onClick={onNewShell}>
-                    <span>+</span>
-                    <span>New Terminal</span>
-                  </button>
-                </div>
+              <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
+                <button className="section-toggle" onClick={onNewAssistant}>
+                  <span>+</span>
+                  <span>New AI Assistant</span>
+                </button>
+                <button className="section-toggle" onClick={onNewShell}>
+                  <span>+</span>
+                  <span>New Terminal</span>
+                </button>
 
-                {/* Sections — only shown when populated */}
                 {assistantTabs.length > 0 && (
                   <CollapsibleSection
                     label="AI Assistants"

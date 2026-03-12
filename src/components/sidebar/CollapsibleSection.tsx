@@ -17,7 +17,7 @@ export default function CollapsibleSection({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="mt-1">
+    <>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="section-toggle"
@@ -33,10 +33,10 @@ export default function CollapsibleSection({
         )}
       </button>
       {isOpen && (
-        <div className="flex flex-col gap-0.5 mt-0.5 pl-4">
+        <div className="tree-branch mt-0.5">
           {children}
         </div>
       )}
-    </div>
+    </>
   );
 }

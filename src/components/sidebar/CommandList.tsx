@@ -16,23 +16,26 @@ export default function CommandList({
 }: CommandListProps) {
   if (commands.length === 0) {
     return (
-      <div className="px-2.5 py-1.5" style={{ color: "var(--text-muted)" }}>
-        No commands configured
+      <div className="tree-node">
+        <div className="px-2.5 py-1.5" style={{ color: "var(--text-muted)" }}>
+          No commands configured
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-0.5">
+    <>
       {commands.map((cmd) => (
-        <CommandItem
-          key={cmd.name}
-          command={cmd}
-          onStart={() => onStart(cmd.name)}
-          onStop={() => onStop(cmd.name)}
-          onFocus={() => onFocus(cmd.name)}
-        />
+        <div key={cmd.name} className="tree-node">
+          <CommandItem
+            command={cmd}
+            onStart={() => onStart(cmd.name)}
+            onStop={() => onStop(cmd.name)}
+            onFocus={() => onFocus(cmd.name)}
+          />
+        </div>
       ))}
-    </div>
+    </>
   );
 }

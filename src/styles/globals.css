@@ -300,6 +300,68 @@ select {
   color: var(--text-secondary);
 }
 
+/* ── Tree guide lines (VS Code-style) ─────────────────── */
+
+.tree-branch {
+  position: relative;
+  padding-left: 16px;
+}
+
+.tree-node {
+  position: relative;
+}
+
+/* Hide empty tree-nodes (e.g. when child component returns null) */
+.tree-node:empty {
+  display: none;
+}
+
+/* Vertical line segment */
+.tree-node::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+/* Horizontal connector at midpoint (14px = half of 28px min-height) */
+.tree-node::after {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 14px;
+  width: 12px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+/* First child: vertical line starts at connector midpoint */
+.tree-node:first-child::before {
+  top: 14px;
+}
+
+/* Last child: vertical line stops at connector midpoint */
+.tree-node:last-child::before {
+  height: 14px;
+  bottom: auto;
+}
+
+/* Only child: no vertical line */
+.tree-node:only-child::before {
+  display: none;
+}
+
+/* Reduce left padding so items sit close to connector end */
+.tree-node > .list-item,
+.tree-node > .section-toggle {
+  padding-left: 8px;
+}
+
 /* Badge / count pill */
 .badge {
   font-size: var(--text-badge);
