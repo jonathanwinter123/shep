@@ -1,12 +1,12 @@
 import { useMemo, useState, useEffect } from "react";
 import type { RepoInfo, TerminalTab, CommandState } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
+import { Sparkles, SquareTerminal } from "lucide-react";
 import ProjectItem from "./ProjectItem";
 import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
 import GitStatusRow from "./GitStatusRow";
-import IdeLaunchRow from "./IdeLaunchRow";
 import CommandsRow from "./CommandsRow";
 
 interface ProjectListProps {
@@ -98,50 +98,38 @@ export default function ProjectList({
             />
             {isExpanded && (
               <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
-                <button className="section-toggle" onClick={onNewAssistant}>
-                  <span>+</span>
-                  <span>New AI Assistant</span>
-                </button>
-                <button className="section-toggle" onClick={onNewShell}>
-                  <span>+</span>
-                  <span>New Terminal</span>
-                </button>
+                <CollapsibleSection
+                  label="AI Assistants"
+                  icon={<Sparkles size={14} />}
+                  badge={assistantTabs.length || null}
+                  hasItems={assistantTabs.length > 0}
+                  onAdd={onNewAssistant}
+                >
+                  <AssistantList
+                    assistantTabs={assistantTabs}
+                    activeTabId={activeTabId}
+                    onSelectTab={onSelectTab}
+                    onCloseTab={onCloseTab}
+                  />
+                </CollapsibleSection>
 
-                {assistantTabs.length > 0 && (
-                  <CollapsibleSection
-                    label="AI Assistants"
-                    badge={assistantTabs.length}
-                  >
-                    <AssistantList
-                      assistantTabs={assistantTabs}
-                      activeTabId={activeTabId}
-                      onSelectTab={onSelectTab}
-                      onCloseTab={onCloseTab}
-                    />
-                  </CollapsibleSection>
-                )}
-
-                {shellTabs.length > 0 && (
-                  <CollapsibleSection
-                    label="Terminals"
-                    badge={shellTabs.length}
-                  >
-                    <TerminalList
-                      tabs={shellTabs}
-                      activeTabId={activeTabId}
-                      onSelectTab={onSelectTab}
-                      onCloseTab={onCloseTab}
-                    />
-                  </CollapsibleSection>
-                )}
-
-                <GitStatusRow repoPath={repo.path} />
-                <IdeLaunchRow
-                  repoPath={repo.path}
-                  onOpenInEditor={onOpenInEditor}
-                />
+                <CollapsibleSection
+                  label="Terminals"
+                  icon={<SquareTerminal size={14} />}
+                  badge={shellTabs.length || null}
+                  hasItems={shellTabs.length > 0}
+                  onAdd={onNewShell}
+                >
+                  <TerminalList
+                    tabs={shellTabs}
+                    activeTabId={activeTabId}
+                    onSelectTab={onSelectTab}
+                    onCloseTab={onCloseTab}
+                  />
+                </CollapsibleSection>
 
                 <CommandsRow badge={commandsBadge} />
+                <GitStatusRow repoPath={repo.path} />
               </div>
             )}
           </div>
