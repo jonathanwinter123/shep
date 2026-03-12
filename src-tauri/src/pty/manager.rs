@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::ipc::Channel;
 
@@ -7,6 +8,7 @@ use super::session::{PtyOutput, PtySession};
 pub struct PtyManager {
     sessions: Mutex<HashMap<u32, PtySession>>,
     next_id: Mutex<u32>,
+    shutting_down: AtomicBool,
 }
 
 impl PtyManager {
@@ -14,7 +16,20 @@ impl PtyManager {
         PtyManager {
             sessions: Mutex::new(HashMap::new()),
             next_id: Mutex::new(1),
+            shutting_down: AtomicBool::new(false),
         }
+    }
+
+    pub fn session_count(&self) -> usize {
+        self.sessions.lock().unwrap().len()
+    }
+
+    pub fn begin_shutdown(&self) -> bool {
+        !self.shutting_down.swap(true, Ordering::SeqCst)
+    }
+
+    pub fn is_shutting_down(&self) -> bool {
+        self.shutting_down.load(Ordering::SeqCst)
     }
 
     pub fn spawn(

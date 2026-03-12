@@ -3,7 +3,7 @@ mod git;
 mod pty;
 mod workspace;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
 use pty::manager::PtyManager;
 use workspace::manager::WorkspaceManager;
@@ -11,7 +11,7 @@ use workspace::manager::WorkspaceManager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let _ = fix_path_env::fix();
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(PtyManager::new())
         .manage(WorkspaceManager::new())
@@ -31,6 +31,21 @@ pub fn run() {
             }
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let pty = window.state::<PtyManager>();
+                if pty.is_shutting_down() {
+                    return;
+                }
+                let count = pty.session_count();
+                if count > 0 {
+                    api.prevent_close();
+                    let _ = window.emit("quit-requested", count);
+                } else {
+                    pty.kill_all();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::list_repos,
             commands::register_repo,
@@ -44,6 +59,8 @@ pub fn run() {
             commands::write_pty,
             commands::resize_pty,
             commands::kill_pty,
+            commands::get_pty_session_count,
+            commands::shutdown_and_quit,
             commands::get_username,
             commands::get_computer_name,
             commands::is_git_repo,
@@ -62,6 +79,22 @@ pub fn run() {
             commands::git_create_branch,
             commands::check_command_exists,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app_handle, event| {
+        if let RunEvent::ExitRequested { api, .. } = &event {
+            let pty = app_handle.state::<PtyManager>();
+            if pty.is_shutting_down() {
+                return;
+            }
+            let count = pty.session_count();
+            if count > 0 {
+                api.prevent_exit();
+                let _ = app_handle.emit("quit-requested", count);
+            } else {
+                pty.kill_all();
+            }
+        }
+    });
 }

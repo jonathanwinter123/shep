@@ -19,6 +19,7 @@ import {
 } from "../../lib/terminalConfig";
 import { createTerminalTheme } from "./terminalTheme";
 import { useThemeStore } from "../../stores/useThemeStore";
+import { useTerminalStore } from "../../stores/useTerminalStore";
 
 interface TerminalViewProps {
   ptyId: number;
@@ -65,6 +66,11 @@ export default function TerminalView({
     // Send input to PTY
     term.onData((data) => {
       writePty(ptyId, data).catch(console.error);
+    });
+
+    // Track terminal bell (attention request)
+    term.onBell(() => {
+      useTerminalStore.getState().setTabBell(ptyId);
     });
 
     const entry = { term, fitAddon, rendererAddon: null as WebglAddon | CanvasAddon | null };

@@ -54,6 +54,16 @@ export interface TerminalTab {
   branch: string | null; // git branch at launch (refreshable)
 }
 
+// ── Tab activity tracking ────────────────────────────────────────────
+
+export interface TabActivity {
+  alive: boolean;
+  active: boolean;
+  exitCode: number | null;
+  bell: boolean;
+  lastActivityAt: number;
+}
+
 // ── Coding assistants ───────────────────────────────────────────────
 
 export interface CodingAssistant {

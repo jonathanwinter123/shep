@@ -24,7 +24,10 @@ export default function GitStatusRow({ repoPath }: GitStatusRowProps) {
       <GitBranch size={14} className="shrink-0" />
       <span className="truncate">{status.branch || "HEAD"}</span>
       {status.dirty && (
-        <span className="badge">{changeCount}</span>
+        <>
+          <span className="badge">{changeCount}</span>
+          <span className="git-dirty-dot" />
+        </>
       )}
       {hasRemoteDelta && (
         <span className="badge">

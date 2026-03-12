@@ -15,7 +15,7 @@ interface ProjectListProps {
   tabs: TerminalTab[];
   activeTabId: string | null;
   commands: CommandState[];
-  projectActivity: Record<string, { terminalCount: number; runningCount: number }>;
+  projectActivity: Record<string, { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean }>;
   onSelectRepo: (repoPath: string) => void;
   onAddProject: (repoPath: string) => void;
   onRemoveProject: (repoPath: string) => void;

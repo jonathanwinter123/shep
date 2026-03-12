@@ -40,18 +40,31 @@ export default function Sidebar({
   const projectState = useTerminalStore((s) => s.projectState);
   const projectCommands = useCommandStore((s) => s.projectCommands);
 
+  const tabActivity = useTerminalStore((s) => s.tabActivity);
+
   const projectActivity = useMemo(() => {
-    const activity: Record<string, { terminalCount: number; runningCount: number }> = {};
+    const activity: Record<string, { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean }> = {};
     for (const repo of repos) {
       const repoTabs = projectState[repo.path]?.tabs ?? [];
       const cmds = projectCommands[repo.path] ?? [];
+      let hasAttention = false;
+      let hasCrash = false;
+      for (const tab of repoTabs) {
+        const a = tabActivity[tab.ptyId];
+        if (a) {
+          if (a.bell) hasAttention = true;
+          if (!a.alive && a.exitCode !== 0) hasCrash = true;
+        }
+      }
       activity[repo.path] = {
         terminalCount: repoTabs.length,
         runningCount: cmds.filter((c) => c.status === "running").length,
+        hasAttention,
+        hasCrash,
       };
     }
     return activity;
-  }, [repos, projectState, projectCommands]);
+  }, [repos, projectState, projectCommands, tabActivity]);
 
   return (
     <div className="w-72 shrink-0 flex flex-col h-full pr-4 mr-4 border-r border-white/8" onContextMenu={(e) => e.preventDefault()}>

@@ -13,6 +13,15 @@ const terminalInstances = new Map<number, Terminal>();
 // Buffer for PTY output that arrives before terminal is registered
 const pendingOutput = new Map<number, string[]>();
 
+// Debounce timers for activity detection — clears "active" after 3s of silence
+const activityTimers = new Map<number, ReturnType<typeof setTimeout>>();
+const ACTIVITY_TIMEOUT = 3000;
+
+function cleanupActivityState(ptyId: number) {
+  const timer = activityTimers.get(ptyId);
+  if (timer) { clearTimeout(timer); activityTimers.delete(ptyId); }
+}
+
 export function registerTerminal(ptyId: number, term: Terminal) {
   terminalInstances.set(ptyId, term);
 }
@@ -66,7 +75,7 @@ export function usePty() {
     setCommandStatusForProject,
     setCommandPtyIdForProject,
   } = useCommandStore();
-  const { addTab, removeTab, findTabByCommand, setActiveTab } =
+  const { addTab, removeTab, findTabByCommand, setActiveTab, initActivity, setTabActive, setTabExited, updateLastActivity, removeActivity } =
     useTerminalStore();
 
   const handlePtyMessage = useCallback(
@@ -78,14 +87,26 @@ export function usePty() {
     ) => {
       if (msg.event === "data") {
         writeToPty(ptyId, msg.data);
+        updateLastActivity(ptyId);
+        setTabActive(ptyId, true);
+
+        // Reset the idle timer — after 3s of no output, mark as inactive
+        const existing = activityTimers.get(ptyId);
+        if (existing) clearTimeout(existing);
+        activityTimers.set(ptyId, setTimeout(() => {
+          setTabActive(ptyId, false);
+          activityTimers.delete(ptyId);
+        }, ACTIVITY_TIMEOUT));
       } else if (msg.event === "exit") {
+        cleanupActivityState(ptyId);
+        setTabExited(ptyId, msg.data.code);
         if (commandName) {
           setCommandStatusForProject(repoPath, commandName, "crashed");
           setCommandPtyIdForProject(repoPath, commandName, null);
         }
       }
     },
-    [setCommandStatusForProject, setCommandPtyIdForProject],
+    [setCommandStatusForProject, setCommandPtyIdForProject, updateLastActivity, setTabActive, setTabExited],
   );
 
   const spawnSession = useCallback(
@@ -110,6 +131,7 @@ export function usePty() {
       });
 
       resolvedPtyId = ptyId;
+      initActivity(ptyId);
 
       for (const msg of bufferedMessages) {
         handlePtyMessage(ptyId, commandName, repoPath, msg);
@@ -117,7 +139,7 @@ export function usePty() {
 
       return ptyId;
     },
-    [handlePtyMessage],
+    [handlePtyMessage, initActivity],
   );
 
   const startCommand = useCallback(
@@ -182,8 +204,10 @@ export function usePty() {
       const command = commands.find((c) => c.name === commandName);
       const tab = state.projectState[path]?.tabs.find((t) => t.commandName === commandName);
       if (command?.ptyId) {
+        cleanupActivityState(command.ptyId);
         await killPty(command.ptyId).catch(() => {});
         unregisterTerminal(command.ptyId);
+        removeActivity(command.ptyId);
       }
       if (tab) {
         removeTab(tab.id);
@@ -191,7 +215,7 @@ export function usePty() {
       setCommandStatus(commandName, "stopped");
       setCommandPtyId(commandName, null);
     },
-    [setCommandStatus, setCommandPtyId, removeTab],
+    [setCommandStatus, setCommandPtyId, removeTab, removeActivity],
   );
 
   const restartCommand = useCallback(
@@ -301,8 +325,10 @@ export function usePty() {
       const tab = tabs.find((t) => t.id === tabId);
       if (!tab) return;
 
+      cleanupActivityState(tab.ptyId);
       await killPty(tab.ptyId).catch(() => {});
       unregisterTerminal(tab.ptyId);
+      removeActivity(tab.ptyId);
 
       if (tab.commandName) {
         setCommandStatus(tab.commandName, "stopped");
@@ -318,17 +344,19 @@ export function usePty() {
 
       removeTab(tabId);
     },
-    [setCommandStatus, setCommandPtyId, removeTab],
+    [setCommandStatus, setCommandPtyId, removeTab, removeActivity],
   );
 
   const killProjectPtys = useCallback(async (repoPath: string) => {
     const state = useTerminalStore.getState();
     const tabs = state.projectState[repoPath]?.tabs ?? [];
     for (const tab of tabs) {
+      cleanupActivityState(tab.ptyId);
       await killPty(tab.ptyId).catch(() => {});
       unregisterTerminal(tab.ptyId);
+      removeActivity(tab.ptyId);
     }
-  }, []);
+  }, [removeActivity]);
 
   return {
     startCommand,

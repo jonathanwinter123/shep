@@ -17,7 +17,9 @@ import { usePty } from "../../hooks/usePty";
 import { useThemeApplicator } from "../../hooks/useThemeApplicator";
 import { useGitPolling } from "../../hooks/useGitPolling";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
-import { getUsername, getComputerName, openInEditor, saveWorkspace } from "../../lib/tauri";
+import { listen } from "@tauri-apps/api/event";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit } from "../../lib/tauri";
 import { useEditorStore } from "../../stores/useEditorStore";
 
 import type { CommandConfig, CommandState, TerminalTab, SessionMode, WorkspaceConfig } from "../../lib/types";
@@ -49,7 +51,7 @@ export default function AppShell() {
     useRepoStore();
   const activeConfig = useRepoStore((s) => s.activeConfig);
   const setActiveConfig = useRepoStore((s) => s.setActiveConfig);
-  const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab } =
+  const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab, killProjectPtys } =
     usePty();
 
   const restoreAttemptedRef = useRef(false);
@@ -176,6 +178,7 @@ export default function AppShell() {
 
   const handleRemoveProject = useCallback(
     async (repoPath: string) => {
+      await killProjectPtys(repoPath);
       await removeRepo(repoPath);
       // If that was the active project, clear state
       if (useRepoStore.getState().activeRepoPath === null) {
@@ -183,7 +186,7 @@ export default function AppShell() {
         useCommandStore.getState().switchProject("");
       }
     },
-    [removeRepo],
+    [killProjectPtys, removeRepo],
   );
 
   const handleStartCommand = useCallback(
@@ -333,6 +336,28 @@ export default function AppShell() {
       void handleSelectRepo(initialRepo.path);
     }
   }, [repos, activeRepoPath, handleSelectRepo]);
+
+  // Listen for backend "quit-requested" event (red close button or Cmd+Q with active PTYs)
+  const quitDialogOpenRef = useRef(false);
+  useEffect(() => {
+    const unlisten = listen<number>("quit-requested", async (event) => {
+      if (quitDialogOpenRef.current) return;
+      quitDialogOpenRef.current = true;
+      try {
+        const count = event.payload;
+        const confirmed = await ask(
+          `Quit Shep and stop ${count} running session${count === 1 ? "" : "s"}?`,
+          { title: "Quit Shep", kind: "warning", okLabel: "Quit", cancelLabel: "Cancel" },
+        );
+        if (confirmed) {
+          await shutdownAndQuit();
+        }
+      } finally {
+        quitDialogOpenRef.current = false;
+      }
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, []);
 
   const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive;
 

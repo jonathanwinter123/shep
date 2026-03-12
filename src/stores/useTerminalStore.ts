@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { TerminalTab } from "../lib/types";
+import type { TerminalTab, TabActivity } from "../lib/types";
 
 interface ProjectTerminalState {
   tabs: TerminalTab[];
@@ -9,6 +9,7 @@ interface ProjectTerminalState {
 interface TerminalStore {
   projectState: Record<string, ProjectTerminalState>;
   activeProjectPath: string | null;
+  tabActivity: Record<number, TabActivity>;
   switchProject: (repoPath: string) => void;
   removeProject: (repoPath: string) => void;
   addTab: (tab: TerminalTab) => void;
@@ -17,6 +18,13 @@ interface TerminalStore {
   updateTab: (id: string, patch: Partial<TerminalTab>) => void;
   findTabByCommand: (commandName: string) => TerminalTab | undefined;
   findTabByPtyId: (ptyId: number) => TerminalTab | undefined;
+  initActivity: (ptyId: number) => void;
+  setTabActive: (ptyId: number, active: boolean) => void;
+  setTabExited: (ptyId: number, exitCode: number) => void;
+  setTabBell: (ptyId: number) => void;
+  updateLastActivity: (ptyId: number) => void;
+  clearTabBell: (ptyId: number) => void;
+  removeActivity: (ptyId: number) => void;
 }
 
 function emptyState(): ProjectTerminalState {
@@ -36,11 +44,11 @@ export function nextTabId(): string {
 export const useTerminalStore = create<TerminalStore>((set, get) => ({
   projectState: {},
   activeProjectPath: null,
+  tabActivity: {},
 
   switchProject: (repoPath: string) => {
     set((state) => {
       if (state.projectState[repoPath]) {
-        // Project already exists — only change the active pointer
         return { activeProjectPath: repoPath };
       }
       return {
@@ -140,5 +148,61 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
   findTabByPtyId: (ptyId: number) => {
     const active = getActiveState(get());
     return active.tabs.find((t) => t.ptyId === ptyId);
+  },
+
+  initActivity: (ptyId: number) => {
+    set((state) => ({
+      tabActivity: {
+        ...state.tabActivity,
+        [ptyId]: { alive: true, active: true, exitCode: null, bell: false, lastActivityAt: Date.now() },
+      },
+    }));
+  },
+
+  setTabActive: (ptyId: number, active: boolean) => {
+    set((state) => {
+      const prev = state.tabActivity[ptyId];
+      if (!prev || prev.active === active) return state;
+      return { tabActivity: { ...state.tabActivity, [ptyId]: { ...prev, active } } };
+    });
+  },
+
+  setTabExited: (ptyId: number, exitCode: number) => {
+    set((state) => {
+      const prev = state.tabActivity[ptyId];
+      if (!prev) return state;
+      return { tabActivity: { ...state.tabActivity, [ptyId]: { ...prev, alive: false, exitCode } } };
+    });
+  },
+
+  setTabBell: (ptyId: number) => {
+    set((state) => {
+      const prev = state.tabActivity[ptyId];
+      if (!prev) return state;
+      return { tabActivity: { ...state.tabActivity, [ptyId]: { ...prev, bell: true } } };
+    });
+  },
+
+  updateLastActivity: (ptyId: number) => {
+    set((state) => {
+      const prev = state.tabActivity[ptyId];
+      if (!prev) return state;
+      return { tabActivity: { ...state.tabActivity, [ptyId]: { ...prev, lastActivityAt: Date.now() } } };
+    });
+  },
+
+  clearTabBell: (ptyId: number) => {
+    set((state) => {
+      const prev = state.tabActivity[ptyId];
+      if (!prev) return state;
+      return { tabActivity: { ...state.tabActivity, [ptyId]: { ...prev, bell: false } } };
+    });
+  },
+
+  removeActivity: (ptyId: number) => {
+    set((state) => {
+      const { [ptyId]: _, ...rest } = state.tabActivity;
+      return { tabActivity: rest };
+    });
   },
 }));
