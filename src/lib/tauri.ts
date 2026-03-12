@@ -165,3 +165,7 @@ export function getUsername(): Promise<string> {
 export function getComputerName(): Promise<string> {
   return invoke("get_computer_name");
 }
+
+export function checkCommandExists(command: string): Promise<boolean> {
+  return invoke("check_command_exists", { command });
+}

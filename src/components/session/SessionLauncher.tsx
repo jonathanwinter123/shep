@@ -9,10 +9,12 @@ import {
   gitSwitchBranch,
   gitCreateBranch,
   gitCreateWorktree,
+  checkCommandExists,
 } from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { ChevronDown, GitBranch, GitFork, HandMetal, Play } from "lucide-react";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { ASSISTANT_INSTALL_URLS } from "../sidebar/constants";
 
 interface SessionLauncherProps {
   onStartSession: (
@@ -65,6 +67,8 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   const activeRepoPath = useRepoStore((s) => s.activeRepoPath);
 
   const [selectedAssistant, setSelectedAssistant] = useState<CodingAssistant | null>(null);
+  const [available, setAvailable] = useState<Record<string, boolean>>({});
+  const [installPopover, setInstallPopover] = useState<string | null>(null);
   const [mode, setMode] = useState<SessionMode>("standard");
   const [isGit, setIsGit] = useState(false);
   const [currentBranch, setCurrentBranch] = useState<string>("");
@@ -76,6 +80,21 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   const [initializeGitOnLaunch, setInitializeGitOnLaunch] = useState(false);
   const [launching, setLaunching] = useState(false);
   const branchPickerRef = useRef<HTMLDivElement>(null);
+
+  // Check which assistants are installed
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const results: Record<string, boolean> = {};
+      await Promise.all(
+        CODING_ASSISTANTS.map(async (a) => {
+          results[a.id] = await checkCommandExists(a.command).catch(() => false);
+        }),
+      );
+      if (!cancelled) setAvailable(results);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!activeRepoPath) return;
@@ -100,6 +119,18 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
 
     return () => { cancelled = true; };
   }, [activeRepoPath]);
+
+  // Close install popover on outside click
+  useEffect(() => {
+    if (!installPopover) return;
+    const handleClick = () => setInstallPopover(null);
+    // Delay to avoid closing immediately from the same click
+    const timer = setTimeout(() => document.addEventListener("mousedown", handleClick), 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [installPopover]);
 
   useEffect(() => {
     if (!branchPickerOpen) return;
@@ -185,15 +216,50 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
           {CODING_ASSISTANTS.map((assistant) => {
             const logoUrl = assistantLogoSrc[assistant.id];
             const isSelected = selectedAssistant?.id === assistant.id;
+            const isAvailable = available[assistant.id] !== false;
+            const installUrl = ASSISTANT_INSTALL_URLS[assistant.id];
+            const showPopover = installPopover === assistant.id;
             return (
-              <button
-                key={assistant.id}
-                className={`option-card ${isSelected ? "selected" : ""}`}
-                onClick={() => setSelectedAssistant(assistant)}
-              >
-                {logoUrl && <img src={logoUrl} alt="" width={18} height={18} />}
-                <span>{assistant.name}</span>
-              </button>
+              <div key={assistant.id} className="relative">
+                <button
+                  className={`option-card ${isSelected ? "selected" : ""} ${!isAvailable ? "opacity-40" : ""}`}
+                  onClick={() => {
+                    if (isAvailable) {
+                      setSelectedAssistant(assistant);
+                      setInstallPopover(null);
+                    } else {
+                      setInstallPopover(showPopover ? null : assistant.id);
+                    }
+                  }}
+                >
+                  {logoUrl && <img src={logoUrl} alt="" width={18} height={18} style={!isAvailable ? { filter: "grayscale(1)" } : undefined} />}
+                  <span>{assistant.name}</span>
+                </button>
+                {showPopover && installUrl && (
+                  <div
+                    className="absolute left-0 top-full mt-2 z-50 rounded-lg p-3"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{
+                      background: "var(--glass-panel-strong)",
+                      border: "1px solid var(--glass-border-strong)",
+                      backdropFilter: "blur(24px) saturate(155%)",
+                      WebkitBackdropFilter: "blur(24px) saturate(155%)",
+                      boxShadow: "0 14px 36px rgba(0, 0, 0, 0.28)",
+                      minWidth: 200,
+                    }}
+                  >
+                    <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+                      <strong>{assistant.name}</strong> is not installed on this system.
+                    </p>
+                    <code
+                      className="block text-xs mt-1 px-2 py-1 rounded select-all cursor-text"
+                      style={{ background: "rgba(255,255,255,0.06)", color: "rgb(122, 162, 247)" }}
+                    >
+                      {installUrl}
+                    </code>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

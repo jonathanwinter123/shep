@@ -60,6 +60,7 @@ pub fn run() {
             commands::git_unstage_file,
             commands::git_switch_branch,
             commands::git_create_branch,
+            commands::check_command_exists,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

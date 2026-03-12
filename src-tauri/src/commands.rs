@@ -220,6 +220,15 @@ pub fn get_computer_name() -> String {
         .unwrap_or_default()
 }
 
+#[tauri::command]
+pub fn check_command_exists(command: &str) -> bool {
+    Command::new("which")
+        .arg(command)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
 fn open_path_in_editor(repo_path: &str, editor_id: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
