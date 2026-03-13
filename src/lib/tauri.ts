@@ -7,6 +7,7 @@ import type {
   ChangedFile,
   WorktreeEntry,
   EditorSettings,
+  KeybindingSettings,
   PreferredEditor,
 } from "./types";
 
@@ -41,6 +42,14 @@ export function getEditorSettings(): Promise<EditorSettings> {
 
 export function saveEditorSettings(settings: EditorSettings): Promise<void> {
   return invoke("save_editor_settings", { settings });
+}
+
+export function getKeybindingSettings(): Promise<KeybindingSettings> {
+  return invoke("get_keybinding_settings");
+}
+
+export function saveKeybindingSettings(settings: KeybindingSettings): Promise<void> {
+  return invoke("save_keybinding_settings", { settings });
 }
 
 export function openInEditor(

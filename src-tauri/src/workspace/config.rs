@@ -11,6 +11,8 @@ pub struct GlobalConfig {
     pub repos: Vec<RepoEntry>,
     #[serde(default)]
     pub editor: EditorSettings,
+    #[serde(default)]
+    pub keybindings: KeybindingSettings,
 }
 
 fn default_version() -> u32 {
@@ -23,6 +25,7 @@ impl Default for GlobalConfig {
             version: 1,
             repos: Vec::new(),
             editor: EditorSettings::default(),
+            keybindings: KeybindingSettings::default(),
         }
     }
 }
@@ -31,6 +34,30 @@ impl Default for GlobalConfig {
 pub struct EditorSettings {
     #[serde(default, rename = "preferredEditor")]
     pub preferred_editor: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeybindingSettings {
+    #[serde(default = "default_true", rename = "shiftEnterNewline")]
+    pub shift_enter_newline: bool,
+    #[serde(default = "default_true", rename = "optionDeleteWord")]
+    pub option_delete_word: bool,
+    #[serde(default = "default_true", rename = "cmdKClear")]
+    pub cmd_k_clear: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for KeybindingSettings {
+    fn default() -> Self {
+        KeybindingSettings {
+            shift_enter_newline: true,
+            option_delete_word: true,
+            cmd_k_clear: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

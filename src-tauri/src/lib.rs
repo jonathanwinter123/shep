@@ -54,6 +54,8 @@ pub fn run() {
             commands::save_workspace,
             commands::get_editor_settings,
             commands::save_editor_settings,
+            commands::get_keybinding_settings,
+            commands::save_keybinding_settings,
             commands::open_in_editor,
             commands::spawn_pty,
             commands::write_pty,

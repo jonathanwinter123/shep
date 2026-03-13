@@ -1,4 +1,4 @@
-use super::config::{EditorSettings, RepoInfo, WorkspaceConfig};
+use super::config::{EditorSettings, KeybindingSettings, RepoInfo, WorkspaceConfig};
 use super::loader;
 
 pub struct WorkspaceManager;
@@ -42,5 +42,13 @@ impl WorkspaceManager {
 
     pub fn save_editor_settings(&self, settings: &EditorSettings) -> Result<(), String> {
         loader::save_editor_settings(settings)
+    }
+
+    pub fn load_keybinding_settings(&self) -> Result<KeybindingSettings, String> {
+        loader::load_keybinding_settings()
+    }
+
+    pub fn save_keybinding_settings(&self, settings: &KeybindingSettings) -> Result<(), String> {
+        loader::save_keybinding_settings(settings)
     }
 }

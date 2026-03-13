@@ -26,6 +26,12 @@ export interface EditorSettings {
   preferredEditor: PreferredEditor | null;
 }
 
+export interface KeybindingSettings {
+  shiftEnterNewline: boolean;
+  optionDeleteWord: boolean;
+  cmdKClear: boolean;
+}
+
 // ── Runtime state types ─────────────────────────────────────────────
 
 export type CommandStatus = "stopped" | "running" | "crashed";

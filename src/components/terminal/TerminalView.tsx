@@ -20,6 +20,8 @@ import {
 import { createTerminalTheme } from "./terminalTheme";
 import { useThemeStore } from "../../stores/useThemeStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
+import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
+import { useKeybindingStore } from "../../stores/useKeybindingStore";
 
 interface TerminalViewProps {
   ptyId: number;
@@ -71,6 +73,20 @@ export default function TerminalView({
     // Track terminal bell (attention request)
     term.onBell(() => {
       useTerminalStore.getState().setTabBell(ptyId);
+    });
+
+    // Intercept key combos for custom keybindings
+    term.attachCustomKeyEventHandler((ev) => {
+      const settings = useKeybindingStore.getState().settings;
+      for (const preset of KEYBINDING_PRESETS) {
+        if (settings[preset.id] && preset.match(ev)) {
+          if (ev.type === "keydown") {
+            writePty(ptyId, preset.sequence).catch(console.error);
+          }
+          return false; // prevent xterm default handling
+        }
+      }
+      return true; // let xterm handle normally
     });
 
     const entry = { term, fitAddon, rendererAddon: null as WebglAddon | CanvasAddon | null };

@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { EDITOR_OPTIONS } from "../../lib/editors";
 import { THEME_LIST } from "../../lib/themes";
+import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useThemeStore } from "../../stores/useThemeStore";
+import { useKeybindingStore } from "../../stores/useKeybindingStore";
 
 export default function SettingsPanel() {
   const settingsOptionClass = "option-card w-44 justify-start";
@@ -15,11 +17,22 @@ export default function SettingsPanel() {
   const loadSettings = useEditorStore((s) => s.loadSettings);
   const setPreferredEditor = useEditorStore((s) => s.setPreferredEditor);
 
+  const kbSettings = useKeybindingStore((s) => s.settings);
+  const kbHasLoaded = useKeybindingStore((s) => s.hasLoaded);
+  const loadKbSettings = useKeybindingStore((s) => s.loadSettings);
+  const setKbEnabled = useKeybindingStore((s) => s.setEnabled);
+
   useEffect(() => {
     if (!hasLoaded) {
       void loadSettings();
     }
   }, [hasLoaded, loadSettings]);
+
+  useEffect(() => {
+    if (!kbHasLoaded) {
+      void loadKbSettings();
+    }
+  }, [kbHasLoaded, loadKbSettings]);
 
   return (
     <div className="absolute inset-0 overflow-y-auto p-6">
@@ -92,6 +105,27 @@ export default function SettingsPanel() {
           {error}
         </div>
       )}
+
+      <h2 className="section-label !p-0 mt-8 mb-2">Keybindings</h2>
+      <p className="text-sm text-white/55 mb-4 max-w-2xl">
+        Custom key combos for all terminal sessions. Toggle any preset on or off.
+      </p>
+
+      <div className="flex flex-col gap-3">
+        {KEYBINDING_PRESETS.map((preset) => {
+          const active = kbSettings[preset.id];
+          return (
+            <button
+              key={preset.id}
+              onClick={() => void setKbEnabled(preset.id, !active)}
+              className={`option-card justify-start ${active ? "selected" : ""}`}
+            >
+              <span className="font-medium">{preset.label}</span>
+              <span className="text-xs text-white/50">{preset.description}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
