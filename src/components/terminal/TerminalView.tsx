@@ -22,6 +22,7 @@ import { useThemeStore } from "../../stores/useThemeStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
 import { useKeybindingStore } from "../../stores/useKeybindingStore";
+import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 
 interface TerminalViewProps {
   ptyId: number;
@@ -47,13 +48,15 @@ export default function TerminalView({
     const cached = terminalCache.get(ptyId);
     if (cached) return cached;
 
+    const termSettings = useTerminalSettingsStore.getState().settings;
     const term = new Terminal({
-      cursorBlink: true,
+      cursorBlink: termSettings.cursorBlink,
+      cursorStyle: termSettings.cursorStyle,
       fontSize: TERMINAL_FONT_SIZE,
       fontFamily: TERMINAL_FONT_FAMILY,
       lineHeight: TERMINAL_LINE_HEIGHT,
       theme: createTerminalTheme(useThemeStore.getState().theme),
-      scrollback: 10000,
+      scrollback: termSettings.scrollback,
       allowTransparency: true,
       allowProposedApi: true,
     });

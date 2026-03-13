@@ -1,5 +1,6 @@
 import type { ITheme } from "@xterm/xterm";
 import type { ShepTheme } from "../../lib/themes";
+import type { TerminalSettings } from "../../lib/types";
 import { terminalCache } from "./TerminalView";
 
 // Utility to make hex colors partially transparent
@@ -43,5 +44,13 @@ export function applyThemeToTerminals(theme: ShepTheme): void {
   for (const [, entry] of terminalCache) {
     entry.term.options.theme = xtermTheme;
     entry.term.refresh(0, entry.term.rows - 1);
+  }
+}
+
+export function applyTerminalSettings(settings: TerminalSettings): void {
+  for (const [, entry] of terminalCache) {
+    entry.term.options.cursorStyle = settings.cursorStyle;
+    entry.term.options.cursorBlink = settings.cursorBlink;
+    entry.term.options.scrollback = settings.scrollback;
   }
 }

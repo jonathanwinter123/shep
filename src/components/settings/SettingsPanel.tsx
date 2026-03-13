@@ -1,13 +1,28 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { EDITOR_OPTIONS } from "../../lib/editors";
 import { THEME_LIST } from "../../lib/themes";
 import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useThemeStore } from "../../stores/useThemeStore";
 import { useKeybindingStore } from "../../stores/useKeybindingStore";
+import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
+import type { CursorStyle } from "../../lib/types";
+
+function InfoTip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span className="settings-info-tip" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.4 }}>
+        <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+        <text x="8" y="12" textAnchor="middle" fill="currentColor" fontSize="10" fontWeight="600">i</text>
+      </svg>
+      {show && <span className="settings-info-tip__bubble">{text}</span>}
+    </span>
+  );
+}
 
 export default function SettingsPanel() {
-  const settingsOptionClass = "option-card w-44 justify-start";
+  const optionClass = "option-card w-44 justify-start";
   const themeId = useThemeStore((s) => s.themeId);
   const setTheme = useThemeStore((s) => s.setTheme);
   const settings = useEditorStore((s) => s.settings);
@@ -22,6 +37,11 @@ export default function SettingsPanel() {
   const loadKbSettings = useKeybindingStore((s) => s.loadSettings);
   const setKbEnabled = useKeybindingStore((s) => s.setEnabled);
 
+  const termSettings = useTerminalSettingsStore((s) => s.settings);
+  const termHasLoaded = useTerminalSettingsStore((s) => s.hasLoaded);
+  const loadTermSettings = useTerminalSettingsStore((s) => s.loadSettings);
+  const updateTermSettings = useTerminalSettingsStore((s) => s.updateSettings);
+
   useEffect(() => {
     if (!hasLoaded) {
       void loadSettings();
@@ -34,8 +54,15 @@ export default function SettingsPanel() {
     }
   }, [kbHasLoaded, loadKbSettings]);
 
+  useEffect(() => {
+    if (!termHasLoaded) {
+      void loadTermSettings();
+    }
+  }, [termHasLoaded, loadTermSettings]);
+
   return (
     <div className="absolute inset-0 overflow-y-auto p-6">
+      {/* ── Theme ──────────────────────────────────────────── */}
       <h2 className="section-label !p-0 mb-4">Theme</h2>
 
       <div className="flex flex-wrap gap-3">
@@ -45,7 +72,7 @@ export default function SettingsPanel() {
             <button
               key={t.id}
               onClick={() => setTheme(t.id)}
-              className={`${settingsOptionClass} ${active ? "selected" : ""}`}
+              className={`${optionClass} ${active ? "selected" : ""}`}
             >
               <div
                 className="shrink-0 rounded-full"
@@ -65,10 +92,10 @@ export default function SettingsPanel() {
         })}
       </div>
 
-      <h2 className="section-label !p-0 mt-8 mb-2">Editor</h2>
-      <p className="text-sm text-white/55 mb-4 max-w-2xl">
-        Choose the app Shep should use when you open the selected project from the sidebar.
-      </p>
+      <hr className="settings-divider" />
+
+      {/* ── Editor ─────────────────────────────────────────── */}
+      <h2 className="section-label !p-0 mb-4">Editor</h2>
 
       <div className="flex flex-wrap gap-3">
         {EDITOR_OPTIONS.map((option) => {
@@ -77,7 +104,7 @@ export default function SettingsPanel() {
             <button
               key={option.id}
               onClick={() => void setPreferredEditor(option.id)}
-              className={`${settingsOptionClass} ${active ? "selected" : ""}`}
+              className={`${optionClass} ${active ? "selected" : ""}`}
             >
               <img
                 src={option.logoSrc}
@@ -92,40 +119,85 @@ export default function SettingsPanel() {
         })}
       </div>
 
-      <div className="mt-3 text-sm text-white/50">
-        {isSaving
-          ? "Saving editor preference..."
-          : settings.preferredEditor
-            ? "Sidebar actions will open projects directly in your chosen editor."
-            : "When no editor is set, the sidebar action sends you here to configure one."}
-      </div>
+      {isSaving && <div className="mt-2 text-xs text-white/40">Saving...</div>}
+      {error && <div className="mt-2 text-sm text-red-300">{error}</div>}
 
-      {error && (
-        <div className="mt-2 text-sm text-red-300">
-          {error}
-        </div>
-      )}
+      <hr className="settings-divider" />
 
-      <h2 className="section-label !p-0 mt-8 mb-2">Keybindings</h2>
-      <p className="text-sm text-white/55 mb-4 max-w-2xl">
-        Custom key combos for all terminal sessions. Toggle any preset on or off.
-      </p>
+      {/* ── Keybindings ────────────────────────────────────── */}
+      <h2 className="section-label !p-0 mb-4">Keybindings</h2>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap gap-3">
         {KEYBINDING_PRESETS.map((preset) => {
           const active = kbSettings[preset.id];
           return (
             <button
               key={preset.id}
               onClick={() => void setKbEnabled(preset.id, !active)}
-              className={`option-card justify-start ${active ? "selected" : ""}`}
+              className={`keybinding-card ${active ? "selected" : ""}`}
             >
-              <span className="font-medium">{preset.label}</span>
-              <span className="text-xs text-white/50">{preset.description}</span>
+              <span className="keybinding-card__keys">
+                {preset.keys.map((k, i) => (
+                  <kbd key={i} className="keybinding-kbd">{k}</kbd>
+                ))}
+              </span>
+              <span className="keybinding-card__action">{preset.action}</span>
             </button>
           );
         })}
       </div>
+
+      <hr className="settings-divider" />
+
+      {/* ── Terminal ───────────────────────────────────────── */}
+      <h2 className="section-label !p-0 mb-4">Terminal</h2>
+
+      <div className="settings-row">
+        <span className="settings-row__label">Cursor</span>
+        <div className="flex flex-wrap gap-2">
+          {(["block", "underline", "bar"] as const).map((style) => (
+            <button
+              key={style}
+              onClick={() => void updateTermSettings({ cursorStyle: style as CursorStyle })}
+              className={`option-card option-card--compact ${termSettings.cursorStyle === style ? "selected" : ""}`}
+            >
+              <span className="capitalize">{style}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="settings-row">
+        <span className="settings-row__label">Blink</span>
+        <button
+          onClick={() => void updateTermSettings({ cursorBlink: !termSettings.cursorBlink })}
+          className={`option-card option-card--compact ${termSettings.cursorBlink ? "selected" : ""}`}
+        >
+          {termSettings.cursorBlink ? "On" : "Off"}
+        </button>
+      </div>
+
+      <div className="settings-row">
+        <span className="settings-row__label">
+          Scrollback
+          <InfoTip text="Number of lines kept in the terminal scroll buffer. Higher values use more memory." />
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {[1000, 5000, 10000, 25000, 50000].map((value) => (
+            <button
+              key={value}
+              onClick={() => void updateTermSettings({ scrollback: value })}
+              className={`option-card option-card--compact ${termSettings.scrollback === value ? "selected" : ""}`}
+            >
+              {value >= 1000 ? `${value / 1000}k` : value}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <p className="text-xs text-white/30 mt-6">
+        Settings are saved to ~/.shep/config.yml
+      </p>
     </div>
   );
 }

@@ -21,6 +21,7 @@ import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit } from "../../lib/tauri";
 import { useEditorStore } from "../../stores/useEditorStore";
+import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 
 import type { CommandConfig, CommandState, TerminalTab, SessionMode, WorkspaceConfig } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
@@ -132,13 +133,15 @@ export default function AppShell() {
   const commandsPanelActive = useUIStore((s) => s.commandsPanelActive);
   const launcherActive = useUIStore((s) => s.launcherActive);
   const loadEditorSettings = useEditorStore((s) => s.loadSettings);
+  const loadTerminalSettings = useTerminalSettingsStore((s) => s.loadSettings);
 
   useEffect(() => {
     fetchRepos();
     void loadEditorSettings();
+    void loadTerminalSettings();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));
-  }, [fetchRepos, loadEditorSettings]);
+  }, [fetchRepos, loadEditorSettings, loadTerminalSettings]);
 
   const handleSelectRepo = useCallback(
     async (repoPath: string) => {

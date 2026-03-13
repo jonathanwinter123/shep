@@ -2,7 +2,8 @@ import type { KeybindingSettings } from "./types";
 
 export interface KeybindingPreset {
   id: keyof KeybindingSettings;
-  label: string;
+  keys: string[];
+  action: string;
   description: string;
   /** Bytes to write to the PTY when the combo fires */
   sequence: string;
@@ -13,7 +14,8 @@ export interface KeybindingPreset {
 export const KEYBINDING_PRESETS: KeybindingPreset[] = [
   {
     id: "shiftEnterNewline",
-    label: "Shift + Enter → newline",
+    keys: ["Shift", "Enter"],
+    action: "Newline",
     description: "Send a newline instead of submitting. Useful for multi-line input in Claude Code, Codex, etc.",
     sequence: "\n",
     match: (ev) =>
@@ -21,7 +23,8 @@ export const KEYBINDING_PRESETS: KeybindingPreset[] = [
   },
   {
     id: "optionDeleteWord",
-    label: "Option + Backspace → delete word",
+    keys: ["\u2325", "Delete"],
+    action: "Delete word",
     description: "Delete the previous word, matching macOS text editing conventions.",
     sequence: "\x17", // Ctrl+W
     match: (ev) =>
@@ -29,7 +32,8 @@ export const KEYBINDING_PRESETS: KeybindingPreset[] = [
   },
   {
     id: "cmdKClear",
-    label: "Cmd + K → clear terminal",
+    keys: ["\u2318", "K"],
+    action: "Clear terminal",
     description: "Clear the terminal screen, matching iTerm and Terminal.app behavior.",
     sequence: "\x0c", // form feed
     match: (ev) =>

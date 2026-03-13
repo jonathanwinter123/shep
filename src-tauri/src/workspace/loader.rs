@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use super::config::{
     CommandConfig, EditorSettings, GlobalConfig, KeybindingSettings, RepoEntry, RepoInfo,
-    WorkspaceConfig,
+    TerminalSettings, WorkspaceConfig,
 };
 
 // ── Paths ───────────────────────────────────────────────────────────
@@ -69,6 +69,16 @@ pub fn load_keybinding_settings() -> Result<KeybindingSettings, String> {
 pub fn save_keybinding_settings(settings: &KeybindingSettings) -> Result<(), String> {
     let mut config = load_global_config()?;
     config.keybindings = settings.clone();
+    save_global_config(&config)
+}
+
+pub fn load_terminal_settings() -> Result<TerminalSettings, String> {
+    Ok(load_global_config()?.terminal)
+}
+
+pub fn save_terminal_settings(settings: &TerminalSettings) -> Result<(), String> {
+    let mut config = load_global_config()?;
+    config.terminal = settings.clone();
     save_global_config(&config)
 }
 

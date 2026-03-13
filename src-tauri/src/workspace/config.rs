@@ -13,6 +13,8 @@ pub struct GlobalConfig {
     pub editor: EditorSettings,
     #[serde(default)]
     pub keybindings: KeybindingSettings,
+    #[serde(default)]
+    pub terminal: TerminalSettings,
 }
 
 fn default_version() -> u32 {
@@ -26,6 +28,7 @@ impl Default for GlobalConfig {
             repos: Vec::new(),
             editor: EditorSettings::default(),
             keybindings: KeybindingSettings::default(),
+            terminal: TerminalSettings::default(),
         }
     }
 }
@@ -56,6 +59,34 @@ impl Default for KeybindingSettings {
             shift_enter_newline: true,
             option_delete_word: true,
             cmd_k_clear: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerminalSettings {
+    #[serde(default = "default_cursor_style", rename = "cursorStyle")]
+    pub cursor_style: String,
+    #[serde(default = "default_true", rename = "cursorBlink")]
+    pub cursor_blink: bool,
+    #[serde(default = "default_scrollback")]
+    pub scrollback: u32,
+}
+
+fn default_cursor_style() -> String {
+    "block".to_string()
+}
+
+fn default_scrollback() -> u32 {
+    10000
+}
+
+impl Default for TerminalSettings {
+    fn default() -> Self {
+        TerminalSettings {
+            cursor_style: default_cursor_style(),
+            cursor_blink: true,
+            scrollback: default_scrollback(),
         }
     }
 }
