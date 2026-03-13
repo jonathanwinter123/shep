@@ -19,7 +19,7 @@ import {
 } from "../../lib/terminalConfig";
 import { createTerminalTheme } from "./terminalTheme";
 import { useThemeStore } from "../../stores/useThemeStore";
-import { useTerminalStore } from "../../stores/useTerminalStore";
+import { notifyAgent } from "../../lib/notifications";
 import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
 import { useKeybindingStore } from "../../stores/useKeybindingStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
@@ -75,7 +75,16 @@ export default function TerminalView({
 
     // Track terminal bell (attention request)
     term.onBell(() => {
-      useTerminalStore.getState().setTabBell(ptyId);
+      console.log("[shep] BEL received on pty", ptyId);
+      notifyAgent(ptyId, "Terminal bell");
+    });
+
+    // Intercept OSC 9 notifications from coding agents (Claude Code, Codex, Gemini)
+    term.parser.registerOscHandler(9, (data) => {
+      console.log("[shep] OSC 9 received on pty", ptyId, "data:", data);
+      const message = data.startsWith("2;") ? data.slice(2) : data;
+      if (message) notifyAgent(ptyId, message);
+      return true;
     });
 
     // Intercept key combos for custom keybindings

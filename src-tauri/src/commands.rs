@@ -304,6 +304,18 @@ fn open_path_in_editor(repo_path: &str, editor_id: &str) -> Result<(), String> {
     }
 }
 
+#[tauri::command]
+pub fn send_notification(title: &str, body: &str) {
+    let script = format!(
+        "display notification \"{}\" with title \"{}\"",
+        body.replace('\\', "\\\\").replace('"', "\\\""),
+        title.replace('\\', "\\\\").replace('"', "\\\""),
+    );
+    let _ = Command::new("osascript")
+        .args(["-e", &script])
+        .spawn();
+}
+
 fn editor_app_name(editor_id: &str) -> Option<&'static str> {
     match editor_id {
         "vscode" => Some("Visual Studio Code"),

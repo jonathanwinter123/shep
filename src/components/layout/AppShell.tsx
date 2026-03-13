@@ -22,6 +22,7 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit } from "../../lib/tauri";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
+import { initNotifications } from "../../lib/notifications";
 
 import type { CommandConfig, CommandState, TerminalTab, SessionMode, WorkspaceConfig } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
@@ -139,6 +140,7 @@ export default function AppShell() {
     fetchRepos();
     void loadEditorSettings();
     void loadTerminalSettings();
+    initNotifications();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));
   }, [fetchRepos, loadEditorSettings, loadTerminalSettings]);
@@ -222,7 +224,9 @@ export default function AppShell() {
     useUIStore.getState().deactivateCommandsPanel();
     useUIStore.getState().deactivateLauncher();
     setActiveTab(tabId);
-  }, [setActiveTab]);
+    const tab = tabs.find((t) => t.id === tabId);
+    if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
+  }, [setActiveTab, tabs]);
 
   const handleNewAssistant = useCallback(() => {
     useUIStore.getState().openLauncher();
