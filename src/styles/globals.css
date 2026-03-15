@@ -384,6 +384,7 @@ select {
 
 /* Tab (tab bar items) */
 .tab {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -405,6 +406,36 @@ select {
   background: var(--surface-active);
   border-color: var(--border-active);
   color: var(--text-primary);
+}
+.tab.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+.tab.drop-before::before,
+.tab.drop-after::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.4);
+}
+.tab.drop-before::before {
+  left: -2px;
+}
+.tab.drop-after::after {
+  right: -2px;
+}
+.tab-rename-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  outline: none;
+  color: var(--text-primary);
+  font: inherit;
+  padding: 0;
+  max-width: 128px;
 }
 
 /* Section header (top-level labels like "PROJECTS") */

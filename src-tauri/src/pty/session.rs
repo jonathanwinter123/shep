@@ -180,9 +180,6 @@ impl PtySession {
             .map_err(|e| format!("Failed to kill PTY: {e}"))
     }
 
-    pub fn is_alive(&self) -> bool {
-        self.alive.load(Ordering::SeqCst)
-    }
 }
 
 #[cfg(test)]

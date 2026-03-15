@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState } from "react";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { useGitStore } from "../../stores/useGitStore";
@@ -20,6 +21,67 @@ export default function TabBar({
   const tabs = projectTerminals?.tabs ?? [];
   const activeTabId = projectTerminals?.activeTabId ?? null;
   const setActiveTab = useTerminalStore((s) => s.setActiveTab);
+  const reorderTab = useTerminalStore((s) => s.reorderTab);
+  const updateTab = useTerminalStore((s) => s.updateTab);
+
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [dragTabId, setDragTabId] = useState<string | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const dragRef = useRef({ startX: 0, didDrag: false, dropIndex: null as number | null });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const computeDropIndex = useCallback((clientX: number) => {
+    const container = containerRef.current;
+    if (!container) return null;
+    const tabEls = Array.from(container.querySelectorAll<HTMLElement>("[data-tab-index]"));
+    for (let i = 0; i < tabEls.length; i++) {
+      const rect = tabEls[i].getBoundingClientRect();
+      if (clientX < rect.left + rect.width / 2) return i;
+    }
+    return tabEls.length;
+  }, []);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent, tabId: string) => {
+    if ((e.target as HTMLElement).closest(".icon-btn")) return;
+    const d = dragRef.current;
+    d.startX = e.clientX;
+    d.didDrag = false;
+    d.dropIndex = null;
+
+    const cleanup = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      setDragTabId(null);
+      setDropIndex(null);
+      d.didDrag = false;
+    };
+
+    const onMove = (ev: PointerEvent) => {
+      if (!d.didDrag && Math.abs(ev.clientX - d.startX) > 4) {
+        d.didDrag = true;
+        setDragTabId(tabId);
+      }
+      if (d.didDrag) {
+        const idx = computeDropIndex(ev.clientX);
+        d.dropIndex = idx;
+        setDropIndex(idx);
+      }
+    };
+
+    const onUp = () => {
+      if (d.didDrag && d.dropIndex !== null) {
+        reorderTab(tabId, d.dropIndex);
+      }
+      cleanup();
+    };
+
+    const onCancel = () => cleanup();
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+  }, [computeDropIndex, reorderTab]);
 
   const settingsTabOpen = useUIStore((s) => s.settingsTabOpen);
   const settingsActive = useUIStore((s) => s.settingsActive);
@@ -62,23 +124,68 @@ export default function TabBar({
 
   return (
     <div className="tab-bar">
-      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-        {tabs.map((tab) => {
+      <div
+        ref={containerRef}
+        className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
+      >
+        {tabs.map((tab, i) => {
           const isActive = tab.id === activeTabId && !anyOverlay;
+          const isDragging = tab.id === dragTabId;
           const logoUrl = tab.assistantId
             ? assistantLogoSrc[tab.assistantId]
             : null;
 
+          const showDropBefore = dropIndex !== null && dragTabId && tab.id !== dragTabId && dropIndex === i;
+          const showDropAfter = dropIndex !== null && dragTabId && tab.id !== dragTabId && dropIndex === i + 1 && i === tabs.length - 1;
+
           return (
             <div
               key={tab.id}
-              className={`tab ${isActive ? "active" : ""}`}
-              onClick={() => handleSelectTab(tab.id)}
+              data-tab-index={i}
+              className={`tab ${isActive ? "active" : ""}${isDragging ? " dragging" : ""}${showDropBefore ? " drop-before" : ""}${showDropAfter ? " drop-after" : ""}`}
+              onClick={() => {
+                if (!dragRef.current.didDrag) handleSelectTab(tab.id);
+              }}
+              onPointerDown={(e) => handlePointerDown(e, tab.id)}
             >
               {logoUrl ? (
                 <img src={logoUrl} alt="" width={12} height={12} />
               ) : null}
-              <span className="truncate max-w-32">{tab.label}</span>
+              {editingTabId === tab.id ? (
+                <input
+                  className="tab-rename-input"
+                  defaultValue={tab.label}
+                  autoFocus
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  onFocus={(e) => e.target.select()}
+                  onBlur={(e) => {
+                    const val = e.target.value.trim();
+                    if (val && val !== tab.label) updateTab(tab.id, { label: val });
+                    setEditingTabId(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                    if (e.key === "Escape") {
+                      e.currentTarget.value = tab.label;
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span
+                  className="truncate max-w-32"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setEditingTabId(tab.id);
+                  }}
+                >
+                  {tab.label}
+                </span>
+              )}
               <button
                 className="icon-btn ml-0.5"
                 onClick={(e) => {
