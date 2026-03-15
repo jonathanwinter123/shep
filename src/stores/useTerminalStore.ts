@@ -62,9 +62,17 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
   removeProject: (repoPath: string) => {
     set((state) => {
       const projectState = { ...state.projectState };
+      const removedTabs = projectState[repoPath]?.tabs ?? [];
       delete projectState[repoPath];
+
+      const tabActivity = { ...state.tabActivity };
+      for (const tab of removedTabs) {
+        delete tabActivity[tab.ptyId];
+      }
+
       return {
         projectState,
+        tabActivity,
         ...(state.activeProjectPath === repoPath
           ? { activeProjectPath: null }
           : {}),
@@ -147,10 +155,15 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
       if (!path) return state;
       const current = state.projectState[path] ?? emptyState();
       const fromIndex = current.tabs.findIndex((t) => t.id === tabId);
-      if (fromIndex === -1 || fromIndex === toIndex) return state;
+      if (fromIndex === -1) return state;
+
+      const boundedIndex = Math.max(0, Math.min(toIndex, current.tabs.length));
+      const targetIndex = boundedIndex > fromIndex ? boundedIndex - 1 : boundedIndex;
+      if (fromIndex === targetIndex) return state;
+
       const tabs = [...current.tabs];
       const [moved] = tabs.splice(fromIndex, 1);
-      tabs.splice(toIndex, 0, moved);
+      tabs.splice(targetIndex, 0, moved);
       return {
         projectState: {
           ...state.projectState,

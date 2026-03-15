@@ -1,4 +1,4 @@
-use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -20,7 +20,7 @@ pub struct PtySession {
     master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
     alive: Arc<AtomicBool>,
-    child: Box<dyn portable_pty::Child + Send + Sync>,
+    killer: Box<dyn ChildKiller + Send + Sync>,
 }
 
 fn decode_utf8_chunks(pending: &mut Vec<u8>, incoming: &[u8]) -> Vec<String> {
@@ -100,10 +100,11 @@ impl PtySession {
         cmd.env("TERM_PROGRAM", "iTerm.app"); // Fix for CLI tools (like gemini-cli) assuming solid backgrounds
         cmd.env("COLORTERM", "truecolor"); // Enable 24-bit color support
 
-        let child = pair
+        let mut child = pair
             .slave
             .spawn_command(cmd)
             .map_err(|e| format!("Failed to spawn command: {e}"))?;
+        let killer = child.clone_killer();
 
         // Drop slave — we only need the master side
         drop(pair.slave);
@@ -145,14 +146,18 @@ impl PtySession {
             }
 
             alive_clone.store(false, Ordering::SeqCst);
-            let _ = channel.send(PtyOutput::Exit { code: 0 });
+            let exit_code = child
+                .wait()
+                .map(|status| status.exit_code() as i32)
+                .unwrap_or(1);
+            let _ = channel.send(PtyOutput::Exit { code: exit_code });
         });
 
         Ok(PtySession {
             master: pair.master,
             writer,
             alive,
-            child,
+            killer,
         })
     }
 
@@ -175,7 +180,7 @@ impl PtySession {
 
     pub fn kill(&mut self) -> Result<(), String> {
         self.alive.store(false, Ordering::SeqCst);
-        self.child
+        self.killer
             .kill()
             .map_err(|e| format!("Failed to kill PTY: {e}"))
     }

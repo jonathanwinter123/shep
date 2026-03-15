@@ -5,6 +5,7 @@ import { useGitStore } from "../../stores/useGitStore";
 import { GitBranch, Terminal } from "lucide-react";
 import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { handleActionKey } from "../../lib/a11y";
 
 interface TabBarProps {
   onClose: (tabId: string) => void;
@@ -127,6 +128,8 @@ export default function TabBar({
       <div
         ref={containerRef}
         className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
+        role="tablist"
+        aria-label="Workspace tabs"
       >
         {tabs.map((tab, i) => {
           const isActive = tab.id === activeTabId && !anyOverlay;
@@ -146,7 +149,12 @@ export default function TabBar({
               onClick={() => {
                 if (!dragRef.current.didDrag) handleSelectTab(tab.id);
               }}
+              onKeyDown={(event) => handleActionKey(event, () => handleSelectTab(tab.id))}
               onPointerDown={(e) => handlePointerDown(e, tab.id)}
+              role="tab"
+              tabIndex={0}
+              aria-selected={isActive}
+              aria-label={`Open tab ${tab.label}`}
             >
               {logoUrl ? (
                 <img src={logoUrl} alt="" width={12} height={12} />
@@ -188,6 +196,7 @@ export default function TabBar({
               )}
               <button
                 className="icon-btn ml-0.5"
+                aria-label={`Close tab ${tab.label}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onClose(tab.id);
@@ -203,11 +212,17 @@ export default function TabBar({
           <div
             className={`tab ${launcherActive ? "active" : ""}`}
             onClick={activateLauncher}
+            onKeyDown={(event) => handleActionKey(event, activateLauncher)}
+            role="tab"
+            tabIndex={0}
+            aria-selected={launcherActive}
+            aria-label="Open new session panel"
           >
             <span>+</span>
             <span>New Session</span>
             <button
               className="icon-btn ml-0.5"
+              aria-label="Close new session panel"
               onClick={(e) => {
                 e.stopPropagation();
                 closeLauncher();
@@ -222,11 +237,17 @@ export default function TabBar({
           <div
             className={`tab ${gitPanelActive ? "active" : ""}`}
             onClick={activateGitPanel}
+            onKeyDown={(event) => handleActionKey(event, activateGitPanel)}
+            role="tab"
+            tabIndex={0}
+            aria-selected={gitPanelActive}
+            aria-label="Open Git panel"
           >
             <GitBranch size={12} />
             <span>Git</span>
             <button
               className="icon-btn ml-0.5"
+              aria-label="Close Git panel"
               onClick={(e) => {
                 e.stopPropagation();
                 closeGitPanel();
@@ -241,11 +262,17 @@ export default function TabBar({
           <div
             className={`tab ${commandsPanelActive ? "active" : ""}`}
             onClick={activateCommandsPanel}
+            onKeyDown={(event) => handleActionKey(event, activateCommandsPanel)}
+            role="tab"
+            tabIndex={0}
+            aria-selected={commandsPanelActive}
+            aria-label="Open commands panel"
           >
             <Terminal size={12} />
             <span>Commands</span>
             <button
               className="icon-btn ml-0.5"
+              aria-label="Close commands panel"
               onClick={(e) => {
                 e.stopPropagation();
                 closeCommandsPanel();
@@ -260,11 +287,17 @@ export default function TabBar({
           <div
             className={`tab ${settingsActive ? "active" : ""}`}
             onClick={activateSettings}
+            onKeyDown={(event) => handleActionKey(event, activateSettings)}
+            role="tab"
+            tabIndex={0}
+            aria-selected={settingsActive}
+            aria-label="Open settings panel"
           >
             <GearIcon size={12} />
             <span>Settings</span>
             <button
               className="icon-btn ml-0.5"
+              aria-label="Close settings panel"
               onClick={(e) => {
                 e.stopPropagation();
                 closeSettingsTab();
@@ -279,6 +312,7 @@ export default function TabBar({
           className="tab"
           onClick={onNewShell}
           title="New Terminal"
+          aria-label="Open new terminal"
         >
           +
         </button>
@@ -288,7 +322,11 @@ export default function TabBar({
         <div
           className="flex items-center gap-1.5 shrink-0 text-xs pl-3 border-l border-white/8 cursor-pointer hover:opacity-80 transition-opacity"
           onClick={openGitPanel}
+          onKeyDown={(event) => handleActionKey(event, openGitPanel)}
           title="Open Git panel"
+          role="button"
+          tabIndex={0}
+          aria-label={`Open Git panel for branch ${gitStatus.branch}`}
         >
           <GitBranch size={12} />
           <span className="truncate max-w-32">{gitStatus.branch}</span>

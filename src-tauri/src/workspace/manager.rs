@@ -1,4 +1,4 @@
-use super::config::{EditorSettings, KeybindingSettings, RepoInfo, TerminalSettings, WorkspaceConfig};
+use super::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, WorkspaceConfig};
 use super::loader;
 
 pub struct WorkspaceManager;
@@ -16,7 +16,7 @@ impl WorkspaceManager {
         loader::list_repos()
     }
 
-    pub fn register_repo(&self, repo_path: &str) -> Result<WorkspaceConfig, String> {
+    pub fn register_repo(&self, repo_path: &str) -> Result<RegisteredRepo, String> {
         loader::register_repo(repo_path)
     }
 

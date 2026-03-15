@@ -70,20 +70,24 @@ export default function TerminalView({
 
     // Send input to PTY
     term.onData((data) => {
-      writePty(ptyId, data).catch(console.error);
+      writePty(ptyId, data).catch((error) => {
+        if (import.meta.env.DEV) {
+          console.error("Failed to write PTY input:", error);
+        }
+      });
     });
 
     // Track terminal bell (attention request)
     term.onBell(() => {
-      console.log("[shep] BEL received on pty", ptyId);
-      notifyAgent(ptyId, "Terminal bell");
+      void notifyAgent(ptyId, "Terminal bell");
     });
 
     // Intercept OSC 9 notifications from coding agents (Claude Code, Codex, Gemini)
     term.parser.registerOscHandler(9, (data) => {
-      console.log("[shep] OSC 9 received on pty", ptyId, "data:", data);
       const message = data.startsWith("2;") ? data.slice(2) : data;
-      if (message) notifyAgent(ptyId, message);
+      if (message) {
+        void notifyAgent(ptyId, message);
+      }
       return true;
     });
 
@@ -93,7 +97,11 @@ export default function TerminalView({
       for (const preset of KEYBINDING_PRESETS) {
         if (settings[preset.id] && preset.match(ev)) {
           if (ev.type === "keydown") {
-            writePty(ptyId, preset.sequence).catch(console.error);
+            writePty(ptyId, preset.sequence).catch((error) => {
+              if (import.meta.env.DEV) {
+                console.error("Failed to write PTY keybinding:", error);
+              }
+            });
           }
           return false; // prevent xterm default handling
         }
@@ -127,7 +135,11 @@ export default function TerminalView({
     }
 
     lastSizeRef.current = size;
-    await resizePty(ptyId, size.cols, size.rows).catch(console.error);
+    await resizePty(ptyId, size.cols, size.rows).catch((error) => {
+      if (import.meta.env.DEV) {
+        console.error("Failed to resize PTY:", error);
+      }
+    });
   }, [ptyId]);
 
   useEffect(() => {
@@ -150,13 +162,17 @@ export default function TerminalView({
           term.loadAddon(canvas);
           cached.rendererAddon = canvas;
         } catch (err) {
-          console.warn("Canvas renderer failed, trying WebGL:", err);
+          if (import.meta.env.DEV) {
+            console.warn("Canvas renderer failed, trying WebGL:", err);
+          }
           try {
             const webgl = new WebglAddon();
             term.loadAddon(webgl);
             cached.rendererAddon = webgl;
           } catch (err2) {
-            console.warn("No accelerated renderer available:", err2);
+            if (import.meta.env.DEV) {
+              console.warn("No accelerated renderer available:", err2);
+            }
           }
         }
       }

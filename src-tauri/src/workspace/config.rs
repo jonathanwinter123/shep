@@ -105,6 +105,12 @@ pub struct RepoInfo {
     pub valid: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisteredRepo {
+    pub path: String,
+    pub workspace: WorkspaceConfig,
+}
+
 // ── Per-repo workspace config (<repo>/.shep/workspace.yml) ──────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

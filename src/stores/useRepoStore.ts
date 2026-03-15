@@ -36,13 +36,14 @@ export const useRepoStore = create<RepoStore>((set, get) => ({
   },
 
   addRepo: async (repoPath: string) => {
-    const config = await registerRepo(repoPath);
+    const registered = await registerRepo(repoPath);
     const repos = await listRepos();
-    // Use the canonical path from the repo list (Rust canonicalizes it)
-    const registered = repos.find((r) => r.name === config.name);
-    const canonicalPath = registered?.path ?? repoPath;
-    set({ repos, activeRepoPath: canonicalPath, activeConfig: config });
-    return config;
+    set({
+      repos,
+      activeRepoPath: registered.path,
+      activeConfig: registered.workspace,
+    });
+    return registered.workspace;
   },
 
   removeRepo: async (repoPath: string) => {

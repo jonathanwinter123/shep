@@ -8,7 +8,7 @@ use crate::git;
 use crate::git::{ChangedFile, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::PtyOutput;
-use crate::workspace::config::{EditorSettings, KeybindingSettings, RepoInfo, TerminalSettings, WorkspaceConfig};
+use crate::workspace::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, WorkspaceConfig};
 use crate::workspace::manager::WorkspaceManager;
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -22,7 +22,7 @@ pub fn list_repos(workspace: State<'_, WorkspaceManager>) -> Result<Vec<RepoInfo
 pub fn register_repo(
     repo_path: &str,
     workspace: State<'_, WorkspaceManager>,
-) -> Result<WorkspaceConfig, String> {
+) -> Result<RegisteredRepo, String> {
     workspace.register_repo(repo_path)
 }
 

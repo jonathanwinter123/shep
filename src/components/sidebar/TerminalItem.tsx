@@ -1,6 +1,7 @@
 import type { TerminalTab, TabActivity } from "../../lib/types";
 import { Terminal } from "lucide-react";
 import { useTerminalStore } from "../../stores/useTerminalStore";
+import { handleActionKey } from "../../lib/a11y";
 
 interface TerminalItemProps {
   tab: TerminalTab;
@@ -28,12 +29,18 @@ export default function TerminalItem({
     <div
       className={`list-item sidebar-closable ${isActive ? "active" : ""}`}
       onClick={onClick}
+      onKeyDown={(event) => handleActionKey(event, onClick)}
+      role="button"
+      tabIndex={0}
+      aria-pressed={isActive}
+      aria-label={`Open terminal tab ${tab.label}`}
     >
       <Terminal size={14} className="shrink-0" />
       <span className="min-w-0 truncate text-left">{tab.label}</span>
       <span className={`sidebar-status-dot ${dotClass(activity)}`} />
       <button
         className="icon-btn sidebar-close-btn"
+        aria-label={`Close terminal tab ${tab.label}`}
         onClick={(e) => {
           e.stopPropagation();
           onClose();

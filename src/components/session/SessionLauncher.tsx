@@ -15,13 +15,15 @@ import { useRepoStore } from "../../stores/useRepoStore";
 import { ChevronDown, GitBranch, GitFork, HandMetal, Play } from "lucide-react";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { ASSISTANT_INSTALL_URLS } from "../sidebar/constants";
+import { getErrorMessage } from "../../lib/errors";
+import { useNoticeStore } from "../../stores/useNoticeStore";
 
 interface SessionLauncherProps {
   onStartSession: (
     assistantId: string,
     mode: SessionMode,
     worktreePath: string | null,
-  ) => void;
+  ) => Promise<boolean>;
 }
 
 /** Generate a unique branch name by appending -2, -3, etc. if needed */
@@ -65,6 +67,7 @@ function modeBranchSlug(mode: SessionMode): string {
 
 export default function SessionLauncher({ onStartSession }: SessionLauncherProps) {
   const activeRepoPath = useRepoStore((s) => s.activeRepoPath);
+  const pushNotice = useNoticeStore((s) => s.pushNotice);
 
   const [selectedAssistant, setSelectedAssistant] = useState<CodingAssistant | null>(null);
   const [available, setAvailable] = useState<Record<string, boolean>>({});
@@ -166,7 +169,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   }, [isGit, mode]);
 
   const handleStart = async () => {
-    if (!selectedAssistant || !activeRepoPath) return;
+    if (!selectedAssistant || !activeRepoPath || launching) return;
     setLaunching(true);
 
     try {
@@ -196,9 +199,19 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         }
       }
 
-      onStartSession(selectedAssistant.id, mode, worktreePath);
+      const started = await onStartSession(selectedAssistant.id, mode, worktreePath);
+      if (!started) {
+        setLaunching(false);
+      }
     } catch (e) {
-      console.error("Failed to start session:", e);
+      if (import.meta.env.DEV) {
+        console.error("Failed to start session:", e);
+      }
+      pushNotice({
+        tone: "error",
+        title: "Couldn’t start session",
+        message: getErrorMessage(e),
+      });
       setLaunching(false);
     }
   };
@@ -444,9 +457,10 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         <button
           className="btn-primary"
           disabled={launching || !!yoloUnavailable}
+          aria-busy={launching}
           onClick={handleStart}
         >
-          {launching ? "Starting..." : "Start Session"}
+          {launching ? "Preparing Session..." : "Start Session"}
         </button>
       )}
     </div>

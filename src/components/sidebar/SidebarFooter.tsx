@@ -22,6 +22,7 @@ export default function SidebarFooter({
         <button
           onClick={toggleSettings}
           className={`${footerButtonClass} ${settingsTabOpen ? "active" : ""}`}
+          aria-label="Open settings"
         >
           <GearIcon size={20} />
           <span className="text-[10px]">Settings</span>
@@ -37,6 +38,7 @@ export default function SidebarFooter({
             editorDisabled ? "opacity-40 cursor-default hover:!bg-transparent hover:!text-[var(--text-secondary)]" : ""
           }`}
           title="IDE"
+          aria-label={editorDisabled ? "Open project in IDE unavailable" : "Open active project in IDE"}
         >
           <CodeXml size={20} />
           <span className="text-[10px]">IDE</span>

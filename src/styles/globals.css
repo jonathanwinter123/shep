@@ -4,6 +4,7 @@ html,
 body,
 #root {
   height: 100%;
+  overscroll-behavior: none;
 }
 
 :root {
@@ -105,6 +106,7 @@ body.theme-clear .glass-panel {
 
 body {
   margin: 0;
+  overflow: hidden;
   font-family: "SF Pro Display", "IBM Plex Sans", "Segoe UI", sans-serif;
   font-size: var(--text-body);
   color: var(--app-fg);
@@ -149,6 +151,10 @@ select {
 }
 .list-item:hover {
   color: var(--text-primary);
+}
+.list-item:focus-visible {
+  outline: 2px solid rgba(122, 162, 247, 0.75);
+  outline-offset: 2px;
 }
 .list-item.active {
   color: var(--text-primary);
@@ -198,6 +204,12 @@ select {
   width: 100%;
 }
 .context-menu__item:hover {
+  background: var(--surface-active);
+  color: var(--text-primary);
+}
+.context-menu__item:focus-visible {
+  outline: 2px solid rgba(122, 162, 247, 0.75);
+  outline-offset: -2px;
   background: var(--surface-active);
   color: var(--text-primary);
 }
@@ -263,6 +275,10 @@ select {
   border-color: var(--border-hover);
   color: var(--text-primary);
 }
+.option-card:focus-visible {
+  outline: 2px solid rgba(122, 162, 247, 0.75);
+  outline-offset: 2px;
+}
 .option-card.selected {
   background: var(--surface-active);
   border-color: var(--border-active);
@@ -299,6 +315,27 @@ select {
   flex-shrink: 0;
 }
 
+.settings-meta-grid {
+  display: grid;
+  gap: 8px;
+  max-width: 560px;
+}
+
+.settings-meta-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.settings-meta-row__label {
+  color: var(--text-muted);
+}
+
+.settings-meta-row span:last-child {
+  overflow-wrap: anywhere;
+}
+
 /* Keybinding card */
 .keybinding-card {
   display: flex;
@@ -317,6 +354,10 @@ select {
   background: var(--surface-hover);
   border-color: var(--border-hover);
   color: var(--text-primary);
+}
+.keybinding-card:focus-visible {
+  outline: 2px solid rgba(122, 162, 247, 0.75);
+  outline-offset: 2px;
 }
 .keybinding-card.selected {
   background: var(--surface-active);
@@ -392,6 +433,10 @@ select {
   background: rgba(255, 255, 255, 0.12);
   border-color: var(--glass-highlight);
 }
+.btn-primary:focus-visible {
+  outline: 2px solid rgba(122, 162, 247, 0.75);
+  outline-offset: 2px;
+}
 .btn-primary:active {
   transform: translateY(1px);
 }
@@ -399,6 +444,63 @@ select {
   opacity: 0.4;
   cursor: default;
   transform: none;
+}
+
+.notice-center {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 36px));
+  pointer-events: none;
+}
+
+.notice-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--surface-raised), transparent 10%);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  pointer-events: auto;
+}
+
+.notice-card--success {
+  border-color: rgba(45, 212, 191, 0.28);
+}
+
+.notice-card--error {
+  border-color: rgba(247, 118, 142, 0.34);
+}
+
+.notice-card__copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notice-card__copy strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.notice-card__copy span {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.notice-card__close {
+  margin-top: -2px;
+  flex-shrink: 0;
 }
 
 /* Branch tag (text-only pill) */
@@ -442,6 +544,10 @@ select {
 .tab:hover {
   background: var(--surface-hover);
   color: rgb(241, 245, 249);
+}
+.tab:focus-visible {
+  outline: 2px solid rgba(122, 162, 247, 0.75);
+  outline-offset: 2px;
 }
 .tab.active {
   background: var(--surface-active);
@@ -510,6 +616,10 @@ select {
 .section-toggle:hover {
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-secondary);
+}
+.section-toggle:focus-visible {
+  outline: 2px solid rgba(122, 162, 247, 0.75);
+  outline-offset: 2px;
 }
 
 /* ── Tree guide lines (VS Code-style) ─────────────────── */
@@ -724,6 +834,10 @@ select {
   background: var(--surface-active);
   color: var(--text-primary);
 }
+.icon-btn:focus-visible {
+  outline: 2px solid rgba(122, 162, 247, 0.75);
+  outline-offset: 2px;
+}
 
 /* Ghost button (dashed outline, add actions) */
 .btn-ghost {
@@ -734,16 +848,20 @@ select {
   padding: 6px 10px;
   border-radius: var(--radius-md);
   font-size: var(--text-body);
-  color: var(--text-muted);
-  border: 1px dashed var(--border-hover);
-  background: transparent;
+  color: var(--text-secondary);
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 .btn-ghost:hover {
   background: var(--surface-hover);
-  border-color: var(--border-active);
-  color: var(--text-secondary);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: var(--text-primary);
+}
+.btn-ghost:focus-visible {
+  outline: 2px solid rgba(122, 162, 247, 0.75);
+  outline-offset: 2px;
 }
 
 /* ── Layout classes ─────────────────────────────────────── */
@@ -894,6 +1012,7 @@ select {
 
 .terminal-surface .xterm-viewport {
   scrollbar-color: rgba(185, 208, 255, 0.24) transparent;
+  overscroll-behavior: none;
 }
 
 .tab-bar {

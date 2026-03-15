@@ -32,6 +32,11 @@ export default function ContextMenu({ x, y, items, onClose }: ContextMenuProps) 
   }, [x, y]);
 
   useEffect(() => {
+    const firstItem = menuRef.current?.querySelector<HTMLButtonElement>("[role='menuitem']");
+    firstItem?.focus();
+  }, []);
+
+  useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
@@ -53,11 +58,14 @@ export default function ContextMenu({ x, y, items, onClose }: ContextMenuProps) 
       ref={menuRef}
       className="context-menu"
       style={{ left: x, top: y }}
+      role="menu"
+      aria-label="Context menu"
     >
       {items.map((item) => (
         <button
           key={item.label}
           className={`context-menu__item ${item.danger ? "context-menu__item--danger" : ""}`}
+          role="menuitem"
           onClick={() => {
             item.onClick();
             if (!item.keepOpen) onClose();

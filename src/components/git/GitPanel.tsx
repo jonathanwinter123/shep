@@ -7,11 +7,14 @@ import type { ChangedFile, WorktreeEntry } from "../../lib/types";
 import FileList from "./FileList";
 import DiffViewer from "./DiffViewer";
 import BranchDropdown from "./BranchDropdown";
+import { useNoticeStore } from "../../stores/useNoticeStore";
+import { getErrorMessage } from "../../lib/errors";
 
 export default function GitPanel() {
   const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
   const projectGitStatus = useGitStore((s) => s.projectGitStatus);
   const refreshStatus = useGitStore((s) => s.refreshStatus);
+  const pushNotice = useNoticeStore((s) => s.pushNotice);
 
   // Worktree viewing state: null = main repo, string = worktree path
   const [viewingPath, setViewingPath] = useState<string | null>(null);
@@ -31,10 +34,15 @@ export default function GitPanel() {
     try {
       const entries = await gitListWorktrees(activeProjectPath);
       setWorktreeEntries(entries);
-    } catch {
+    } catch (error) {
       setWorktreeEntries([]);
+      pushNotice({
+        tone: "error",
+        title: "Couldn’t load worktrees",
+        message: getErrorMessage(error),
+      });
     }
-  }, [activeProjectPath]);
+  }, [activeProjectPath, pushNotice]);
 
   useEffect(() => {
     fetchWorktrees();
@@ -104,10 +112,15 @@ export default function GitPanel() {
     try {
       const result = await gitChangedFiles(effectivePath);
       setFiles(result);
-    } catch {
+    } catch (error) {
       setFiles([]);
+      pushNotice({
+        tone: "error",
+        title: "Couldn’t load changed files",
+        message: getErrorMessage(error),
+      });
     }
-  }, [effectivePath]);
+  }, [effectivePath, pushNotice]);
 
   // Fetch file list on mount and when effective path changes
   useEffect(() => {
@@ -137,11 +150,16 @@ export default function GitPanel() {
           file.area === "staged",
         );
         setDiffContent(diff);
-      } catch {
+      } catch (error) {
         setDiffContent("");
+        pushNotice({
+          tone: "error",
+          title: "Couldn’t load diff",
+          message: getErrorMessage(error),
+        });
       }
     },
-    [effectivePath],
+    [effectivePath, pushNotice],
   );
 
   const handleStage = useCallback(
@@ -151,11 +169,15 @@ export default function GitPanel() {
         await gitStageFile(effectivePath, file.path);
         await fetchFiles();
         await refreshStatus(effectivePath);
-      } catch {
-        // ignore
+      } catch (error) {
+        pushNotice({
+          tone: "error",
+          title: `Couldn’t stage ${file.path}`,
+          message: getErrorMessage(error),
+        });
       }
     },
-    [effectivePath, fetchFiles, refreshStatus],
+    [effectivePath, fetchFiles, pushNotice, refreshStatus],
   );
 
   const handleUnstage = useCallback(
@@ -165,11 +187,15 @@ export default function GitPanel() {
         await gitUnstageFile(effectivePath, file.path);
         await fetchFiles();
         await refreshStatus(effectivePath);
-      } catch {
-        // ignore
+      } catch (error) {
+        pushNotice({
+          tone: "error",
+          title: `Couldn’t unstage ${file.path}`,
+          message: getErrorMessage(error),
+        });
       }
     },
-    [effectivePath, fetchFiles, refreshStatus],
+    [effectivePath, fetchFiles, pushNotice, refreshStatus],
   );
 
   const handleBranchChanged = useCallback(() => {

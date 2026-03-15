@@ -1,6 +1,7 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
 import type {
   RepoInfo,
+  RegisteredRepo,
   WorkspaceConfig,
   PtyOutput,
   GitStatus,
@@ -18,7 +19,7 @@ export function listRepos(): Promise<RepoInfo[]> {
   return invoke("list_repos");
 }
 
-export function registerRepo(repoPath: string): Promise<WorkspaceConfig> {
+export function registerRepo(repoPath: string): Promise<RegisteredRepo> {
   return invoke("register_repo", { repoPath });
 }
 
