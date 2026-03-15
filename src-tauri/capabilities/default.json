@@ -12,6 +12,7 @@
     "core:window:allow-set-size",
     "core:window:allow-start-dragging",
     "core:window:allow-toggle-maximize",
+    "core:window:allow-set-effects",
     "dialog:default",
     "notification:default"
   ]

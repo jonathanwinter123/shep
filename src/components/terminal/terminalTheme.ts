@@ -42,6 +42,13 @@ export function createTerminalTheme(theme: ShepTheme): ITheme {
 export function applyThemeToTerminals(theme: ShepTheme): void {
   const xtermTheme = createTerminalTheme(theme);
   for (const [, entry] of terminalCache) {
+    // Skip hidden terminals entirely — setting options.theme on a
+    // terminal with display:none corrupts xterm's internal scroll state.
+    // Hidden terminals get the theme applied when they become visible
+    // (TerminalView's useEffect re-applies the current store theme).
+    const el = entry.term.element;
+    if (!el || el.offsetParent === null) continue;
+
     entry.term.options.theme = xtermTheme;
     entry.term.refresh(0, entry.term.rows - 1);
   }
