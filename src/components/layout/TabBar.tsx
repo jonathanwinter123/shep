@@ -22,7 +22,9 @@ export default function TabBar({
   const activeTabId = projectTerminals?.activeTabId ?? null;
   const setActiveTab = useTerminalStore((s) => s.setActiveTab);
   const reorderTab = useTerminalStore((s) => s.reorderTab);
+  const updateTab = useTerminalStore((s) => s.updateTab);
 
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [dragTabId, setDragTabId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const dragRef = useRef({ startX: 0, didDrag: false, dropIndex: null as number | null });
@@ -46,6 +48,15 @@ export default function TabBar({
     d.didDrag = false;
     d.dropIndex = null;
 
+    const cleanup = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      setDragTabId(null);
+      setDropIndex(null);
+      d.didDrag = false;
+    };
+
     const onMove = (ev: PointerEvent) => {
       if (!d.didDrag && Math.abs(ev.clientX - d.startX) > 4) {
         d.didDrag = true;
@@ -59,18 +70,17 @@ export default function TabBar({
     };
 
     const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
       if (d.didDrag && d.dropIndex !== null) {
         reorderTab(tabId, d.dropIndex);
       }
-      setDragTabId(null);
-      setDropIndex(null);
-      d.didDrag = false;
+      cleanup();
     };
+
+    const onCancel = () => cleanup();
 
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
   }, [computeDropIndex, reorderTab]);
 
   const settingsTabOpen = useUIStore((s) => s.settingsTabOpen);
@@ -141,7 +151,41 @@ export default function TabBar({
               {logoUrl ? (
                 <img src={logoUrl} alt="" width={12} height={12} />
               ) : null}
-              <span className="truncate max-w-32">{tab.label}</span>
+              {editingTabId === tab.id ? (
+                <input
+                  className="tab-rename-input"
+                  defaultValue={tab.label}
+                  autoFocus
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  onFocus={(e) => e.target.select()}
+                  onBlur={(e) => {
+                    const val = e.target.value.trim();
+                    if (val && val !== tab.label) updateTab(tab.id, { label: val });
+                    setEditingTabId(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                    if (e.key === "Escape") {
+                      e.currentTarget.value = tab.label;
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span
+                  className="truncate max-w-32"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setEditingTabId(tab.id);
+                  }}
+                >
+                  {tab.label}
+                </span>
+              )}
               <button
                 className="icon-btn ml-0.5"
                 onClick={(e) => {

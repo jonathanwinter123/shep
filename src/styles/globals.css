@@ -427,6 +427,16 @@ select {
 .tab.drop-after::after {
   right: -2px;
 }
+.tab-rename-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  outline: none;
+  color: var(--text-primary);
+  font: inherit;
+  padding: 0;
+  max-width: 128px;
+}
 
 /* Section header (top-level labels like "PROJECTS") */
 .section-label {
