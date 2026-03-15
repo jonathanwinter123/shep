@@ -13,6 +13,7 @@ pub fn run() {
     let _ = fix_path_env::fix();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(PtyManager::new())
         .manage(WorkspaceManager::new())
         .setup(|app| {
