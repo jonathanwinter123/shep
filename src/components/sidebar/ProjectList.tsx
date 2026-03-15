@@ -82,7 +82,7 @@ export default function ProjectList({
 
   return (
     <div className="flex flex-col gap-0.5 px-2 pb-2">
-      {repos.map((repo) => {
+      {[...repos].sort((a, b) => a.name.localeCompare(b.name)).map((repo) => {
         const isActive = repo.path === activeRepoPath;
         const isExpanded = isActive && expandedPath === repo.path;
         return (
