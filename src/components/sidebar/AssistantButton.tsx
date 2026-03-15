@@ -1,6 +1,7 @@
 import type { TerminalTab, TabActivity } from "../../lib/types";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { useTerminalStore } from "../../stores/useTerminalStore";
+import { handleActionKey } from "../../lib/a11y";
 
 interface AssistantButtonProps {
   tab: TerminalTab;
@@ -29,14 +30,19 @@ export default function AssistantButton({
     <div
       className={`list-item sidebar-closable w-full ${isActive ? "active" : ""}`}
       onClick={onClick}
+      onKeyDown={(event) => handleActionKey(event, onClick)}
       title={tab.label}
       role="button"
+      tabIndex={0}
+      aria-pressed={isActive}
+      aria-label={`Open assistant tab ${tab.label}`}
     >
       {logoUrl && <img src={logoUrl} alt="" width={14} height={14} />}
       <span className="truncate text-left">{tab.label}</span>
       <span className={`sidebar-status-dot ${dotClass(activity)}`} />
       <button
         className="icon-btn sidebar-close-btn"
+        aria-label={`Close assistant tab ${tab.label}`}
         onClick={(e) => {
           e.stopPropagation();
           onClose();

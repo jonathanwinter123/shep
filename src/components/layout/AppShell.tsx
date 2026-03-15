@@ -102,7 +102,11 @@ export default function AppShell() {
     for (const project of Object.values(projectState)) {
       all.push(...project.tabs);
     }
-    return all;
+
+    // Keep terminal DOM order stable even when the visible tab order changes.
+    // xterm renderers can fail to repaint cleanly when their mounted nodes are
+    // shuffled around in the document during tab drag/reorder operations.
+    return all.sort((a, b) => a.ptyId - b.ptyId || a.id.localeCompare(b.id));
   }, [projectState]);
 
   const commands = useCommandStore(
@@ -416,6 +420,7 @@ export default function AppShell() {
       <NoticeCenter />
       <div
         className="drag-region"
+        aria-hidden="true"
         onMouseDown={(e) => {
           if (e.buttons === 1) {
             if (e.detail === 2) {

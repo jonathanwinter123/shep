@@ -14,6 +14,7 @@ import ContextMenu from "../shared/ContextMenu";
 import type { ContextMenuItem } from "../shared/ContextMenu";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
+import { handleActionKey } from "../../lib/a11y";
 
 interface ProjectItemProps {
   repo: RepoInfo;
@@ -116,7 +117,12 @@ export default function ProjectItem({
         className={`list-item ${isActive ? "project-active" : ""} ${!repo.valid ? "opacity-50" : ""}`}
         onClick={onClick}
         onContextMenu={handleContextMenu}
+        onKeyDown={(event) => handleActionKey(event, onClick)}
         title={repo.path}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label={`${repo.name}${repo.valid ? "" : " unavailable"}`}
       >
         {isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
         <span className="truncate flex-1 font-medium">{repo.name}</span>

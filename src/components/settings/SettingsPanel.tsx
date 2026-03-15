@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getIdentifier, getName, getTauriVersion, getVersion } from "@tauri-apps/api/app";
 import { EDITOR_OPTIONS } from "../../lib/editors";
 import { THEME_LIST } from "../../lib/themes";
 import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
@@ -7,6 +8,14 @@ import { useThemeStore } from "../../stores/useThemeStore";
 import { useKeybindingStore } from "../../stores/useKeybindingStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import type { CursorStyle } from "../../lib/types";
+import { getErrorMessage } from "../../lib/errors";
+
+interface AppMeta {
+  name: string;
+  version: string;
+  identifier: string;
+  tauriVersion: string;
+}
 
 function InfoTip({ text }: { text: string }) {
   const [show, setShow] = useState(false);
@@ -23,6 +32,8 @@ function InfoTip({ text }: { text: string }) {
 
 export default function SettingsPanel() {
   const optionClass = "option-card w-44 justify-start";
+  const [appMeta, setAppMeta] = useState<AppMeta | null>(null);
+  const [appMetaError, setAppMetaError] = useState<string | null>(null);
   const themeId = useThemeStore((s) => s.themeId);
   const setTheme = useThemeStore((s) => s.setTheme);
   const settings = useEditorStore((s) => s.settings);
@@ -63,6 +74,35 @@ export default function SettingsPanel() {
       void loadTermSettings();
     }
   }, [termHasLoaded, loadTermSettings]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const [name, version, identifier, tauriVersion] = await Promise.all([
+          getName(),
+          getVersion(),
+          getIdentifier(),
+          getTauriVersion(),
+        ]);
+
+        if (!cancelled) {
+          setAppMeta({ name, version, identifier, tauriVersion });
+          setAppMetaError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAppMeta(null);
+          setAppMetaError(getErrorMessage(error));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="absolute inset-0 overflow-y-auto p-6">
@@ -207,6 +247,39 @@ export default function SettingsPanel() {
 
       <p className="text-xs text-white/30 mt-6">
         Settings are saved to ~/.shep/config.yml
+      </p>
+
+      <hr className="settings-divider" />
+
+      <h2 className="section-label !p-0 mb-4">About</h2>
+
+      {appMeta ? (
+        <div className="settings-meta-grid">
+          <div className="settings-meta-row">
+            <span className="settings-meta-row__label">App</span>
+            <span>{appMeta.name}</span>
+          </div>
+          <div className="settings-meta-row">
+            <span className="settings-meta-row__label">Version</span>
+            <span>{appMeta.version}</span>
+          </div>
+          <div className="settings-meta-row">
+            <span className="settings-meta-row__label">Identifier</span>
+            <span>{appMeta.identifier}</span>
+          </div>
+          <div className="settings-meta-row">
+            <span className="settings-meta-row__label">Tauri</span>
+            <span>{appMeta.tauriVersion}</span>
+          </div>
+        </div>
+      ) : appMetaError ? (
+        <div className="mt-2 text-sm text-red-300">{appMetaError}</div>
+      ) : (
+        <div className="mt-2 text-xs text-white/40">Loading app info...</div>
+      )}
+
+      <p className="text-xs text-white/40 mt-4 max-w-lg leading-5">
+        For tester reports, include the app version, what you were doing, and whether the issue happened in a packaged build or dev mode.
       </p>
     </div>
   );

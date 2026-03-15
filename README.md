@@ -1,56 +1,69 @@
 # Shep
 
-**A terminal workspace for developers who run too many things at once.**
+**A native terminal workspace for developers running projects, agents, and background tasks side by side.**
 
-Shep is a native macOS app that organizes your terminal sessions into project workspaces. Dev servers, test watchers, AI coding agents — instead of juggling 15 terminal tabs, Shep keeps everything in one place with autostart, status indicators, and one-click agent launches.
+Shep gives each repo a dedicated workspace for terminals, AI coding agents, commands, and git-aware workflows. Instead of managing a pile of Terminal tabs, iTerm windows, and half-remembered shell commands, you open one app and work from a single place.
 
-<!-- TODO: Add screenshot -->
-<!-- ![Shep screenshot](docs/screenshot.png) -->
+## Screenshot
+
+![Shep screenshot](docs/images/shep-screenshot.png)
+
+## Why Shep
+
+- Keep project terminals grouped by repo instead of spread across shell windows.
+- Launch AI coding agents from the app with standard, worktree, and autonomous modes.
+- Start common tasks quickly with saved commands and autostart behavior.
+- See which sessions are running, stopped, or need attention without hunting for them.
+- Use git worktrees to isolate agent runs from your main branch.
+
+## What It Does
+
+- **Project workspaces** for repos, tasks, agents, and terminal tabs
+- **Assistant launcher** for Codex CLI, Claude Code, and Gemini CLI
+- **Git-aware sessions** with worktree-backed agent launches
+- **Autostart tasks** for dev servers, watchers, and recurring commands
+- **Status indicators** so crashed or noisy sessions are easy to spot
+- **In-app notices** for common failures instead of silent errors or browser alerts
+- **Native macOS packaging** via Tauri
 
 ## Download
 
-### GitHub Releases
+Download the latest `.dmg` from [GitHub Releases](https://github.com/stumptowndoug/shep/releases).
 
-Grab the latest `.dmg` from the [Releases](https://github.com/stumptowndoug/shep/releases) page. Open it, drag Shep to Applications, done.
+After downloading:
 
-### Build from Source
+1. Open the `.dmg`
+2. Drag `Shep.app` into `Applications`
+3. Launch Shep
 
-If you'd rather build it yourself:
+Note: the current release flow is aimed at small-group testing. If the app is unsigned or not notarized, macOS may show an extra security prompt on first launch.
 
-```bash
-git clone https://github.com/stumptowndoug/shep.git
-cd shep
-pnpm install
-pnpm tauri build
-```
+## Requirements
 
-The built app lands in `src-tauri/target/release/bundle/macos/shep.app` and a ready-to-share DMG in `src-tauri/target/release/bundle/dmg/`.
+For using Shep:
 
-**Requirements for building:**
-- macOS with Xcode CLI tools
+- macOS
+- A local git repo to work from
+- Any CLI agents you want to launch already installed on your machine
+
+For building from source:
+
 - Node.js 20+
-- Rust (via [rustup](https://rustup.rs))
-- [pnpm](https://pnpm.io)
-
-## Features
-
-- **Project workspaces** — register repos and define named tasks (dev server, tests, linters, etc.) that live together
-- **Autostart** — mark tasks to launch automatically when you open a project
-- **Status indicators** — see at a glance what's running, stopped, or crashed
-- **Tab management** — each task gets its own terminal tab, plus blank shells on demand
-- **AI agent launcher** — built-in support for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://github.com/openai/codex), and [Gemini CLI](https://github.com/google-gemini/gemini-cli) with standard, worktree, and autonomous modes
-- **Git worktree isolation** — spin up AI sessions in isolated worktrees so agents can go wild without touching your working branch
-- **Glass terminal rendering** — translucent terminal backgrounds with full 256-color and Unicode support
+- `pnpm`
+- Rust via `rustup`
+- Xcode Command Line Tools
 
 ## Getting Started
 
-### 1. Add a project
+### 1. Add a repo
 
-Click **+** next to the project dropdown. Point it at a repo directory.
+Open Shep and add a local repository from the sidebar.
 
 ### 2. Configure tasks
 
-Shep creates a config at `~/.shep/projects/<project-name>/workspace.yml`. Edit it to define your tasks:
+Shep stores project configuration under `~/.shep/projects/<project-name>/workspace.yml`.
+
+Example:
 
 ```yaml
 name: my-app
@@ -62,62 +75,120 @@ tasks:
   - name: tests
     command: npm test -- --watch
     autostart: false
-  - name: claude
-    command: claude
-    autostart: true
+  - name: codex
+    command: codex
+    autostart: false
 ```
 
-### 3. Work
+### 3. Open workspaces and sessions
 
-Select your project from the sidebar. Autostart tasks spin up immediately. Click any task to jump to its terminal. Hover for start/stop/restart controls.
+Use the sidebar and tab bar to:
 
-**Shortcuts:**
-- **+** in the tab bar opens a blank shell
-- **x** on a tab kills the process and closes it
-- Switching projects tears down old terminals and starts fresh
+- open project terminals
+- launch assistants
+- create blank shells
+- jump into git or commands views
+- switch projects without manually rebuilding your terminal layout
 
-## AI Agents
+## Assistant Modes
 
-Shep has first-class support for CLI-based coding agents. The sidebar shows a dedicated Assistants section with three session modes:
+Shep supports three session modes for supported coding agents:
 
-| Mode | What it does |
-|------|-------------|
-| **Standard** | Runs the agent in your current repo directory |
-| **Worktree** | Creates an isolated git worktree so the agent works on a separate branch |
-| **YOLO** | Worktree + the agent's autonomous flag (e.g. `--dangerously-skip-permissions` for Claude) |
+| Mode | Purpose |
+| --- | --- |
+| `Standard` | Runs the agent in the current repo directory |
+| `Worktree` | Creates an isolated git worktree for the session |
+| `YOLO` | Uses a worktree and the agent's more autonomous mode when available |
 
-Currently supports **Claude Code**, **Codex CLI**, and **Gemini CLI**. Adding more is just a config change.
+Supported today:
 
-## Development
+- Codex CLI
+- Claude Code
+- Gemini CLI
+
+## Build From Source
+
+### Install dependencies
 
 ```bash
-pnpm install       # first time only
-pnpm tauri dev     # launches with hot reload
+pnpm install
 ```
 
-Frontend changes appear instantly. Rust changes trigger a recompile. The dev server runs at `localhost:5173`.
+### Run in development
 
-### Project Structure
-
-```
-src/                    React frontend (TypeScript + Tailwind CSS)
-  components/           UI — layout, sidebar, terminal, settings
-  stores/               Zustand state management
-  hooks/                PTY lifecycle, theme application
-  lib/                  Types, Tauri IPC wrappers, config
-
-src-tauri/              Rust backend (Tauri v2)
-  src/commands.rs       IPC command handlers
-  src/pty/              PTY process management (portable-pty)
-  src/workspace/        Config loading and workspace management
-  src/git.rs            Git operations and worktree support
+```bash
+pnpm tauri dev
 ```
 
-### Tech Stack
+This starts the Vite frontend and the Tauri shell together.
 
-**Frontend:** React 19 , TypeScript, Zustand, Tailwind CSS, xterm.js, Vite
-**Backend:** Rust, Tauri 2, portable-pty
-**Build:** pnpm, Vite, Tauri CLI
+### Create a production build
+
+```bash
+pnpm tauri build
+```
+
+### Create a debug-packaged build
+
+```bash
+pnpm tauri build --debug
+```
+
+Useful validation commands:
+
+```bash
+pnpm build
+cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+Build artifacts land here:
+
+- App bundle: `src-tauri/target/release/bundle/macos/shep.app`
+- DMG: `src-tauri/target/release/bundle/dmg/`
+
+Debug artifacts land here:
+
+- App bundle: `src-tauri/target/debug/bundle/macos/shep.app`
+- DMG: `src-tauri/target/debug/bundle/dmg/`
+
+## Project Structure
+
+```text
+src/                    React frontend
+src/components/         App UI
+src/hooks/              UI and PTY lifecycle hooks
+src/lib/                Shared helpers and Tauri bindings
+src/stores/             Zustand stores
+
+src-tauri/              Rust backend and Tauri config
+src-tauri/src/commands.rs
+src-tauri/src/pty/      PTY process management
+src-tauri/src/workspace/
+```
+
+## Tech Stack
+
+- React 19
+- TypeScript
+- Zustand
+- Vite
+- xterm.js
+- Rust
+- Tauri 2
+
+## Reporting Issues
+
+For tester reports, include:
+
+- Shep version
+- macOS version
+- whether the issue happened in dev mode or the packaged app
+- the repo/workflow you were using
+- anything visible in the terminal or notice UI
+
+## Releases
+
+Release steps are documented in [docs/RELEASING.md](docs/RELEASING.md).
 
 ## License
 
