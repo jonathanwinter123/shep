@@ -18,6 +18,10 @@ const CSS_VAR_MAP: [keyof ShepTheme, string][] = [
   ["glassBorder", "--glass-border"],
   ["glassPanelStrong", "--glass-panel-strong"],
   ["glassBorderStrong", "--glass-border-strong"],
+  ["statusRunning", "--status-running"],
+  ["statusStopped", "--status-stopped"],
+  ["statusCrashed", "--status-crashed"],
+  ["statusAttention", "--status-attention"],
 ];
 
 export function useThemeApplicator(): void {
@@ -28,17 +32,23 @@ export function useThemeApplicator(): void {
     for (const [key, cssVar] of CSS_VAR_MAP) {
       style.setProperty(cssVar, theme[key] as string);
     }
+
+    // Derive UI text colors from terminal palette
+    style.setProperty("--text-primary", theme.termBrightWhite);
+    style.setProperty("--text-secondary", theme.termWhite);
+    style.setProperty("--text-muted", `color-mix(in srgb, ${theme.termBrightWhite}, transparent 45%)`);
+
     applyThemeToTerminals(theme);
 
     const win = getCurrentWindow();
     if (theme.isTransparent) {
-      document.body.classList.add("theme-glass");
+      document.body.classList.add("theme-clear");
       win.setEffects({
-        effects: [Effect.UnderWindowBackground],
+        effects: [Effect.HudWindow],
         state: EffectState.Active,
       });
     } else {
-      document.body.classList.remove("theme-glass");
+      document.body.classList.remove("theme-clear");
       win.clearEffects();
     }
   }, [theme]);

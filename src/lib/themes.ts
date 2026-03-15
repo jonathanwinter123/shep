@@ -18,6 +18,12 @@ export interface ShepTheme {
   glassPanelStrong: string;
   glassBorderStrong: string;
 
+  // Status indicators
+  statusRunning: string;
+  statusStopped: string;
+  statusCrashed: string;
+  statusAttention: string;
+
   // Core UI colors
   appBg: string;
   appFg: string;
@@ -53,38 +59,43 @@ const tokyoNight: ShepTheme = {
   bgRadial1: "rgba(122, 162, 247, 0.10)",
   bgRadial2: "rgba(187, 154, 247, 0.06)",
   bgRadial3: "rgba(125, 207, 255, 0.06)",
-  bgLinearFrom: "#16161e",
-  bgLinearMid: "#1a1b26",
-  bgLinearTo: "#16161e",
+  bgLinearFrom: "#13141c",
+  bgLinearMid: "#16171f",
+  bgLinearTo: "#13141c",
 
-  frameTint: "rgba(22, 22, 30, 0.30)",
-  panelTint: "rgba(26, 27, 38, 0.52)",
+  frameTint: "#1a1b26",
+  panelTint: "rgba(26, 27, 38, 0.60)",
   glassBorder: "rgba(169, 177, 214, 0.12)",
   glassPanelStrong: "rgba(22, 22, 30, 0.78)",
   glassBorderStrong: "rgba(169, 177, 214, 0.18)",
 
-  appBg: "#1a1b26",
-  appFg: "#a9b1d6",
+  statusRunning: "#7aa2f7",
+  statusStopped: "#414868",
+  statusCrashed: "#f7768e",
+  statusAttention: "#e0af68",
 
-  termForeground: "#a9b1d6",
+  appBg: "#1a1b26",
+  appFg: "#c0caf5",
+
+  termForeground: "#c0caf5",
   termCursor: "#c0caf5",
-  termSelection: "#515c7e4d",
-  termBlack: "#363b54",
+  termSelection: "#283457",
+  termBlack: "#15161e",
   termRed: "#f7768e",
-  termGreen: "#73daca",
+  termGreen: "#9ece6a",
   termYellow: "#e0af68",
   termBlue: "#7aa2f7",
   termMagenta: "#bb9af7",
   termCyan: "#7dcfff",
-  termWhite: "#787c99",
-  termBrightBlack: "#363b54",
+  termWhite: "#a9b1d6",
+  termBrightBlack: "#414868",
   termBrightRed: "#f7768e",
-  termBrightGreen: "#73daca",
+  termBrightGreen: "#9ece6a",
   termBrightYellow: "#e0af68",
   termBrightBlue: "#7aa2f7",
   termBrightMagenta: "#bb9af7",
   termBrightCyan: "#7dcfff",
-  termBrightWhite: "#acb0d0",
+  termBrightWhite: "#c0caf5",
 };
 
 /* ── Monokai ───────────────────────────────────────────── */
@@ -105,6 +116,11 @@ const monokai: ShepTheme = {
   glassBorder: "rgba(117, 113, 94, 0.14)",
   glassPanelStrong: "rgba(30, 31, 28, 0.80)",
   glassBorderStrong: "rgba(117, 113, 94, 0.20)",
+
+  statusRunning: "#66d9ef",
+  statusStopped: "#75715e",
+  statusCrashed: "#f92672",
+  statusAttention: "#e6db74",
 
   appBg: "#272822",
   appFg: "#f8f8f2",
@@ -149,6 +165,11 @@ const dracula: ShepTheme = {
   glassPanelStrong: "rgba(33, 34, 44, 0.78)",
   glassBorderStrong: "rgba(98, 114, 164, 0.20)",
 
+  statusRunning: "#8be9fd",
+  statusStopped: "#6272a4",
+  statusCrashed: "#ff5555",
+  statusAttention: "#f1fa8c",
+
   appBg: "#282a36",
   appFg: "#f8f8f2",
 
@@ -173,54 +194,59 @@ const dracula: ShepTheme = {
   termBrightWhite: "#ffffff",
 };
 
-/* ── Glass ─────────────────────────────────────────────── */
-const glass: ShepTheme = {
-  id: "glass",
-  name: "Glass",
+/* ── Clear ─────────────────────────────────────────────── */
+const clear: ShepTheme = {
+  id: "clear",
+  name: "Clear",
   isTransparent: true,
 
-  bgRadial1: "rgba(130, 160, 220, 0.18)",
-  bgRadial2: "rgba(160, 120, 230, 0.16)",
-  bgRadial3: "rgba(100, 210, 220, 0.16)",
-  bgLinearFrom: "#0a0b12",
-  bgLinearMid: "#0e0f18",
-  bgLinearTo: "#0a0b12",
+  bgRadial1: "rgba(120, 160, 240, 0.08)",
+  bgRadial2: "rgba(140, 100, 220, 0.06)",
+  bgRadial3: "rgba(80, 180, 220, 0.06)",
+  bgLinearFrom: "rgba(12, 18, 35, 0.30)",
+  bgLinearMid: "rgba(12, 18, 35, 0.22)",
+  bgLinearTo: "rgba(12, 18, 35, 0.30)",
 
-  frameTint: "rgba(14, 15, 24, 0.08)",
-  panelTint: "rgba(14, 15, 24, 0.15)",
-  glassBorder: "rgba(160, 180, 230, 0.22)",
-  glassPanelStrong: "rgba(14, 15, 24, 0.52)",
-  glassBorderStrong: "rgba(160, 180, 230, 0.28)",
+  frameTint: "rgba(12, 18, 35, 0.10)",
+  panelTint: "rgba(12, 18, 35, 0.14)",
+  glassBorder: "rgba(160, 185, 240, 0.12)",
+  glassPanelStrong: "rgba(12, 18, 35, 0.40)",
+  glassBorderStrong: "rgba(160, 185, 240, 0.16)",
 
-  appBg: "#0e0f18",
-  appFg: "#b8c4e0",
+  statusRunning: "#60c0e0",
+  statusStopped: "#384058",
+  statusCrashed: "#e06080",
+  statusAttention: "#c8a050",
 
-  termForeground: "#b8c4e0",
-  termCursor: "#88aaff",
-  termSelection: "#4455884d",
-  termBlack: "#2a2e3c",
-  termRed: "#f07088",
-  termGreen: "#78ddb8",
-  termYellow: "#e0b870",
-  termBlue: "#7aa8f8",
-  termMagenta: "#c090f0",
-  termCyan: "#70c8e0",
-  termWhite: "#9aa0b8",
-  termBrightBlack: "#4a5068",
-  termBrightRed: "#f58898",
-  termBrightGreen: "#90e8c8",
+  appBg: "#0c1223",
+  appFg: "#c0ccdf",
+
+  termForeground: "#c0ccdf",
+  termCursor: "#90b0ff",
+  termSelection: "#4466994d",
+  termBlack: "#2a3040",
+  termRed: "#f27088",
+  termGreen: "#6cd4b0",
+  termYellow: "#ddb870",
+  termBlue: "#7ca8f0",
+  termMagenta: "#b890e8",
+  termCyan: "#6cc8d8",
+  termWhite: "#98a0b8",
+  termBrightBlack: "#485068",
+  termBrightRed: "#f88898",
+  termBrightGreen: "#88e0c0",
   termBrightYellow: "#e8c888",
-  termBrightBlue: "#90b8ff",
-  termBrightMagenta: "#d0a8f8",
-  termBrightCyan: "#88d8f0",
-  termBrightWhite: "#d0d8e8",
+  termBrightBlue: "#98b8ff",
+  termBrightMagenta: "#cca8f0",
+  termBrightCyan: "#88d8e8",
+  termBrightWhite: "#d8e0f0",
 };
 
 export const THEMES: Record<string, ShepTheme> = {
   "tokyo-night": tokyoNight,
   monokai,
   dracula,
-  glass,
+  clear,
 };
 
 export const THEME_LIST: ShepTheme[] = Object.values(THEMES);
