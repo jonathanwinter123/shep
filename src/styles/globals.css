@@ -8,8 +8,8 @@ body,
 
 :root {
   color-scheme: dark;
-  --app-bg: #1a1b26;
-  --app-fg: #a9b1d6;
+  --app-bg: #282a36;
+  --app-fg: #f8f8f2;
   --glass-panel-strong: rgba(22, 22, 30, 0.78);
   --glass-panel-soft: rgba(255, 255, 255, 0.05);
   --glass-border: rgba(169, 177, 214, 0.12);
@@ -19,14 +19,14 @@ body,
   --glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
 
   /* Theme-driven vars (defaults = Shibuya) */
-  --bg-radial-1: rgba(122, 162, 247, 0.10);
-  --bg-radial-2: rgba(187, 154, 247, 0.06);
-  --bg-radial-3: rgba(125, 207, 255, 0.06);
-  --bg-linear-from: #16161e;
-  --bg-linear-mid: #1a1b26;
-  --bg-linear-to: #16161e;
-  --frame-tint: rgba(22, 22, 30, 0.3);
-  --panel-tint: rgba(26, 27, 38, 0.52);
+  --bg-radial-1: rgba(189, 147, 249, 0.08);
+  --bg-radial-2: rgba(255, 121, 198, 0.05);
+  --bg-radial-3: rgba(139, 233, 253, 0.05);
+  --bg-linear-from: #1d1e28;
+  --bg-linear-mid: #282a36;
+  --bg-linear-to: #1d1e28;
+  --frame-tint: #282a36;
+  --panel-tint: rgba(40, 42, 54, 0.60);
 
   /* ── Design tokens ────────────────────────────────────── */
 
