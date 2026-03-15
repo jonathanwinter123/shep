@@ -4,6 +4,7 @@ html,
 body,
 #root {
   height: 100%;
+  overscroll-behavior: none;
 }
 
 :root {
@@ -105,6 +106,7 @@ body.theme-clear .glass-panel {
 
 body {
   margin: 0;
+  overflow: hidden;
   font-family: "SF Pro Display", "IBM Plex Sans", "Segoe UI", sans-serif;
   font-size: var(--text-body);
   color: var(--app-fg);
@@ -399,6 +401,63 @@ select {
   opacity: 0.4;
   cursor: default;
   transform: none;
+}
+
+.notice-center {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 36px));
+  pointer-events: none;
+}
+
+.notice-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--surface-raised), transparent 10%);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  pointer-events: auto;
+}
+
+.notice-card--success {
+  border-color: rgba(45, 212, 191, 0.28);
+}
+
+.notice-card--error {
+  border-color: rgba(247, 118, 142, 0.34);
+}
+
+.notice-card__copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notice-card__copy strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.notice-card__copy span {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.notice-card__close {
+  margin-top: -2px;
+  flex-shrink: 0;
 }
 
 /* Branch tag (text-only pill) */
@@ -894,6 +953,7 @@ select {
 
 .terminal-surface .xterm-viewport {
   scrollbar-color: rgba(185, 208, 255, 0.24) transparent;
+  overscroll-behavior: none;
 }
 
 .tab-bar {

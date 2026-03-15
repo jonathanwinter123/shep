@@ -8,8 +8,12 @@ import { useTerminalStore } from "../stores/useTerminalStore";
 
 let focused = true;
 let permissionGranted = false;
+let initialized = false;
 
 export async function initNotifications() {
+  if (initialized) return;
+  initialized = true;
+
   listen("tauri://focus", () => {
     focused = true;
   });
@@ -18,21 +22,30 @@ export async function initNotifications() {
   });
 
   permissionGranted = await isPermissionGranted();
-  if (!permissionGranted) {
-    const permission = await requestPermission();
-    permissionGranted = permission === "granted";
-  }
 }
 
-export function notifyAgent(ptyId: number, message: string) {
-  console.log("[shep] notifyAgent ptyId:", ptyId, "message:", message, "focused:", focused, "permissionGranted:", permissionGranted);
+async function ensureNotificationPermission() {
+  if (permissionGranted) return true;
+
+  const permission = await requestPermission();
+  permissionGranted = permission === "granted";
+  return permissionGranted;
+}
+
+export async function notifyAgent(ptyId: number, message: string) {
   useTerminalStore.getState().setTabBell(ptyId);
 
-  // TODO: restore `if (!focused)` guard after testing
+  if (focused) {
+    return;
+  }
+
   try {
+    const hasPermission = await ensureNotificationPermission();
+    if (!hasPermission) return;
     sendNativeNotification({ title: "Shep", body: message });
-    console.log("[shep] notification sent");
-  } catch (e) {
-    console.error("[shep] notification error:", e);
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.error("[shep] notification error:", error);
+    }
   }
 }

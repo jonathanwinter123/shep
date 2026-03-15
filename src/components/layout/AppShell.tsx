@@ -8,10 +8,12 @@ import SettingsPanel from "../settings/SettingsPanel";
 import GitPanel from "../git/GitPanel";
 import CommandsPanel from "../commands/CommandsPanel";
 import SessionLauncher from "../session/SessionLauncher";
+import NoticeCenter from "../shared/NoticeCenter";
 import ShepLogo from "../sidebar/icons/ShepLogo";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
+import { useGitStore } from "../../stores/useGitStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { usePty } from "../../hooks/usePty";
 import { useThemeApplicator } from "../../hooks/useThemeApplicator";
@@ -23,6 +25,8 @@ import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQ
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { initNotifications } from "../../lib/notifications";
+import { getErrorMessage } from "../../lib/errors";
+import { useNoticeStore } from "../../stores/useNoticeStore";
 
 import type { CommandConfig, CommandState, TerminalTab, SessionMode, WorkspaceConfig } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
@@ -53,6 +57,7 @@ export default function AppShell() {
     useRepoStore();
   const activeConfig = useRepoStore((s) => s.activeConfig);
   const setActiveConfig = useRepoStore((s) => s.setActiveConfig);
+  const pushNotice = useNoticeStore((s) => s.pushNotice);
   const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab, killProjectPtys } =
     usePty();
 
@@ -121,12 +126,18 @@ export default function AppShell() {
         setActiveConfig(nextConfig);
         return nextConfig;
       } catch (error) {
-        console.error("Failed to save workspace commands:", error);
-        window.alert(String(error));
+        if (import.meta.env.DEV) {
+          console.error("Failed to save workspace commands:", error);
+        }
+        pushNotice({
+          tone: "error",
+          title: "Couldn’t save workspace",
+          message: getErrorMessage(error),
+        });
         return null;
       }
     },
-    [activeConfig, activeRepoPath, setActiveConfig],
+    [activeConfig, activeRepoPath, pushNotice, setActiveConfig],
   );
 
   const settingsActive = useUIStore((s) => s.settingsActive);
@@ -140,7 +151,7 @@ export default function AppShell() {
     fetchRepos();
     void loadEditorSettings();
     void loadTerminalSettings();
-    initNotifications();
+    void initNotifications();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));
   }, [fetchRepos, loadEditorSettings, loadTerminalSettings]);
@@ -149,49 +160,71 @@ export default function AppShell() {
     async (repoPath: string) => {
       if (repoPath === activeRepoPath) return;
 
-      const isFirstVisit = !useCommandStore.getState().hasProject(repoPath);
+      try {
+        const isFirstVisit = !useCommandStore.getState().hasProject(repoPath);
 
-      const config = await openRepo(repoPath);
-      useTerminalStore.getState().switchProject(repoPath);
-      useCommandStore.getState().switchProject(repoPath);
+        const config = await openRepo(repoPath);
+        useTerminalStore.getState().switchProject(repoPath);
+        useCommandStore.getState().switchProject(repoPath);
 
-      if (isFirstVisit) {
-        useCommandStore.getState().loadCommands(repoPath, config.commands);
+        if (isFirstVisit) {
+          useCommandStore.getState().loadCommands(repoPath, config.commands);
 
-        for (const cmd of config.commands) {
-          if (cmd.autostart) {
-            const { cols, rows } = getTerminalDimensions();
-            await startCommand(cmd, cols, rows);
+          for (const cmd of config.commands) {
+            if (cmd.autostart) {
+              const { cols, rows } = getTerminalDimensions();
+              await startCommand(cmd, cols, rows);
+            }
           }
         }
+      } catch (error) {
+        pushNotice({
+          tone: "error",
+          title: "Couldn’t open project",
+          message: getErrorMessage(error),
+        });
       }
     },
-    [activeRepoPath, openRepo, startCommand, getTerminalDimensions],
+    [activeRepoPath, openRepo, startCommand, getTerminalDimensions, pushNotice],
   );
 
   const handleAddProject = useCallback(
     async (repoPath: string) => {
-      const config = await addRepo(repoPath);
-      // addRepo sets activeRepoPath in the repo store, get the canonical path
-      const canonicalPath = useRepoStore.getState().activeRepoPath!;
-      useTerminalStore.getState().switchProject(canonicalPath);
-      useCommandStore.getState().switchProject(canonicalPath);
-      useCommandStore.getState().loadCommands(canonicalPath, config.commands);
+      try {
+        const config = await addRepo(repoPath);
+        // addRepo sets activeRepoPath in the repo store, get the canonical path
+        const canonicalPath = useRepoStore.getState().activeRepoPath!;
+        useTerminalStore.getState().switchProject(canonicalPath);
+        useCommandStore.getState().switchProject(canonicalPath);
+        useCommandStore.getState().loadCommands(canonicalPath, config.commands);
+      } catch (error) {
+        pushNotice({
+          tone: "error",
+          title: "Couldn’t add project",
+          message: getErrorMessage(error),
+        });
+      }
     },
-    [addRepo],
+    [addRepo, pushNotice],
   );
 
   const handleRemoveProject = useCallback(
     async (repoPath: string) => {
-      await killProjectPtys(repoPath);
-      await removeRepo(repoPath);
-      // If that was the active project, clear state
-      if (useRepoStore.getState().activeRepoPath === null) {
-        useTerminalStore.getState().switchProject("");
-        useCommandStore.getState().switchProject("");
+      try {
+        await killProjectPtys(repoPath);
+        await removeRepo(repoPath);
+        useTerminalStore.getState().removeProject(repoPath);
+        useCommandStore.getState().removeProject(repoPath);
+        useGitStore.getState().removeProject(repoPath);
+      } catch (error) {
+        pushNotice({
+          tone: "error",
+          title: "Couldn’t remove project",
+          message: getErrorMessage(error),
+        });
       }
     },
-    [killProjectPtys, removeRepo],
+    [killProjectPtys, pushNotice, removeRepo],
   );
 
   const handleStartCommand = useCallback(
@@ -233,10 +266,14 @@ export default function AppShell() {
   }, []);
 
   const handleStartSession = useCallback(
-    (assistantId: string, mode: SessionMode, worktreePath: string | null) => {
+    async (assistantId: string, mode: SessionMode, worktreePath: string | null) => {
       const { cols, rows } = getTerminalDimensions();
-      launchAssistant(assistantId, cols, rows, mode, worktreePath);
-      useUIStore.getState().closeLauncher();
+      const ptyId = await launchAssistant(assistantId, cols, rows, mode, worktreePath);
+      if (ptyId) {
+        useUIStore.getState().closeLauncher();
+        return true;
+      }
+      return false;
     },
     [launchAssistant, getTerminalDimensions],
   );
@@ -317,10 +354,16 @@ export default function AppShell() {
     try {
       await openInEditor(repoPath);
     } catch (error) {
-      console.error("Failed to open editor:", error);
-      window.alert(String(error));
+      if (import.meta.env.DEV) {
+        console.error("Failed to open editor:", error);
+      }
+      pushNotice({
+        tone: "error",
+        title: "Couldn’t open editor",
+        message: getErrorMessage(error),
+      });
     }
-  }, []);
+  }, [pushNotice]);
 
   useEffect(() => {
     if (activeRepoPath) {
@@ -370,6 +413,7 @@ export default function AppShell() {
 
   return (
     <div className="app-shell">
+      <NoticeCenter />
       <div
         className="drag-region"
         onMouseDown={(e) => {

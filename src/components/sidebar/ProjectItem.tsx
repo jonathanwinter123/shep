@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import ContextMenu from "../shared/ContextMenu";
 import type { ContextMenuItem } from "../shared/ContextMenu";
+import { useNoticeStore } from "../../stores/useNoticeStore";
+import { getErrorMessage } from "../../lib/errors";
 
 interface ProjectItemProps {
   repo: RepoInfo;
@@ -41,6 +43,7 @@ export default function ProjectItem({
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const preferredEditor = useEditorStore((s) => s.settings.preferredEditor);
+  const pushNotice = useNoticeStore((s) => s.pushNotice);
   const preferredEditorLabel = getEditorLabel(preferredEditor);
   const editorActionLabel = preferredEditorLabel
     ? `Open in ${preferredEditorLabel}`
@@ -75,7 +78,21 @@ export default function ProjectItem({
       label: "Copy Path",
       icon: <Copy size={14} />,
       onClick: () => {
-        navigator.clipboard.writeText(repo.path);
+        navigator.clipboard.writeText(repo.path)
+          .then(() => {
+            pushNotice({
+              tone: "success",
+              title: "Copied project path",
+              message: repo.path,
+            });
+          })
+          .catch((error) => {
+            pushNotice({
+              tone: "error",
+              title: "Couldn’t copy project path",
+              message: getErrorMessage(error),
+            });
+          });
       },
     },
     {

@@ -34,11 +34,15 @@ export default function SettingsPanel() {
 
   const kbSettings = useKeybindingStore((s) => s.settings);
   const kbHasLoaded = useKeybindingStore((s) => s.hasLoaded);
+  const kbIsSaving = useKeybindingStore((s) => s.isSaving);
+  const kbError = useKeybindingStore((s) => s.error);
   const loadKbSettings = useKeybindingStore((s) => s.loadSettings);
   const setKbEnabled = useKeybindingStore((s) => s.setEnabled);
 
   const termSettings = useTerminalSettingsStore((s) => s.settings);
   const termHasLoaded = useTerminalSettingsStore((s) => s.hasLoaded);
+  const termIsSaving = useTerminalSettingsStore((s) => s.isSaving);
+  const termError = useTerminalSettingsStore((s) => s.error);
   const loadTermSettings = useTerminalSettingsStore((s) => s.loadSettings);
   const updateTermSettings = useTerminalSettingsStore((s) => s.updateSettings);
 
@@ -147,6 +151,9 @@ export default function SettingsPanel() {
         })}
       </div>
 
+      {kbIsSaving && <div className="mt-2 text-xs text-white/40">Saving keybindings...</div>}
+      {kbError && <div className="mt-2 text-sm text-red-300">{kbError}</div>}
+
       <hr className="settings-divider" />
 
       {/* ── Terminal ───────────────────────────────────────── */}
@@ -194,6 +201,9 @@ export default function SettingsPanel() {
           ))}
         </div>
       </div>
+
+      {termIsSaving && <div className="mt-2 text-xs text-white/40">Saving terminal settings...</div>}
+      {termError && <div className="mt-2 text-sm text-red-300">{termError}</div>}
 
       <p className="text-xs text-white/30 mt-6">
         Settings are saved to ~/.shep/config.yml

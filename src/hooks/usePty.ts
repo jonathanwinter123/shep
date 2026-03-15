@@ -4,8 +4,10 @@ import type { PtyOutput, CommandConfig, SessionMode } from "../lib/types";
 import { useCommandStore } from "../stores/useCommandStore";
 import { useTerminalStore, nextTabId } from "../stores/useTerminalStore";
 import { useRepoStore } from "../stores/useRepoStore";
+import { useNoticeStore } from "../stores/useNoticeStore";
 import { CODING_ASSISTANTS } from "../components/sidebar/constants";
 import type { Terminal } from "@xterm/xterm";
+import { getErrorMessage } from "../lib/errors";
 
 // Map ptyId -> xterm instance for writing output
 const terminalInstances = new Map<number, Terminal>();
@@ -16,6 +18,7 @@ const pendingOutput = new Map<number, string[]>();
 // Debounce timers for activity detection — clears "active" after 3s of silence
 const activityTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const ACTIVITY_TIMEOUT = 3000;
+const stoppingPtys = new Set<number>();
 
 function cleanupActivityState(ptyId: number) {
   const timer = activityTimers.get(ptyId);
@@ -69,6 +72,7 @@ function resolveCommandCwd(repoPath: string, commandCwd: string | null) {
 
 export function usePty() {
   const activeRepoPath = useRepoStore((s) => s.activeRepoPath);
+  const pushNotice = useNoticeStore((s) => s.pushNotice);
   const {
     setCommandStatus,
     setCommandPtyId,
@@ -100,8 +104,14 @@ export function usePty() {
       } else if (msg.event === "exit") {
         cleanupActivityState(ptyId);
         setTabExited(ptyId, msg.data.code);
+        const stoppedByUser = stoppingPtys.delete(ptyId);
         if (commandName) {
-          setCommandStatusForProject(repoPath, commandName, "crashed");
+          const command = useCommandStore.getState().projectCommands[repoPath]
+            ?.find((entry) => entry.name === commandName);
+          const nextStatus = stoppedByUser || msg.data.code === 0 ? "stopped" : "crashed";
+          if (command?.status !== "stopped" || nextStatus === "crashed") {
+            setCommandStatusForProject(repoPath, commandName, nextStatus);
+          }
           setCommandPtyIdForProject(repoPath, commandName, null);
         }
       }
@@ -181,7 +191,15 @@ export function usePty() {
 
         return ptyId;
       } catch (e) {
-        console.error(`Failed to start command "${commandName}":`, e);
+        if (import.meta.env.DEV) {
+          console.error(`Failed to start command "${commandName}":`, e);
+        }
+        pushNotice({
+          tone: "error",
+          title: `Couldn’t start ${commandName}`,
+          message: getErrorMessage(e),
+        });
+        return null;
       }
     },
     [
@@ -192,6 +210,7 @@ export function usePty() {
       findTabByCommand,
       setActiveTab,
       addTab,
+      pushNotice,
     ],
   );
 
@@ -205,7 +224,10 @@ export function usePty() {
       const tab = state.projectState[path]?.tabs.find((t) => t.commandName === commandName);
       if (command?.ptyId) {
         cleanupActivityState(command.ptyId);
-        await killPty(command.ptyId).catch(() => {});
+        stoppingPtys.add(command.ptyId);
+        await killPty(command.ptyId).catch(() => {
+          stoppingPtys.delete(command.ptyId!);
+        });
         unregisterTerminal(command.ptyId);
         removeActivity(command.ptyId);
       }
@@ -256,10 +278,18 @@ export function usePty() {
 
         return ptyId;
       } catch (e) {
-        console.error("Failed to spawn shell:", e);
+        if (import.meta.env.DEV) {
+          console.error("Failed to spawn shell:", e);
+        }
+        pushNotice({
+          tone: "error",
+          title: "Couldn’t open shell",
+          message: getErrorMessage(e),
+        });
+        return null;
       }
     },
-    [activeRepoPath, spawnSession, addTab],
+    [activeRepoPath, spawnSession, addTab, pushNotice],
   );
 
   const launchAssistant = useCallback(
@@ -310,10 +340,18 @@ export function usePty() {
 
         return ptyId;
       } catch (e) {
-        console.error(`Failed to launch ${assistant.name}:`, e);
+        if (import.meta.env.DEV) {
+          console.error(`Failed to launch ${assistant.name}:`, e);
+        }
+        pushNotice({
+          tone: "error",
+          title: `Couldn’t launch ${assistant.name}`,
+          message: getErrorMessage(e),
+        });
+        return null;
       }
     },
-    [activeRepoPath, spawnSession, addTab],
+    [activeRepoPath, spawnSession, addTab, pushNotice],
   );
 
   const closeTab = useCallback(
@@ -326,7 +364,10 @@ export function usePty() {
       if (!tab) return;
 
       cleanupActivityState(tab.ptyId);
-      await killPty(tab.ptyId).catch(() => {});
+      stoppingPtys.add(tab.ptyId);
+      await killPty(tab.ptyId).catch(() => {
+        stoppingPtys.delete(tab.ptyId);
+      });
       unregisterTerminal(tab.ptyId);
       removeActivity(tab.ptyId);
 
@@ -337,14 +378,21 @@ export function usePty() {
 
       // Clean up worktree for YOLO sessions
       if (tab.worktreePath) {
-        await gitRemoveWorktree(tab.repoPath, tab.worktreePath).catch((e) => {
-          console.warn("Failed to remove worktree:", e);
+        await gitRemoveWorktree(tab.repoPath, tab.worktreePath).catch((error) => {
+          if (import.meta.env.DEV) {
+            console.warn("Failed to remove worktree:", error);
+          }
+          pushNotice({
+            tone: "error",
+            title: "Worktree cleanup failed",
+            message: getErrorMessage(error),
+          });
         });
       }
 
       removeTab(tabId);
     },
-    [setCommandStatus, setCommandPtyId, removeTab, removeActivity],
+    [setCommandStatus, setCommandPtyId, removeTab, removeActivity, pushNotice],
   );
 
   const killProjectPtys = useCallback(async (repoPath: string) => {
@@ -352,11 +400,27 @@ export function usePty() {
     const tabs = state.projectState[repoPath]?.tabs ?? [];
     for (const tab of tabs) {
       cleanupActivityState(tab.ptyId);
-      await killPty(tab.ptyId).catch(() => {});
+      stoppingPtys.add(tab.ptyId);
+      await killPty(tab.ptyId).catch(() => {
+        stoppingPtys.delete(tab.ptyId);
+      });
       unregisterTerminal(tab.ptyId);
       removeActivity(tab.ptyId);
+
+      if (tab.worktreePath) {
+        await gitRemoveWorktree(tab.repoPath, tab.worktreePath).catch((error) => {
+          if (import.meta.env.DEV) {
+            console.warn("Failed to remove worktree:", error);
+          }
+          pushNotice({
+            tone: "error",
+            title: "Worktree cleanup failed",
+            message: getErrorMessage(error),
+          });
+        });
+      }
     }
-  }, [removeActivity]);
+  }, [removeActivity, pushNotice]);
 
   return {
     startCommand,

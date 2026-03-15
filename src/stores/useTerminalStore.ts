@@ -62,9 +62,17 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
   removeProject: (repoPath: string) => {
     set((state) => {
       const projectState = { ...state.projectState };
+      const removedTabs = projectState[repoPath]?.tabs ?? [];
       delete projectState[repoPath];
+
+      const tabActivity = { ...state.tabActivity };
+      for (const tab of removedTabs) {
+        delete tabActivity[tab.ptyId];
+      }
+
       return {
         projectState,
+        tabActivity,
         ...(state.activeProjectPath === repoPath
           ? { activeProjectPath: null }
           : {}),
