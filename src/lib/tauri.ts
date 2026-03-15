@@ -193,7 +193,3 @@ export function getComputerName(): Promise<string> {
 export function checkCommandExists(command: string): Promise<boolean> {
   return invoke("check_command_exists", { command });
 }
-
-export function sendNotification(title: string, body: string): Promise<void> {
-  return invoke("send_notification", { title, body });
-}

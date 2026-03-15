@@ -25,11 +25,14 @@ export async function initNotifications() {
 }
 
 export function notifyAgent(ptyId: number, message: string) {
-  console.log("[shep] notifyAgent ptyId:", ptyId, "message:", message, "focused:", focused);
+  console.log("[shep] notifyAgent ptyId:", ptyId, "message:", message, "focused:", focused, "permissionGranted:", permissionGranted);
   useTerminalStore.getState().setTabBell(ptyId);
 
   // TODO: restore `if (!focused)` guard after testing
-  if (permissionGranted) {
+  try {
     sendNativeNotification({ title: "Shep", body: message });
+    console.log("[shep] notification sent");
+  } catch (e) {
+    console.error("[shep] notification error:", e);
   }
 }

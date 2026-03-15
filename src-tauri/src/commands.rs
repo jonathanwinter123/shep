@@ -304,19 +304,6 @@ fn open_path_in_editor(repo_path: &str, editor_id: &str) -> Result<(), String> {
     }
 }
 
-#[tauri::command]
-pub fn send_notification(app: tauri::AppHandle, title: &str, body: &str) {
-    use tauri_plugin_notification::NotificationExt;
-    match app.notification().builder()
-        .title(title)
-        .body(body)
-        .show()
-    {
-        Ok(_) => log::info!("Notification sent: {title}"),
-        Err(e) => log::error!("Notification failed: {e}"),
-    }
-}
-
 fn editor_app_name(editor_id: &str) -> Option<&'static str> {
     match editor_id {
         "vscode" => Some("Visual Studio Code"),
