@@ -15,8 +15,9 @@ body,
   --glass-panel-soft: rgba(255, 255, 255, 0.05);
   --glass-border: rgba(169, 177, 214, 0.12);
   --glass-border-strong: rgba(169, 177, 214, 0.18);
-  --glass-shadow: 0 24px 80px rgba(16, 16, 22, 0.48);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
   --glass-highlight: rgba(255, 255, 255, 0.2);
+  --glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
 
   /* Theme-driven vars (defaults = Tokyo Night) */
   --bg-radial-1: rgba(150, 165, 200, 0.10);
@@ -25,9 +26,6 @@ body,
   --bg-linear-from: #16161e;
   --bg-linear-mid: #1a1b26;
   --bg-linear-to: #16161e;
-  --ambient-orb-1: rgba(150, 165, 200, 0.10);
-  --ambient-orb-2: rgba(150, 180, 175, 0.07);
-  --ambient-orb-3: rgba(170, 165, 195, 0.06);
   --frame-tint: rgba(22, 22, 30, 0.3);
   --panel-tint: rgba(26, 27, 38, 0.52);
 
@@ -733,38 +731,6 @@ select {
   display: flex;
 }
 
-.app-shell__ambient {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(80px);
-  opacity: 0.72;
-  pointer-events: none;
-}
-
-.app-shell__ambient--blue {
-  top: -120px;
-  left: -40px;
-  width: 320px;
-  height: 320px;
-  background: var(--ambient-orb-1);
-}
-
-.app-shell__ambient--mint {
-  right: -100px;
-  top: 40px;
-  width: 280px;
-  height: 280px;
-  background: var(--ambient-orb-2);
-}
-
-.app-shell__ambient--ember {
-  bottom: -120px;
-  left: 40%;
-  width: 320px;
-  height: 240px;
-  background: var(--ambient-orb-3);
-}
-
 .app-shell__frame {
   position: relative;
   display: flex;
@@ -774,6 +740,7 @@ select {
   border: 1px solid var(--glass-border);
   border-radius: 16px;
   background:
+    var(--glass-noise),
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)),
     var(--frame-tint);
   box-shadow: var(--glass-shadow);
@@ -793,6 +760,7 @@ select {
 .glass-panel {
   border: 1px solid var(--glass-border);
   background:
+    var(--glass-noise),
     linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025)),
     var(--panel-tint);
   box-shadow:

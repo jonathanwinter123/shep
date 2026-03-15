@@ -10,11 +10,6 @@ export interface ShepTheme {
   bgLinearMid: string;
   bgLinearTo: string;
 
-  // Ambient orbs
-  ambientOrb1: string;
-  ambientOrb2: string;
-  ambientOrb3: string;
-
   // Glass tints
   frameTint: string;
   panelTint: string;
@@ -57,10 +52,6 @@ const suffolk: ShepTheme = {
   bgLinearMid: "#1a1b26",
   bgLinearTo: "#16161e",
 
-  ambientOrb1: "rgba(150, 165, 200, 0.10)",
-  ambientOrb2: "rgba(150, 180, 175, 0.07)",
-  ambientOrb3: "rgba(170, 165, 195, 0.06)",
-
   frameTint: "rgba(22, 22, 30, 0.3)",
   panelTint: "rgba(26, 27, 38, 0.52)",
   glassBorder: "rgba(169, 177, 214, 0.12)",
@@ -99,10 +90,6 @@ const jacob: ShepTheme = {
   bgLinearFrom: "#09090e",
   bgLinearMid: "#0e0f14",
   bgLinearTo: "#09090e",
-
-  ambientOrb1: "rgba(170, 165, 195, 0.04)",
-  ambientOrb2: "rgba(150, 180, 165, 0.02)",
-  ambientOrb3: "rgba(190, 165, 175, 0.02)",
 
   frameTint: "rgba(9, 9, 14, 0.65)",
   panelTint: "rgba(14, 15, 20, 0.80)",
@@ -143,10 +130,6 @@ const merino: ShepTheme = {
   bgLinearMid: "#21252b",
   bgLinearTo: "#282c34",
 
-  ambientOrb1: "rgba(150, 170, 200, 0.12)",
-  ambientOrb2: "rgba(160, 175, 155, 0.08)",
-  ambientOrb3: "rgba(190, 160, 165, 0.08)",
-
   frameTint: "rgba(27, 31, 39, 0.3)",
   panelTint: "rgba(33, 37, 43, 0.52)",
   glassBorder: "rgba(171, 178, 191, 0.12)",
@@ -186,10 +169,6 @@ const cheviot: ShepTheme = {
   bgLinearMid: "#3d4452",
   bgLinearTo: "#363c4a",
 
-  ambientOrb1: "rgba(160, 170, 195, 0.10)",
-  ambientOrb2: "rgba(160, 180, 165, 0.07)",
-  ambientOrb3: "rgba(185, 165, 175, 0.07)",
-
   frameTint: "rgba(54, 60, 74, 0.30)",
   panelTint: "rgba(61, 68, 82, 0.52)",
   glassBorder: "rgba(200, 210, 230, 0.14)",
@@ -218,11 +197,51 @@ const cheviot: ShepTheme = {
   termBrightWhite: "#e0e4ec",
 };
 
+const dorset: ShepTheme = {
+  id: "dorset",
+  name: "Dorset",
+
+  bgRadial1: "rgba(130, 160, 220, 0.14)",
+  bgRadial2: "rgba(140, 190, 180, 0.10)",
+  bgRadial3: "rgba(180, 150, 200, 0.10)",
+  bgLinearFrom: "#12131a",
+  bgLinearMid: "#181a24",
+  bgLinearTo: "#12131a",
+
+  frameTint: "rgba(18, 19, 26, 0.12)",
+  panelTint: "rgba(24, 26, 36, 0.22)",
+  glassBorder: "rgba(160, 180, 230, 0.20)",
+
+  appBg: "#181a24",
+  appFg: "#b8c4e0",
+
+  termForeground: "#b8c4e0",
+  termCursor: "#88aaff",
+  termSelection: "#4455884d",
+  termBlack: "#2a2e3c",
+  termRed: "#f07088",
+  termGreen: "#78ddb8",
+  termYellow: "#e0b870",
+  termBlue: "#7aa8f8",
+  termMagenta: "#c090f0",
+  termCyan: "#70c8e0",
+  termWhite: "#9aa0b8",
+  termBrightBlack: "#4a5068",
+  termBrightRed: "#f58898",
+  termBrightGreen: "#90e8c8",
+  termBrightYellow: "#e8c888",
+  termBrightBlue: "#90b8ff",
+  termBrightMagenta: "#d0a8f8",
+  termBrightCyan: "#88d8f0",
+  termBrightWhite: "#d0d8e8",
+};
+
 export const THEMES: Record<string, ShepTheme> = {
   merino,
   suffolk,
   jacob,
   cheviot,
+  dorset,
 };
 
 export const THEME_LIST: ShepTheme[] = Object.values(THEMES);

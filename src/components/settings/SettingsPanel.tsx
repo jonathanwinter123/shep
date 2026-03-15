@@ -79,7 +79,7 @@ export default function SettingsPanel() {
                 style={{
                   width: 24,
                   height: 24,
-                  background: `linear-gradient(135deg, ${t.ambientOrb1} 0%, ${t.bgLinearMid} 50%, ${t.ambientOrb3} 100%)`,
+                  background: `linear-gradient(135deg, ${t.bgRadial1} 0%, ${t.bgLinearMid} 50%, ${t.bgRadial3} 100%)`,
                   outline: active
                     ? "2px solid rgba(255,255,255,0.7)"
                     : "2px solid transparent",

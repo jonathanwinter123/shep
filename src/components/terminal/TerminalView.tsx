@@ -114,6 +114,10 @@ export default function TerminalView({
     const size = { cols: cached.term.cols, rows: cached.term.rows };
     const lastSize = lastSizeRef.current;
 
+    // Always refresh the viewport so scroll state is restored after
+    // visibility changes (e.g. closing settings overlay).
+    cached.term.refresh(0, cached.term.rows - 1);
+
     if (
       lastSize &&
       lastSize.cols === size.cols &&
@@ -124,7 +128,6 @@ export default function TerminalView({
 
     lastSizeRef.current = size;
     await resizePty(ptyId, size.cols, size.rows).catch(console.error);
-    cached.term.refresh(0, cached.term.rows - 1);
   }, [ptyId]);
 
   useEffect(() => {
@@ -162,6 +165,11 @@ export default function TerminalView({
     const attachTerminal = async () => {
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       if (disposed) return;
+
+      // Re-apply the current theme now that the container is visible.
+      // Theme changes that occurred while hidden were deferred to avoid
+      // corrupting xterm's scroll state.
+      term.options.theme = createTerminalTheme(useThemeStore.getState().theme);
 
       await fitAndResize();
       if (disposed) return;

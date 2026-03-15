@@ -384,10 +384,6 @@ export default function AppShell() {
       >
         <span className="drag-region__logo"><ShepLogo size={18} /></span>
       </div>
-      <div className="app-shell__ambient app-shell__ambient--blue" />
-      <div className="app-shell__ambient app-shell__ambient--mint" />
-      <div className="app-shell__ambient app-shell__ambient--ember" />
-
       <div className="app-shell__frame">
         <Sidebar
           repos={repos}
