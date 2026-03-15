@@ -1,6 +1,7 @@
 export interface ShepTheme {
   id: string;
   name: string;
+  isTransparent: boolean;
 
   // Body background
   bgRadial1: string;
@@ -47,6 +48,7 @@ export interface ShepTheme {
 const tokyoNight: ShepTheme = {
   id: "tokyo-night",
   name: "Tokyo Night",
+  isTransparent: false,
 
   bgRadial1: "rgba(122, 162, 247, 0.10)",
   bgRadial2: "rgba(187, 154, 247, 0.06)",
@@ -89,6 +91,7 @@ const tokyoNight: ShepTheme = {
 const monokai: ShepTheme = {
   id: "monokai",
   name: "Monokai",
+  isTransparent: false,
 
   bgRadial1: "rgba(249, 38, 114, 0.08)",
   bgRadial2: "rgba(166, 226, 46, 0.05)",
@@ -131,6 +134,7 @@ const monokai: ShepTheme = {
 const dracula: ShepTheme = {
   id: "dracula",
   name: "Dracula",
+  isTransparent: false,
 
   bgRadial1: "rgba(189, 147, 249, 0.08)",
   bgRadial2: "rgba(255, 121, 198, 0.05)",
@@ -173,6 +177,7 @@ const dracula: ShepTheme = {
 const glass: ShepTheme = {
   id: "glass",
   name: "Glass",
+  isTransparent: true,
 
   bgRadial1: "rgba(130, 160, 220, 0.18)",
   bgRadial2: "rgba(160, 120, 230, 0.16)",

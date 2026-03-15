@@ -59,6 +59,10 @@ body,
   --status-attention: rgb(250, 204, 21);  /* yellow-400 */
 }
 
+body.theme-glass {
+  background: transparent !important;
+}
+
 body {
   margin: 0;
   font-family: "SF Pro Display", "IBM Plex Sans", "Segoe UI", sans-serif;
