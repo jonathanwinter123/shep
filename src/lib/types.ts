@@ -20,6 +20,11 @@ export interface WorkspaceConfig {
   assistants: AssistantConfig[];
 }
 
+export interface RegisteredRepo {
+  path: string;
+  workspace: WorkspaceConfig;
+}
+
 export type PreferredEditor = "vscode" | "zed" | "cursor" | "sublime_text";
 
 export interface EditorSettings {

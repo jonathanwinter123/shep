@@ -2,8 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::config::{
-    CommandConfig, EditorSettings, GlobalConfig, KeybindingSettings, RepoEntry, RepoInfo,
-    TerminalSettings, WorkspaceConfig,
+    CommandConfig, EditorSettings, GlobalConfig, KeybindingSettings, RegisteredRepo, RepoEntry,
+    RepoInfo, TerminalSettings, WorkspaceConfig,
 };
 
 // ── Paths ───────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ pub fn list_repos() -> Result<Vec<RepoInfo>, String> {
     Ok(repos)
 }
 
-pub fn register_repo(repo_path: &str) -> Result<WorkspaceConfig, String> {
+pub fn register_repo(repo_path: &str) -> Result<RegisteredRepo, String> {
     let path = Path::new(repo_path);
     if !path.is_dir() {
         return Err(format!("Directory does not exist: {repo_path}"));
@@ -131,7 +131,11 @@ pub fn register_repo(repo_path: &str) -> Result<WorkspaceConfig, String> {
     ensure_repo_shep_dir(&canonical_str)?;
 
     // Load or create workspace config
-    load_or_create_workspace(&canonical_str)
+    let workspace = load_or_create_workspace(&canonical_str)?;
+    Ok(RegisteredRepo {
+        path: canonical_str,
+        workspace,
+    })
 }
 
 pub fn unregister_repo(repo_path: &str) -> Result<(), String> {
