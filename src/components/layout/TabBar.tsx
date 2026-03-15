@@ -56,6 +56,8 @@ export default function TabBar({
     useUIStore.getState().deactivateGitPanel();
     useUIStore.getState().deactivateCommandsPanel();
     setActiveTab(tabId);
+    const tab = tabs.find((t) => t.id === tabId);
+    if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
   };
 
   return (

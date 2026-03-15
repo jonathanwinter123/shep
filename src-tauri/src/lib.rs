@@ -13,6 +13,7 @@ pub fn run() {
     let _ = fix_path_env::fix();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(PtyManager::new())
         .manage(WorkspaceManager::new())
         .setup(|app| {
@@ -54,6 +55,10 @@ pub fn run() {
             commands::save_workspace,
             commands::get_editor_settings,
             commands::save_editor_settings,
+            commands::get_keybinding_settings,
+            commands::save_keybinding_settings,
+            commands::get_terminal_settings,
+            commands::save_terminal_settings,
             commands::open_in_editor,
             commands::spawn_pty,
             commands::write_pty,

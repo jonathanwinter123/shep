@@ -26,6 +26,20 @@ export interface EditorSettings {
   preferredEditor: PreferredEditor | null;
 }
 
+export interface KeybindingSettings {
+  shiftEnterNewline: boolean;
+  optionDeleteWord: boolean;
+  cmdKClear: boolean;
+}
+
+export type CursorStyle = "block" | "underline" | "bar";
+
+export interface TerminalSettings {
+  cursorStyle: CursorStyle;
+  cursorBlink: boolean;
+  scrollback: number;
+}
+
 // ── Runtime state types ─────────────────────────────────────────────
 
 export type CommandStatus = "stopped" | "running" | "crashed";

@@ -8,7 +8,7 @@ use crate::git;
 use crate::git::{ChangedFile, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::PtyOutput;
-use crate::workspace::config::{EditorSettings, RepoInfo, WorkspaceConfig};
+use crate::workspace::config::{EditorSettings, KeybindingSettings, RepoInfo, TerminalSettings, WorkspaceConfig};
 use crate::workspace::manager::WorkspaceManager;
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -64,6 +64,36 @@ pub fn save_editor_settings(
     workspace: State<'_, WorkspaceManager>,
 ) -> Result<(), String> {
     workspace.save_editor_settings(&settings)
+}
+
+#[tauri::command]
+pub fn get_keybinding_settings(
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<KeybindingSettings, String> {
+    workspace.load_keybinding_settings()
+}
+
+#[tauri::command]
+pub fn save_keybinding_settings(
+    settings: KeybindingSettings,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<(), String> {
+    workspace.save_keybinding_settings(&settings)
+}
+
+#[tauri::command]
+pub fn get_terminal_settings(
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<TerminalSettings, String> {
+    workspace.load_terminal_settings()
+}
+
+#[tauri::command]
+pub fn save_terminal_settings(
+    settings: TerminalSettings,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<(), String> {
+    workspace.save_terminal_settings(&settings)
 }
 
 #[tauri::command]

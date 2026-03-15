@@ -2,7 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::config::{
-    CommandConfig, EditorSettings, GlobalConfig, RepoEntry, RepoInfo, WorkspaceConfig,
+    CommandConfig, EditorSettings, GlobalConfig, KeybindingSettings, RepoEntry, RepoInfo,
+    TerminalSettings, WorkspaceConfig,
 };
 
 // ── Paths ───────────────────────────────────────────────────────────
@@ -58,6 +59,26 @@ pub fn load_editor_settings() -> Result<EditorSettings, String> {
 pub fn save_editor_settings(settings: &EditorSettings) -> Result<(), String> {
     let mut config = load_global_config()?;
     config.editor = settings.clone();
+    save_global_config(&config)
+}
+
+pub fn load_keybinding_settings() -> Result<KeybindingSettings, String> {
+    Ok(load_global_config()?.keybindings)
+}
+
+pub fn save_keybinding_settings(settings: &KeybindingSettings) -> Result<(), String> {
+    let mut config = load_global_config()?;
+    config.keybindings = settings.clone();
+    save_global_config(&config)
+}
+
+pub fn load_terminal_settings() -> Result<TerminalSettings, String> {
+    Ok(load_global_config()?.terminal)
+}
+
+pub fn save_terminal_settings(settings: &TerminalSettings) -> Result<(), String> {
+    let mut config = load_global_config()?;
+    config.terminal = settings.clone();
     save_global_config(&config)
 }
 

@@ -19,7 +19,10 @@ import {
 } from "../../lib/terminalConfig";
 import { createTerminalTheme } from "./terminalTheme";
 import { useThemeStore } from "../../stores/useThemeStore";
-import { useTerminalStore } from "../../stores/useTerminalStore";
+import { notifyAgent } from "../../lib/notifications";
+import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
+import { useKeybindingStore } from "../../stores/useKeybindingStore";
+import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 
 interface TerminalViewProps {
   ptyId: number;
@@ -45,13 +48,15 @@ export default function TerminalView({
     const cached = terminalCache.get(ptyId);
     if (cached) return cached;
 
+    const termSettings = useTerminalSettingsStore.getState().settings;
     const term = new Terminal({
-      cursorBlink: true,
+      cursorBlink: termSettings.cursorBlink,
+      cursorStyle: termSettings.cursorStyle,
       fontSize: TERMINAL_FONT_SIZE,
       fontFamily: TERMINAL_FONT_FAMILY,
       lineHeight: TERMINAL_LINE_HEIGHT,
       theme: createTerminalTheme(useThemeStore.getState().theme),
-      scrollback: 10000,
+      scrollback: termSettings.scrollback,
       allowTransparency: true,
       allowProposedApi: true,
     });
@@ -70,7 +75,30 @@ export default function TerminalView({
 
     // Track terminal bell (attention request)
     term.onBell(() => {
-      useTerminalStore.getState().setTabBell(ptyId);
+      console.log("[shep] BEL received on pty", ptyId);
+      notifyAgent(ptyId, "Terminal bell");
+    });
+
+    // Intercept OSC 9 notifications from coding agents (Claude Code, Codex, Gemini)
+    term.parser.registerOscHandler(9, (data) => {
+      console.log("[shep] OSC 9 received on pty", ptyId, "data:", data);
+      const message = data.startsWith("2;") ? data.slice(2) : data;
+      if (message) notifyAgent(ptyId, message);
+      return true;
+    });
+
+    // Intercept key combos for custom keybindings
+    term.attachCustomKeyEventHandler((ev) => {
+      const settings = useKeybindingStore.getState().settings;
+      for (const preset of KEYBINDING_PRESETS) {
+        if (settings[preset.id] && preset.match(ev)) {
+          if (ev.type === "keydown") {
+            writePty(ptyId, preset.sequence).catch(console.error);
+          }
+          return false; // prevent xterm default handling
+        }
+      }
+      return true; // let xterm handle normally
     });
 
     const entry = { term, fitAddon, rendererAddon: null as WebglAddon | CanvasAddon | null };

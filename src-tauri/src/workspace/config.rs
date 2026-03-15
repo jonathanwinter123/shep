@@ -11,6 +11,10 @@ pub struct GlobalConfig {
     pub repos: Vec<RepoEntry>,
     #[serde(default)]
     pub editor: EditorSettings,
+    #[serde(default)]
+    pub keybindings: KeybindingSettings,
+    #[serde(default)]
+    pub terminal: TerminalSettings,
 }
 
 fn default_version() -> u32 {
@@ -23,6 +27,8 @@ impl Default for GlobalConfig {
             version: 1,
             repos: Vec::new(),
             editor: EditorSettings::default(),
+            keybindings: KeybindingSettings::default(),
+            terminal: TerminalSettings::default(),
         }
     }
 }
@@ -31,6 +37,58 @@ impl Default for GlobalConfig {
 pub struct EditorSettings {
     #[serde(default, rename = "preferredEditor")]
     pub preferred_editor: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeybindingSettings {
+    #[serde(default = "default_true", rename = "shiftEnterNewline")]
+    pub shift_enter_newline: bool,
+    #[serde(default = "default_true", rename = "optionDeleteWord")]
+    pub option_delete_word: bool,
+    #[serde(default = "default_true", rename = "cmdKClear")]
+    pub cmd_k_clear: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for KeybindingSettings {
+    fn default() -> Self {
+        KeybindingSettings {
+            shift_enter_newline: true,
+            option_delete_word: true,
+            cmd_k_clear: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerminalSettings {
+    #[serde(default = "default_cursor_style", rename = "cursorStyle")]
+    pub cursor_style: String,
+    #[serde(default = "default_true", rename = "cursorBlink")]
+    pub cursor_blink: bool,
+    #[serde(default = "default_scrollback")]
+    pub scrollback: u32,
+}
+
+fn default_cursor_style() -> String {
+    "block".to_string()
+}
+
+fn default_scrollback() -> u32 {
+    10000
+}
+
+impl Default for TerminalSettings {
+    fn default() -> Self {
+        TerminalSettings {
+            cursor_style: default_cursor_style(),
+            cursor_blink: true,
+            scrollback: default_scrollback(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -19,15 +19,15 @@ body,
   --glass-highlight: rgba(255, 255, 255, 0.2);
 
   /* Theme-driven vars (defaults = Tokyo Night) */
-  --bg-radial-1: rgba(122, 162, 247, 0.18);
-  --bg-radial-2: rgba(115, 218, 202, 0.10);
-  --bg-radial-3: rgba(187, 154, 247, 0.10);
+  --bg-radial-1: rgba(150, 165, 200, 0.10);
+  --bg-radial-2: rgba(150, 180, 175, 0.06);
+  --bg-radial-3: rgba(170, 165, 195, 0.06);
   --bg-linear-from: #16161e;
   --bg-linear-mid: #1a1b26;
   --bg-linear-to: #16161e;
-  --ambient-orb-1: rgba(122, 162, 247, 0.18);
-  --ambient-orb-2: rgba(115, 218, 202, 0.12);
-  --ambient-orb-3: rgba(187, 154, 247, 0.10);
+  --ambient-orb-1: rgba(150, 165, 200, 0.10);
+  --ambient-orb-2: rgba(150, 180, 175, 0.07);
+  --ambient-orb-3: rgba(170, 165, 195, 0.06);
   --frame-tint: rgba(22, 22, 30, 0.3);
   --panel-tint: rgba(26, 27, 38, 0.52);
 
@@ -230,6 +230,105 @@ select {
 .option-card:disabled {
   opacity: 0.4;
   cursor: default;
+}
+.option-card--compact {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+/* Settings layout helpers */
+.settings-divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin: 24px 0;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.settings-row__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+/* Keybinding card */
+.keybinding-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.keybinding-card:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+.keybinding-card.selected {
+  background: var(--surface-active);
+  border-color: var(--border-active);
+  color: var(--text-primary);
+}
+.keybinding-card__keys {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.keybinding-card__action {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+}
+.keybinding-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Info tooltip */
+.settings-info-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: default;
+}
+.settings-info-tip__bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(30, 30, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+  backdrop-filter: blur(12px);
 }
 
 /* Primary action button */
@@ -581,7 +680,7 @@ select {
   position: relative;
   height: 100vh;
   overflow: hidden;
-  padding: 42px 12px 6px;
+  padding: 42px 10px 10px;
 }
 
 .drag-region {
