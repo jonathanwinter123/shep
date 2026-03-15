@@ -14,6 +14,8 @@ export interface ShepTheme {
   frameTint: string;
   panelTint: string;
   glassBorder: string;
+  glassPanelStrong: string;
+  glassBorderStrong: string;
 
   // Core UI colors
   appBg: string;
@@ -41,20 +43,23 @@ export interface ShepTheme {
   termBrightWhite: string;
 }
 
-const suffolk: ShepTheme = {
-  id: "suffolk",
-  name: "Suffolk",
+/* ── Tokyo Night ───────────────────────────────────────── */
+const tokyoNight: ShepTheme = {
+  id: "tokyo-night",
+  name: "Tokyo Night",
 
-  bgRadial1: "rgba(150, 165, 200, 0.10)",
-  bgRadial2: "rgba(150, 180, 175, 0.06)",
-  bgRadial3: "rgba(170, 165, 195, 0.06)",
+  bgRadial1: "rgba(122, 162, 247, 0.10)",
+  bgRadial2: "rgba(187, 154, 247, 0.06)",
+  bgRadial3: "rgba(125, 207, 255, 0.06)",
   bgLinearFrom: "#16161e",
   bgLinearMid: "#1a1b26",
   bgLinearTo: "#16161e",
 
-  frameTint: "rgba(22, 22, 30, 0.3)",
+  frameTint: "rgba(22, 22, 30, 0.30)",
   panelTint: "rgba(26, 27, 38, 0.52)",
   glassBorder: "rgba(169, 177, 214, 0.12)",
+  glassPanelStrong: "rgba(22, 22, 30, 0.78)",
+  glassBorderStrong: "rgba(169, 177, 214, 0.18)",
 
   appBg: "#1a1b26",
   appFg: "#a9b1d6",
@@ -80,20 +85,65 @@ const suffolk: ShepTheme = {
   termBrightWhite: "#acb0d0",
 };
 
-const jacob: ShepTheme = {
-  id: "jacob",
-  name: "Jacob",
+/* ── Monokai ───────────────────────────────────────────── */
+const monokai: ShepTheme = {
+  id: "monokai",
+  name: "Monokai",
 
-  bgRadial1: "rgba(170, 165, 195, 0.04)",
-  bgRadial2: "rgba(150, 180, 165, 0.02)",
-  bgRadial3: "rgba(190, 165, 175, 0.02)",
-  bgLinearFrom: "#09090e",
-  bgLinearMid: "#0e0f14",
-  bgLinearTo: "#09090e",
+  bgRadial1: "rgba(249, 38, 114, 0.08)",
+  bgRadial2: "rgba(166, 226, 46, 0.05)",
+  bgRadial3: "rgba(230, 219, 116, 0.05)",
+  bgLinearFrom: "#1e1f1c",
+  bgLinearMid: "#272822",
+  bgLinearTo: "#1e1f1c",
 
-  frameTint: "rgba(9, 9, 14, 0.65)",
-  panelTint: "rgba(14, 15, 20, 0.80)",
-  glassBorder: "rgba(98, 114, 164, 0.20)",
+  frameTint: "rgba(30, 31, 28, 0.32)",
+  panelTint: "rgba(39, 40, 34, 0.55)",
+  glassBorder: "rgba(117, 113, 94, 0.14)",
+  glassPanelStrong: "rgba(30, 31, 28, 0.80)",
+  glassBorderStrong: "rgba(117, 113, 94, 0.20)",
+
+  appBg: "#272822",
+  appFg: "#f8f8f2",
+
+  termForeground: "#f8f8f2",
+  termCursor: "#f8f8f0",
+  termSelection: "#49483e",
+  termBlack: "#272822",
+  termRed: "#f92672",
+  termGreen: "#a6e22e",
+  termYellow: "#e6db74",
+  termBlue: "#66d9ef",
+  termMagenta: "#ae81ff",
+  termCyan: "#a1efe4",
+  termWhite: "#f8f8f2",
+  termBrightBlack: "#75715e",
+  termBrightRed: "#f92672",
+  termBrightGreen: "#a6e22e",
+  termBrightYellow: "#e6db74",
+  termBrightBlue: "#66d9ef",
+  termBrightMagenta: "#ae81ff",
+  termBrightCyan: "#a1efe4",
+  termBrightWhite: "#f9f8f5",
+};
+
+/* ── Dracula ───────────────────────────────────────────── */
+const dracula: ShepTheme = {
+  id: "dracula",
+  name: "Dracula",
+
+  bgRadial1: "rgba(189, 147, 249, 0.08)",
+  bgRadial2: "rgba(255, 121, 198, 0.05)",
+  bgRadial3: "rgba(139, 233, 253, 0.05)",
+  bgLinearFrom: "#21222c",
+  bgLinearMid: "#282a36",
+  bgLinearTo: "#21222c",
+
+  frameTint: "rgba(33, 34, 44, 0.30)",
+  panelTint: "rgba(40, 42, 54, 0.52)",
+  glassBorder: "rgba(98, 114, 164, 0.14)",
+  glassPanelStrong: "rgba(33, 34, 44, 0.78)",
+  glassBorderStrong: "rgba(98, 114, 164, 0.20)",
 
   appBg: "#282a36",
   appFg: "#f8f8f2",
@@ -119,100 +169,25 @@ const jacob: ShepTheme = {
   termBrightWhite: "#ffffff",
 };
 
-const merino: ShepTheme = {
-  id: "merino",
-  name: "Merino",
+/* ── Glass ─────────────────────────────────────────────── */
+const glass: ShepTheme = {
+  id: "glass",
+  name: "Glass",
 
-  bgRadial1: "rgba(150, 170, 200, 0.12)",
-  bgRadial2: "rgba(160, 175, 155, 0.08)",
-  bgRadial3: "rgba(190, 160, 165, 0.08)",
-  bgLinearFrom: "#1b1f27",
-  bgLinearMid: "#21252b",
-  bgLinearTo: "#282c34",
+  bgRadial1: "rgba(130, 160, 220, 0.18)",
+  bgRadial2: "rgba(160, 120, 230, 0.16)",
+  bgRadial3: "rgba(100, 210, 220, 0.16)",
+  bgLinearFrom: "#0a0b12",
+  bgLinearMid: "#0e0f18",
+  bgLinearTo: "#0a0b12",
 
-  frameTint: "rgba(27, 31, 39, 0.3)",
-  panelTint: "rgba(33, 37, 43, 0.52)",
-  glassBorder: "rgba(171, 178, 191, 0.12)",
+  frameTint: "rgba(14, 15, 24, 0.08)",
+  panelTint: "rgba(14, 15, 24, 0.15)",
+  glassBorder: "rgba(160, 180, 230, 0.22)",
+  glassPanelStrong: "rgba(14, 15, 24, 0.52)",
+  glassBorderStrong: "rgba(160, 180, 230, 0.28)",
 
-  appBg: "#282c34",
-  appFg: "#abb2bf",
-
-  termForeground: "#abb2bf",
-  termCursor: "#528bff",
-  termSelection: "#3e4451",
-  termBlack: "#282c34",
-  termRed: "#e06c75",
-  termGreen: "#98c379",
-  termYellow: "#e5c07b",
-  termBlue: "#61afef",
-  termMagenta: "#c678dd",
-  termCyan: "#56b6c2",
-  termWhite: "#abb2bf",
-  termBrightBlack: "#5c6370",
-  termBrightRed: "#e06c75",
-  termBrightGreen: "#98c379",
-  termBrightYellow: "#e5c07b",
-  termBrightBlue: "#61afef",
-  termBrightMagenta: "#c678dd",
-  termBrightCyan: "#56b6c2",
-  termBrightWhite: "#ffffff",
-};
-
-const cheviot: ShepTheme = {
-  id: "cheviot",
-  name: "Cheviot",
-
-  bgRadial1: "rgba(160, 170, 195, 0.08)",
-  bgRadial2: "rgba(160, 180, 165, 0.06)",
-  bgRadial3: "rgba(185, 165, 175, 0.06)",
-  bgLinearFrom: "#363c4a",
-  bgLinearMid: "#3d4452",
-  bgLinearTo: "#363c4a",
-
-  frameTint: "rgba(54, 60, 74, 0.30)",
-  panelTint: "rgba(61, 68, 82, 0.52)",
-  glassBorder: "rgba(200, 210, 230, 0.14)",
-
-  appBg: "#3d4452",
-  appFg: "#c8cdd8",
-
-  termForeground: "#c8cdd8",
-  termCursor: "#7aafff",
-  termSelection: "#5a658080",
-  termBlack: "#363c4a",
-  termRed: "#f07080",
-  termGreen: "#85d4a0",
-  termYellow: "#e8c070",
-  termBlue: "#7aafff",
-  termMagenta: "#c48dea",
-  termCyan: "#70c8d8",
-  termWhite: "#c8cdd8",
-  termBrightBlack: "#5a6580",
-  termBrightRed: "#f59098",
-  termBrightGreen: "#a0e0b8",
-  termBrightYellow: "#f0d090",
-  termBrightBlue: "#98c4ff",
-  termBrightMagenta: "#d4a8f0",
-  termBrightCyan: "#90d8e8",
-  termBrightWhite: "#e0e4ec",
-};
-
-const dorset: ShepTheme = {
-  id: "dorset",
-  name: "Dorset",
-
-  bgRadial1: "rgba(130, 160, 220, 0.14)",
-  bgRadial2: "rgba(140, 190, 180, 0.10)",
-  bgRadial3: "rgba(180, 150, 200, 0.10)",
-  bgLinearFrom: "#12131a",
-  bgLinearMid: "#181a24",
-  bgLinearTo: "#12131a",
-
-  frameTint: "rgba(18, 19, 26, 0.12)",
-  panelTint: "rgba(24, 26, 36, 0.22)",
-  glassBorder: "rgba(160, 180, 230, 0.20)",
-
-  appBg: "#181a24",
+  appBg: "#0e0f18",
   appFg: "#b8c4e0",
 
   termForeground: "#b8c4e0",
@@ -237,16 +212,15 @@ const dorset: ShepTheme = {
 };
 
 export const THEMES: Record<string, ShepTheme> = {
-  merino,
-  suffolk,
-  jacob,
-  cheviot,
-  dorset,
+  "tokyo-night": tokyoNight,
+  monokai,
+  dracula,
+  glass,
 };
 
 export const THEME_LIST: ShepTheme[] = Object.values(THEMES);
 
-export const DEFAULT_THEME_ID = "merino";
+export const DEFAULT_THEME_ID = "tokyo-night";
 
 export function getThemeById(id: string): ShepTheme {
   return THEMES[id] ?? THEMES[DEFAULT_THEME_ID];

@@ -15,6 +15,8 @@ const CSS_VAR_MAP: [keyof ShepTheme, string][] = [
   ["frameTint", "--frame-tint"],
   ["panelTint", "--panel-tint"],
   ["glassBorder", "--glass-border"],
+  ["glassPanelStrong", "--glass-panel-strong"],
+  ["glassBorderStrong", "--glass-border-strong"],
 ];
 
 export function useThemeApplicator(): void {

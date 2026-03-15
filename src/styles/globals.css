@@ -10,7 +10,6 @@ body,
   color-scheme: dark;
   --app-bg: #1a1b26;
   --app-fg: #a9b1d6;
-  --glass-panel: rgba(22, 22, 30, 0.56);
   --glass-panel-strong: rgba(22, 22, 30, 0.78);
   --glass-panel-soft: rgba(255, 255, 255, 0.05);
   --glass-border: rgba(169, 177, 214, 0.12);
@@ -19,10 +18,10 @@ body,
   --glass-highlight: rgba(255, 255, 255, 0.2);
   --glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
 
-  /* Theme-driven vars (defaults = Tokyo Night) */
-  --bg-radial-1: rgba(150, 165, 200, 0.10);
-  --bg-radial-2: rgba(150, 180, 175, 0.06);
-  --bg-radial-3: rgba(170, 165, 195, 0.06);
+  /* Theme-driven vars (defaults = Shibuya) */
+  --bg-radial-1: rgba(122, 162, 247, 0.10);
+  --bg-radial-2: rgba(187, 154, 247, 0.06);
+  --bg-radial-3: rgba(125, 207, 255, 0.06);
   --bg-linear-from: #16161e;
   --bg-linear-mid: #1a1b26;
   --bg-linear-to: #16161e;
