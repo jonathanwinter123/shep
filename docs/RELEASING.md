@@ -29,23 +29,37 @@ Before tagging a release:
 3. Make sure the screenshot placeholder is replaced if you want a polished release page.
 4. Review any known issues you want to mention in the release notes.
 
-## Build Validation
+## Build
 
-Run the validation steps from the repo root:
+Set the signing env vars (see [macOS Signing and Notarization](#macos-signing-and-notarization)
+below for first-time setup):
+
+```bash
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Doug Dement (Y49DF9C9JJ)"
+export APPLE_ID="dougdmail@gmail.com"
+export APPLE_PASSWORD="<app-specific-password>"
+export APPLE_TEAM_ID="Y49DF9C9JJ"
+```
+
+Build, sign, and notarize:
 
 ```bash
 pnpm install
-pnpm build
-cargo test --manifest-path src-tauri/Cargo.toml
 pnpm tauri build
+```
+
+Patch the DMG to hide `.VolumeIcon.icns` from Finder:
+
+```bash
+./scripts/post-build-dmg.sh
 ```
 
 Expected release artifacts:
 
 - `src-tauri/target/release/bundle/macos/shep.app`
-- `src-tauri/target/release/bundle/dmg/`
+- `src-tauri/target/release/bundle/dmg/shep_X.Y.Z_aarch64.dmg`
 
-If you want a debug-packaged app for local testing instead:
+For a debug build (local testing only, no signing):
 
 ```bash
 pnpm tauri build --debug
@@ -68,34 +82,43 @@ Minimum smoke pass:
 9. Confirm notifications behave as expected
 10. Confirm opening the repo in the configured editor works
 
-## Tagging the Release
+## Tag and Release
 
-Commit the release changes first, then tag the version.
-
-Example:
+After the build passes and smoke test is complete:
 
 ```bash
-git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml README.md docs/RELEASING.md
-git commit -m "Release v0.2.0"
-git tag v0.2.0
+git tag vX.Y.Z
 git push origin main
-git push origin v0.2.0
+git push origin vX.Y.Z
 ```
 
-Adjust the branch name if your default branch is not `main`.
+Create the GitHub release with the DMG attached:
 
-## GitHub Release
+```bash
+gh release create vX.Y.Z \
+  "src-tauri/target/release/bundle/dmg/shep_X.Y.Z_aarch64.dmg" \
+  --title "Shep vX.Y.Z" \
+  --notes-file - <<'EOF'
+## Shep vX.Y.Z
 
-In GitHub:
+### Highlights
 
-1. Open the repository
-2. Go to `Releases`
-3. Click `Draft a new release`
-4. Select tag `vX.Y.Z`
-5. Set the release title to `Shep vX.Y.Z`
-6. Upload the generated `.dmg`
-7. Add release notes
-8. Publish the release
+- ...
+
+### Install
+
+Download the `.dmg`, open it, and drag Shep into Applications.
+EOF
+```
+
+Or use `--generate-notes` to auto-generate from commits:
+
+```bash
+gh release create vX.Y.Z \
+  "src-tauri/target/release/bundle/dmg/shep_X.Y.Z_aarch64.dmg" \
+  --title "Shep vX.Y.Z" \
+  --generate-notes
+```
 
 ## Release Notes Template
 
