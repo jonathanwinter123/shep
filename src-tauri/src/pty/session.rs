@@ -21,6 +21,7 @@ pub struct PtySession {
     writer: Box<dyn Write + Send>,
     alive: Arc<AtomicBool>,
     killer: Box<dyn ChildKiller + Send + Sync>,
+    child_pid: Option<u32>,
 }
 
 fn decode_utf8_chunks(pending: &mut Vec<u8>, incoming: &[u8]) -> Vec<String> {
@@ -104,6 +105,7 @@ impl PtySession {
             .slave
             .spawn_command(cmd)
             .map_err(|e| format!("Failed to spawn command: {e}"))?;
+        let child_pid = child.process_id();
         let killer = child.clone_killer();
 
         // Drop slave — we only need the master side
@@ -158,6 +160,7 @@ impl PtySession {
             writer,
             alive,
             killer,
+            child_pid,
         })
     }
 
@@ -180,6 +183,20 @@ impl PtySession {
 
     pub fn kill(&mut self) -> Result<(), String> {
         self.alive.store(false, Ordering::SeqCst);
+
+        // Kill the entire process group so child processes (e.g. dev servers)
+        // don't become orphans. Only signal if the process is still ours
+        // (kill(pid, 0) checks existence without sending a signal).
+        if let Some(pid) = self.child_pid {
+            let pid = pid as i32;
+            unsafe {
+                if libc::kill(pid, 0) == 0 {
+                    libc::killpg(pid, libc::SIGHUP);
+                    libc::killpg(pid, libc::SIGTERM);
+                }
+            }
+        }
+
         self.killer
             .kill()
             .map_err(|e| format!("Failed to kill PTY: {e}"))

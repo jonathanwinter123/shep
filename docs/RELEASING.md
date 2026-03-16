@@ -29,23 +29,37 @@ Before tagging a release:
 3. Make sure the screenshot placeholder is replaced if you want a polished release page.
 4. Review any known issues you want to mention in the release notes.
 
-## Build Validation
+## Build
 
-Run the validation steps from the repo root:
+Set the signing env vars (see [macOS Signing and Notarization](#macos-signing-and-notarization)
+below for first-time setup):
+
+```bash
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Doug Dement (Y49DF9C9JJ)"
+export APPLE_ID="dougdmail@gmail.com"
+export APPLE_PASSWORD="<app-specific-password>"
+export APPLE_TEAM_ID="Y49DF9C9JJ"
+```
+
+Build, sign, and notarize:
 
 ```bash
 pnpm install
-pnpm build
-cargo test --manifest-path src-tauri/Cargo.toml
 pnpm tauri build
+```
+
+Patch the DMG to hide `.VolumeIcon.icns` from Finder:
+
+```bash
+./scripts/post-build-dmg.sh
 ```
 
 Expected release artifacts:
 
 - `src-tauri/target/release/bundle/macos/shep.app`
-- `src-tauri/target/release/bundle/dmg/`
+- `src-tauri/target/release/bundle/dmg/shep_X.Y.Z_aarch64.dmg`
 
-If you want a debug-packaged app for local testing instead:
+For a debug build (local testing only, no signing):
 
 ```bash
 pnpm tauri build --debug
@@ -68,34 +82,43 @@ Minimum smoke pass:
 9. Confirm notifications behave as expected
 10. Confirm opening the repo in the configured editor works
 
-## Tagging the Release
+## Tag and Release
 
-Commit the release changes first, then tag the version.
-
-Example:
+After the build passes and smoke test is complete:
 
 ```bash
-git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml README.md docs/RELEASING.md
-git commit -m "Release v0.2.0"
-git tag v0.2.0
+git tag vX.Y.Z
 git push origin main
-git push origin v0.2.0
+git push origin vX.Y.Z
 ```
 
-Adjust the branch name if your default branch is not `main`.
+Create the GitHub release with the DMG attached:
 
-## GitHub Release
+```bash
+gh release create vX.Y.Z \
+  "src-tauri/target/release/bundle/dmg/shep_X.Y.Z_aarch64.dmg" \
+  --title "Shep vX.Y.Z" \
+  --notes-file - <<'EOF'
+## Shep vX.Y.Z
 
-In GitHub:
+### Highlights
 
-1. Open the repository
-2. Go to `Releases`
-3. Click `Draft a new release`
-4. Select tag `vX.Y.Z`
-5. Set the release title to `Shep vX.Y.Z`
-6. Upload the generated `.dmg`
-7. Add release notes
-8. Publish the release
+- ...
+
+### Install
+
+Download the `.dmg`, open it, and drag Shep into Applications.
+EOF
+```
+
+Or use `--generate-notes` to auto-generate from commits:
+
+```bash
+gh release create vX.Y.Z \
+  "src-tauri/target/release/bundle/dmg/shep_X.Y.Z_aarch64.dmg" \
+  --title "Shep vX.Y.Z" \
+  --generate-notes
+```
 
 ## Release Notes Template
 
@@ -133,13 +156,89 @@ If you build on a different architecture, the suffix may differ.
 
 ## macOS Signing and Notarization
 
-For a small trusted tester group, an unsigned release may be acceptable.
+Without signing and notarization, users who download the DMG will see
+"shep is damaged and can't be opened" because macOS quarantines unsigned apps.
+This section covers the full setup to eliminate that.
 
-For wider distribution, plan to add:
+### 1. Apple Developer Program
 
-- Apple code signing
-- notarization
-- a cleaner first-launch experience without Gatekeeper workarounds
+- Enroll at https://developer.apple.com/programs/ as an **Individual** ($99/year)
+- Approval can take minutes to 48 hours
+- Your enrolled name will be visible in the app's certificate info (e.g. "Developer ID Application: Your Name")
+- To show a company name instead, enroll as an Organization (requires a DUNS number)
+
+### 2. Create the Signing Certificate
+
+1. Open **Xcode → Settings → Accounts** (Cmd+,)
+2. Add your Apple ID if not already listed
+3. Select the account → **Manage Certificates**
+4. Click `+` → **Developer ID Application**
+5. Xcode installs the certificate into your local Keychain
+
+Verify it's installed:
+
+```bash
+security find-identity -v -p codesigning
+```
+
+Output will look like:
+
+```
+1) ABC123... "Developer ID Application: Your Name (XXXXXXXXXX)"
+```
+
+The `XXXXXXXXXX` in parentheses is your **Team ID**. The full quoted string is
+your **signing identity**.
+
+### 3. Create an App-Specific Password
+
+1. Go to https://appleid.apple.com
+2. Sign in → **App-Specific Passwords** (under Sign-In and Security)
+3. Generate one, name it something like "tauri-notarize"
+4. Save the generated password — you can't view it again
+
+### 4. Set Environment Variables
+
+These are used at build time only. They are **not** embedded in the app or
+source code. Your email and password are sent only to Apple's notarization
+service.
+
+```bash
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (XXXXXXXXXX)"
+export APPLE_ID="your@email.com"
+export APPLE_PASSWORD="xxxx-xxxx-xxxx-xxxx"
+export APPLE_TEAM_ID="XXXXXXXXXX"
+```
+
+To persist these across terminal sessions, add them to a local `.env` file or
+your shell profile. **Do not commit these values to the repo.**
+
+### 5. Build
+
+```bash
+pnpm tauri build
+```
+
+With the env vars set, Tauri automatically:
+
+1. Signs the `.app` with your Developer ID certificate
+2. Submits it to Apple for notarization (~1-2 minutes)
+3. Staples the notarization ticket to the DMG
+
+The resulting DMG can be downloaded and opened by anyone with just the
+standard "downloaded from the internet" confirmation — no "damaged" error,
+no `xattr` workaround.
+
+### Troubleshooting
+
+- **"No identity found"** — The certificate isn't in your Keychain. Recreate
+  it in Xcode or import it manually.
+- **Notarization fails** — Check that the app-specific password is correct and
+  your Apple ID has accepted the latest developer agreements at
+  https://developer.apple.com/account.
+- **Local testing without signing** — Built apps opened directly from the build
+  folder work fine unsigned. The quarantine issue only applies to apps
+  downloaded via a browser.
 
 ## Notes
 
