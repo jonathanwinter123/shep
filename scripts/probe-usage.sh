@@ -359,6 +359,14 @@ if [[ -n "$gemini_local" ]] && jq -e '.ok and .summary.total != null' >/dev/null
   echo "    Input tokens: $(jq -r '.summary.input' <<<"$gemini_local")"
   echo "    Output tokens: $(jq -r '.summary.output' <<<"$gemini_local")"
   echo "    Cached tokens: $(jq -r '.summary.cached' <<<"$gemini_local")"
+  top_project="$(jq -r '.per_project | to_entries | sort_by(-.value.tokens_7d) | .[0].key // empty' <<<"$gemini_local")"
+  if [[ -n "$top_project" ]]; then
+    echo "    Top project (7d): ${top_project} with $(jq -r --arg p "$top_project" '.per_project[$p].tokens_7d' <<<"$gemini_local") tokens"
+  fi
+  top_model="$(jq -r '.per_model | to_entries | .[0].key // empty' <<<"$gemini_local")"
+  if [[ -n "$top_model" ]]; then
+    echo "    Top model: ${top_model} with $(jq -r --arg m "$top_model" '.per_model[$m]' <<<"$gemini_local") tokens"
+  fi
 else
   echo "  Local observed usage"
   echo "    unavailable"
@@ -710,6 +718,7 @@ import glob
 import json
 import os
 from pathlib import Path
+from collections import defaultdict
 
 tmp_dir = Path(os.environ["TMP_DIR"])
 settings_file = Path(os.environ["SETTINGS_FILE"])
@@ -731,6 +740,14 @@ windows = {
     "7d": {"input": 0, "output": 0, "cached": 0, "thoughts": 0, "tool": 0, "total": 0, "session_count": 0},
     "30d": {"input": 0, "output": 0, "cached": 0, "thoughts": 0, "tool": 0, "total": 0, "session_count": 0},
 }
+per_project = defaultdict(lambda: {
+    "session_count": 0,
+    "tokens_5h": 0,
+    "tokens_7d": 0,
+    "tokens_30d": 0,
+    "tokens_lifetime": 0,
+})
+per_model = defaultdict(int)
 
 from datetime import datetime, timezone
 now = datetime.now(timezone.utc)
@@ -745,6 +762,7 @@ def parse_iso(ts):
 
 for path_str in glob.glob(str(tmp_dir / "*" / "chats" / "*.json")):
     path = Path(path_str)
+    project_name = path.parents[1].name
     try:
       with path.open() as f:
         data = json.load(f)
@@ -772,11 +790,17 @@ for path_str in glob.glob(str(tmp_dir / "*" / "chats" / "*.json")):
                 session_totals[key] += value
                 totals[key] += value
         totals["message_count"] += 1
+        model = message.get("model")
+        if model and isinstance(tokens.get("total"), int):
+            per_model[model] += tokens["total"]
 
     if session_totals["message_count"] > 0:
         totals["session_count"] += 1
+        per_project[project_name]["session_count"] += 1
+        per_project[project_name]["tokens_lifetime"] += session_totals["total"]
         session = {
             "file": str(path),
+            "project": project_name,
             "session_id": data.get("sessionId"),
             "start_time": data.get("startTime"),
             "last_updated": data.get("lastUpdated"),
@@ -791,6 +815,7 @@ for path_str in glob.glob(str(tmp_dir / "*" / "chats" / "*.json")):
             for label, seconds in (("5h", 18000), ("7d", 604800), ("30d", 2592000)):
                 if age_seconds <= seconds:
                     windows[label]["session_count"] += 1
+                    per_project[project_name][f"tokens_{label}"] += session_totals["total"]
                     for key in ("input", "output", "cached", "thoughts", "tool", "total"):
                         windows[label][key] += session_totals[key]
 
@@ -819,6 +844,8 @@ print(json.dumps({
     "projects": projects,
     "summary": totals,
     "windows": windows,
+    "per_project": dict(sorted(per_project.items())),
+    "per_model": dict(sorted(per_model.items(), key=lambda item: item[1], reverse=True)),
     "latest_sessions": sessions[:5],
 }))
 PY
