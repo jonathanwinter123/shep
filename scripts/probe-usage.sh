@@ -90,6 +90,42 @@ human_duration() {
   fi
 }
 
+human_until_iso() {
+  local ts="$1"
+  if [[ -z "$ts" || "$ts" == "null" ]]; then
+    printf "unknown"
+    return
+  fi
+
+  TARGET_TS="$ts" python3 - <<'PY'
+from datetime import datetime, timezone
+import os
+
+target = os.environ.get("TARGET_TS", "")
+try:
+    dt = datetime.fromisoformat(target.replace("Z", "+00:00"))
+except Exception:
+    print("unknown")
+    raise SystemExit(0)
+
+now = datetime.now(timezone.utc)
+delta = int((dt - now).total_seconds())
+if delta < 0:
+    delta = 0
+
+days = delta // 86400
+hours = (delta % 86400) // 3600
+mins = (delta % 3600) // 60
+
+if days > 0:
+    print(f"{days}d {hours}h {mins}m")
+elif hours > 0:
+    print(f"{hours}h {mins}m")
+else:
+    print(f"{mins}m")
+PY
+}
+
 calc_pace_label() {
   local used_percent="$1"
   local elapsed_seconds="$2"
@@ -147,6 +183,42 @@ human_duration() {
   else
     printf "%dm" "$mins"
   fi
+}
+
+human_until_iso() {
+  local ts="$1"
+  if [[ -z "$ts" || "$ts" == "null" ]]; then
+    printf "unknown"
+    return
+  fi
+
+  TARGET_TS="$ts" python3 - <<'PY'
+from datetime import datetime, timezone
+import os
+
+target = os.environ.get("TARGET_TS", "")
+try:
+    dt = datetime.fromisoformat(target.replace("Z", "+00:00"))
+except Exception:
+    print("unknown")
+    raise SystemExit(0)
+
+now = datetime.now(timezone.utc)
+delta = int((dt - now).total_seconds())
+if delta < 0:
+    delta = 0
+
+days = delta // 86400
+hours = (delta % 86400) // 3600
+mins = (delta % 3600) // 60
+
+if days > 0:
+    print(f"{days}d {hours}h {mins}m")
+elif hours > 0:
+    print(f"{hours}h {mins}m")
+else:
+    print(f"{mins}m")
+PY
 }
 
 calc_pace_label() {
@@ -243,11 +315,17 @@ echo
 
 echo "Claude"
 if [[ -n "$claude_live" ]] && jq -e '.ok and .five_hour' >/dev/null <<<"$claude_live"; then
-  five_used="$(jq -r '.five_hour.percent_used // .five_hour.used_percent // empty' <<<"$claude_live")"
-  seven_used="$(jq -r '.seven_day.percent_used // .seven_day.used_percent // empty' <<<"$claude_live")"
+  five_used="$(jq -r '.five_hour.utilization // .five_hour.percent_used // .five_hour.used_percent // empty' <<<"$claude_live")"
+  seven_used="$(jq -r '.seven_day.utilization // .seven_day.percent_used // .seven_day.used_percent // empty' <<<"$claude_live")"
+  sonnet_used="$(jq -r '.seven_day_sonnet.utilization // empty' <<<"$claude_live")"
+  five_remaining="$(awk -v u="$five_used" 'BEGIN { printf "%.0f", 100 - u }')"
+  seven_remaining="$(awk -v u="$seven_used" 'BEGIN { printf "%.0f", 100 - u }')"
   echo "  Provider usage"
-  echo "    5h window: ${five_used:-unknown}% used"
-  echo "    7d window: ${seven_used:-unknown}% used"
+  echo "    5h window: ${five_used:-unknown}% used, ${five_remaining:-unknown}% remaining, resets in $(human_until_iso "$(jq -r '.five_hour.resets_at // empty' <<<"$claude_live")")"
+  echo "    7d window: ${seven_used:-unknown}% used, ${seven_remaining:-unknown}% remaining, resets in $(human_until_iso "$(jq -r '.seven_day.resets_at // empty' <<<"$claude_live")")"
+  if [[ -n "$sonnet_used" ]]; then
+    echo "    7d sonnet window: ${sonnet_used}% used, resets in $(human_until_iso "$(jq -r '.seven_day_sonnet.resets_at // empty' <<<"$claude_live")")"
+  fi
 else
   echo "  Provider usage"
   echo "    unavailable"
@@ -256,7 +334,12 @@ if [[ -n "$claude_local" ]] && jq -e '.ok' >/dev/null <<<"$claude_local"; then
   echo "  Local observed usage"
   echo "    Logged in: $(jq -r '.auth.loggedIn // "unknown"' <<<"$claude_local")"
   echo "    Auth method: $(jq -r '.auth.authMethod // "unknown"' <<<"$claude_local")"
-  echo "    Subscription: $(jq -r '.auth.subscriptionType // "unknown"' <<<"$claude_local")"
+  echo "    Subscription: $(jq -r '.auth.subscriptionType // .backup_account.billingType // "unknown"' <<<"$claude_local")"
+  if jq -e '.usage.windows["5h"]' >/dev/null <<<"$claude_local"; then
+    echo "    5h window: $(jq -r '.usage.windows["5h"].input_tokens + .usage.windows["5h"].output_tokens + .usage.windows["5h"].cache_creation_input_tokens + .usage.windows["5h"].cache_read_input_tokens' <<<"$claude_local") tokens across $(jq -r '.usage.windows["5h"].messages' <<<"$claude_local") messages"
+    echo "    7d window: $(jq -r '.usage.windows["7d"].input_tokens + .usage.windows["7d"].output_tokens + .usage.windows["7d"].cache_creation_input_tokens + .usage.windows["7d"].cache_read_input_tokens' <<<"$claude_local") tokens across $(jq -r '.usage.windows["7d"].messages' <<<"$claude_local") messages"
+    echo "    30d window: $(jq -r '.usage.windows["30d"].input_tokens + .usage.windows["30d"].output_tokens + .usage.windows["30d"].cache_creation_input_tokens + .usage.windows["30d"].cache_read_input_tokens' <<<"$claude_local") tokens across $(jq -r '.usage.windows["30d"].messages' <<<"$claude_local") messages"
+  fi
   echo "    Cost probe: $(jq -r '.cost.raw // "unavailable"' <<<"$claude_local" | tr '\n' ' ' | sed 's/  */ /g')"
 else
   echo "  Local observed usage"
@@ -402,8 +485,11 @@ probe_claude_local() {
   local sessions_dir="$config_dir/sessions"
   local projects_dir="$config_dir/projects"
   local credentials_file="$config_dir/.credentials.json"
+  local backup_file
   local auth_status
   local cost_output
+
+  backup_file="$(find "$config_dir/backups" -maxdepth 1 -type f -name '.claude.json.backup.*' 2>/dev/null | sort | tail -1)"
 
   auth_status="$(claude auth status 2>&1 || true)"
   cost_output="$(claude -p '/cost' 2>&1 || true)"
@@ -435,6 +521,107 @@ print(json.dumps(data))
 PY
   )"
 
+  local usage_json
+  usage_json="$(
+    PROJECTS_DIR="$projects_dir" python3 - <<'PY'
+import glob
+import json
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+
+projects_dir = Path(os.environ["PROJECTS_DIR"])
+now = datetime.now(timezone.utc)
+
+summary = {
+    "messages": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+}
+windows = {
+    "5h": {"seconds": 18000, "messages": 0, "input_tokens": 0, "output_tokens": 0, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0},
+    "7d": {"seconds": 604800, "messages": 0, "input_tokens": 0, "output_tokens": 0, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0},
+    "30d": {"seconds": 2592000, "messages": 0, "input_tokens": 0, "output_tokens": 0, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0},
+}
+
+def parse_iso(ts):
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+for path_str in glob.glob(str(projects_dir / "*" / "*.jsonl")):
+    path = Path(path_str)
+    try:
+        with path.open() as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                usage = obj.get("message", {}).get("usage")
+                if not isinstance(usage, dict):
+                    continue
+                ts = parse_iso(obj.get("timestamp"))
+                if ts is None:
+                    continue
+                age_seconds = (now - ts).total_seconds()
+                summary["messages"] += 1
+                for key in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"):
+                    value = usage.get(key, 0)
+                    if isinstance(value, int):
+                        summary[key] += value
+                for info in windows.values():
+                    if age_seconds <= info["seconds"]:
+                        info["messages"] += 1
+                        for key in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"):
+                            value = usage.get(key, 0)
+                            if isinstance(value, int):
+                                info[key] += value
+    except Exception:
+        continue
+
+for info in windows.values():
+    info.pop("seconds", None)
+
+print(json.dumps({"summary": summary, "windows": windows}))
+PY
+  )"
+
+  local backup_json="null"
+  if [[ -n "${backup_file:-}" ]]; then
+    backup_json="$(
+      BACKUP_FILE="$backup_file" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+path = Path(os.environ["BACKUP_FILE"])
+try:
+    data = json.loads(path.read_text())
+except Exception:
+    print("null")
+    raise SystemExit(0)
+
+account = data.get("oauthAccount") or {}
+subset = {
+    "emailAddress": account.get("emailAddress"),
+    "organizationName": account.get("organizationName"),
+    "billingType": account.get("billingType"),
+    "subscriptionCreatedAt": account.get("subscriptionCreatedAt"),
+}
+print(json.dumps(subset))
+PY
+    )"
+  fi
+
   local payload
   payload="$(
     jq -cn \
@@ -442,11 +629,14 @@ PY
       --arg sessions_dir "$sessions_dir" \
       --arg projects_dir "$projects_dir" \
       --arg credentials_file "$credentials_file" \
+      --arg backup_file "${backup_file:-}" \
       --argjson sessions_dir_exists "$(file_exists_json "$sessions_dir")" \
       --argjson projects_dir_exists "$(file_exists_json "$projects_dir")" \
       --argjson credentials_file_exists "$(file_exists_json "$credentials_file")" \
       --argjson auth "$auth_json" \
       --argjson cost "$cost_json" \
+      --argjson usage "$usage_json" \
+      --argjson backup_account "$backup_json" \
       '{
         config_dir: $config_dir,
         sessions_dir: $sessions_dir,
@@ -455,8 +645,11 @@ PY
         projects_dir_exists: $projects_dir_exists,
         credentials_file: $credentials_file,
         credentials_file_exists: $credentials_file_exists,
+        backup_file: $backup_file,
         auth: $auth,
-        cost: $cost
+        cost: $cost,
+        usage: $usage,
+        backup_account: $backup_account
       }'
   )"
 
@@ -465,18 +658,19 @@ PY
 
 probe_claude_live() {
   local credentials_file="$HOME/.claude/.credentials.json"
+  local source="keychain"
+  local access_token=""
 
-  if [[ ! -f "$credentials_file" ]]; then
-    print_result "claude" "live-api" "false" \
-      "$(jq -cn --arg credentials_file "$credentials_file" '{error: "missing credentials file", credentials_file: $credentials_file}')"
-    return
+  access_token="$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null || true)"
+
+  if [[ -z "$access_token" && -f "$credentials_file" ]]; then
+    source="file"
+    access_token="$(jq -r '.accessToken // .access_token // empty' "$credentials_file" 2>/dev/null || true)"
   fi
 
-  local access_token
-  access_token="$(jq -r '.accessToken // .access_token // empty' "$credentials_file" 2>/dev/null || true)"
   if [[ -z "$access_token" ]]; then
     print_result "claude" "live-api" "false" \
-      "$(jq -cn --arg credentials_file "$credentials_file" '{error: "missing access token in credentials file", credentials_file: $credentials_file}')"
+      "$(jq -cn --arg credentials_file "$credentials_file" '{error: "missing Claude OAuth access token in keychain or credentials file", credentials_file: $credentials_file}')"
     return
   fi
 
@@ -493,7 +687,7 @@ probe_claude_live() {
   fi
 
   local payload
-  payload="$(printf '%s' "$response" | jq '.' 2>/dev/null || jq -Rn --arg raw "$response" '{raw: $raw}')"
+  payload="$(printf '%s' "$response" | jq --arg source "$source" '. + {credential_source: $source}' 2>/dev/null || jq -Rn --arg raw "$response" --arg source "$source" '{raw: $raw, credential_source: $source}')"
   print_result "claude" "live-api" "true" "$payload"
 }
 
