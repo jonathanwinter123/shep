@@ -81,6 +81,11 @@ body:not(.theme-clear) {
       color-mix(in srgb, var(--frame-tint), black 30%) 100%);
 }
 
+/* Opaque themes: derive raised surfaces from --frame-tint */
+body:not(.theme-clear) {
+  --surface-raised: color-mix(in srgb, var(--frame-tint), white 8%);
+}
+
 /* Opaque themes: strip glass overlays so --frame-tint is exact */
 body:not(.theme-clear) .app-shell__frame {
   background: var(--frame-tint);

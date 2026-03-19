@@ -283,6 +283,10 @@ export default function AppShell() {
   );
 
   const handleNewShell = useCallback(() => {
+    useUIStore.getState().deactivateSettings();
+    useUIStore.getState().deactivateLauncher();
+    useUIStore.getState().deactivateGitPanel();
+    useUIStore.getState().deactivateCommandsPanel();
     const { cols, rows } = getTerminalDimensions();
     spawnBlankShell(cols, rows);
   }, [spawnBlankShell, getTerminalDimensions]);
@@ -454,6 +458,7 @@ export default function AppShell() {
           <TabBar
             onClose={closeTab}
             onNewShell={handleNewShell}
+            onNewAssistant={handleNewAssistant}
           />
 
           <div ref={terminalContainerRef} className="terminal-stage">

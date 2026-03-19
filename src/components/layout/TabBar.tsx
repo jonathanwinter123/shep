@@ -1,20 +1,89 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { useGitStore } from "../../stores/useGitStore";
-import { GitBranch, Terminal } from "lucide-react";
+import { GitBranch, Terminal, Sparkles, SquareTerminal } from "lucide-react";
 import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
 
+function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () => void; onNewShell: () => void }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (!open) return;
+    const handle = (e: MouseEvent) => {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target as Node) &&
+        btnRef.current && !btnRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open]);
+
+  const handleToggle = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, left: rect.left });
+    }
+    setOpen(!open);
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        className="tab !px-3 !py-1.5 !text-base font-semibold"
+        onClick={handleToggle}
+        title="New session"
+        aria-label="Open new session"
+      >
+        +
+      </button>
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          className="context-menu"
+          style={{ top: pos.top, left: pos.left }}
+        >
+          <button
+            className="context-menu__item"
+            onClick={() => { onNewAssistant(); setOpen(false); }}
+          >
+            <span className="context-menu__icon"><Sparkles size={14} /></span>
+            <span>AI Assistant</span>
+          </button>
+          <button
+            className="context-menu__item"
+            onClick={() => { onNewShell(); setOpen(false); }}
+          >
+            <span className="context-menu__icon"><SquareTerminal size={14} /></span>
+            <span>Terminal</span>
+          </button>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 interface TabBarProps {
   onClose: (tabId: string) => void;
   onNewShell: () => void;
+  onNewAssistant: () => void;
 }
 
 export default function TabBar({
   onClose,
   onNewShell,
+  onNewAssistant,
 }: TabBarProps) {
   const projectTerminals = useTerminalStore(
     (s) => (s.activeProjectPath ? s.projectState[s.activeProjectPath] : null),
@@ -216,10 +285,10 @@ export default function TabBar({
             role="tab"
             tabIndex={0}
             aria-selected={launcherActive}
-            aria-label="Open new session panel"
+            aria-label="Open new AI assistant panel"
           >
             <span>+</span>
-            <span>New Session</span>
+            <span>New AI Assistant</span>
             <button
               className="icon-btn ml-0.5"
               aria-label="Close new session panel"
@@ -308,14 +377,7 @@ export default function TabBar({
           </div>
         )}
 
-        <button
-          className="tab"
-          onClick={onNewShell}
-          title="New Terminal"
-          aria-label="Open new terminal"
-        >
-          +
-        </button>
+        <NewSessionButton onNewAssistant={onNewAssistant} onNewShell={onNewShell} />
       </div>
 
       {gitStatus?.is_git_repo && (
