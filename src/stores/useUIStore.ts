@@ -41,6 +41,36 @@ interface UIStore {
   setComputerName: (name: string) => void;
 }
 
+/** When closing an active panel tab, activate the next open panel tab (if any). */
+function activateNextOpen(s: UIStore, excluding: string): Partial<UIStore> {
+  const candidates: [string, boolean][] = [
+    ["settings", s.settingsTabOpen],
+    ["git", s.gitPanelOpen],
+    ["commands", s.commandsPanelOpen],
+    ["launcher", s.launcherOpen],
+    ["usage", s.usageTabOpen],
+  ];
+  for (const [name, isOpen] of candidates) {
+    if (name === excluding || !isOpen) continue;
+    switch (name) {
+      case "settings": return { settingsActive: true };
+      case "git": return { gitPanelActive: true };
+      case "commands": return { commandsPanelActive: true };
+      case "launcher": return { launcherActive: true };
+      case "usage": return { usagePanelActive: true };
+    }
+  }
+  return {};
+}
+
+const deactivateAll = {
+  settingsActive: false,
+  gitPanelActive: false,
+  commandsPanelActive: false,
+  launcherActive: false,
+  usagePanelActive: false,
+};
+
 export const useUIStore = create<UIStore>((set) => ({
   settingsTabOpen: false,
   settingsActive: false,
@@ -56,180 +86,123 @@ export const useUIStore = create<UIStore>((set) => ({
   computerName: null,
   openSettings: () => set({
     settingsTabOpen: true,
+    ...deactivateAll,
     settingsActive: true,
-    launcherActive: false,
-    gitPanelActive: false,
-    commandsPanelActive: false,
-    usagePanelActive: false,
   }),
-  closeSettingsTab: () => set({ settingsTabOpen: false, settingsActive: false }),
+  closeSettingsTab: () =>
+    set((s) => ({
+      settingsTabOpen: false,
+      settingsActive: false,
+      ...activateNextOpen(s, "settings"),
+    })),
   activateSettings: () => set({
+    ...deactivateAll,
     settingsActive: true,
-    launcherActive: false,
-    gitPanelActive: false,
-    commandsPanelActive: false,
-    usagePanelActive: false,
   }),
   deactivateSettings: () => set({ settingsActive: false }),
   toggleSettings: () =>
     set((s) => {
       if (s.settingsTabOpen && s.settingsActive) {
-        return { settingsTabOpen: false, settingsActive: false };
+        return { settingsTabOpen: false, settingsActive: false, ...activateNextOpen(s, "settings") };
       }
       if (s.settingsTabOpen) {
-        return {
-          settingsActive: true,
-          launcherActive: false,
-          gitPanelActive: false,
-          commandsPanelActive: false,
-          usagePanelActive: false,
-        };
+        return { ...deactivateAll, settingsActive: true };
       }
-      return {
-        settingsTabOpen: true,
-        settingsActive: true,
-        launcherActive: false,
-        gitPanelActive: false,
-        commandsPanelActive: false,
-        usagePanelActive: false,
-      };
+      return { settingsTabOpen: true, ...deactivateAll, settingsActive: true };
     }),
   openGitPanel: () => set({
     gitPanelOpen: true,
+    ...deactivateAll,
     gitPanelActive: true,
-    settingsActive: false,
-    launcherActive: false,
-    commandsPanelActive: false,
-    usagePanelActive: false,
   }),
-  closeGitPanel: () => set({ gitPanelOpen: false, gitPanelActive: false }),
+  closeGitPanel: () =>
+    set((s) => ({
+      gitPanelOpen: false,
+      gitPanelActive: false,
+      ...activateNextOpen(s, "git"),
+    })),
   activateGitPanel: () => set({
+    ...deactivateAll,
     gitPanelActive: true,
-    settingsActive: false,
-    launcherActive: false,
-    commandsPanelActive: false,
-    usagePanelActive: false,
   }),
   deactivateGitPanel: () => set({ gitPanelActive: false }),
   toggleGitPanel: () =>
     set((s) => {
       if (s.gitPanelOpen && s.gitPanelActive) {
-        return { gitPanelOpen: false, gitPanelActive: false };
+        return { gitPanelOpen: false, gitPanelActive: false, ...activateNextOpen(s, "git") };
       }
       if (s.gitPanelOpen) {
-        return {
-          gitPanelActive: true,
-          settingsActive: false,
-          launcherActive: false,
-          commandsPanelActive: false,
-          usagePanelActive: false,
-        };
+        return { ...deactivateAll, gitPanelActive: true };
       }
-      return {
-        gitPanelOpen: true,
-        gitPanelActive: true,
-        settingsActive: false,
-        launcherActive: false,
-        commandsPanelActive: false,
-        usagePanelActive: false,
-      };
+      return { gitPanelOpen: true, ...deactivateAll, gitPanelActive: true };
     }),
   openCommandsPanel: () => set({
     commandsPanelOpen: true,
+    ...deactivateAll,
     commandsPanelActive: true,
-    settingsActive: false,
-    gitPanelActive: false,
-    launcherActive: false,
-    usagePanelActive: false,
   }),
-  closeCommandsPanel: () => set({ commandsPanelOpen: false, commandsPanelActive: false }),
+  closeCommandsPanel: () =>
+    set((s) => ({
+      commandsPanelOpen: false,
+      commandsPanelActive: false,
+      ...activateNextOpen(s, "commands"),
+    })),
   activateCommandsPanel: () => set({
+    ...deactivateAll,
     commandsPanelActive: true,
-    settingsActive: false,
-    gitPanelActive: false,
-    launcherActive: false,
-    usagePanelActive: false,
   }),
   deactivateCommandsPanel: () => set({ commandsPanelActive: false }),
   toggleCommandsPanel: () =>
     set((s) => {
       if (s.commandsPanelOpen && s.commandsPanelActive) {
-        return { commandsPanelOpen: false, commandsPanelActive: false };
+        return { commandsPanelOpen: false, commandsPanelActive: false, ...activateNextOpen(s, "commands") };
       }
       if (s.commandsPanelOpen) {
-        return {
-          commandsPanelActive: true,
-          settingsActive: false,
-          gitPanelActive: false,
-          launcherActive: false,
-          usagePanelActive: false,
-        };
+        return { ...deactivateAll, commandsPanelActive: true };
       }
-      return {
-        commandsPanelOpen: true,
-        commandsPanelActive: true,
-        settingsActive: false,
-        gitPanelActive: false,
-        launcherActive: false,
-        usagePanelActive: false,
-      };
+      return { commandsPanelOpen: true, ...deactivateAll, commandsPanelActive: true };
     }),
   openLauncher: () => set({
     launcherOpen: true,
+    ...deactivateAll,
     launcherActive: true,
-    settingsActive: false,
-    gitPanelActive: false,
-    commandsPanelActive: false,
-    usagePanelActive: false,
   }),
-  closeLauncher: () => set({ launcherOpen: false, launcherActive: false }),
+  closeLauncher: () =>
+    set((s) => ({
+      launcherOpen: false,
+      launcherActive: false,
+      ...activateNextOpen(s, "launcher"),
+    })),
   activateLauncher: () => set({
+    ...deactivateAll,
     launcherActive: true,
-    settingsActive: false,
-    gitPanelActive: false,
-    commandsPanelActive: false,
-    usagePanelActive: false,
   }),
   deactivateLauncher: () => set({ launcherActive: false }),
   openUsagePanel: () => set({
     usageTabOpen: true,
+    ...deactivateAll,
     usagePanelActive: true,
-    settingsActive: false,
-    gitPanelActive: false,
-    commandsPanelActive: false,
-    launcherActive: false,
   }),
-  closeUsageTab: () => set({ usageTabOpen: false, usagePanelActive: false }),
+  closeUsageTab: () =>
+    set((s) => ({
+      usageTabOpen: false,
+      usagePanelActive: false,
+      ...activateNextOpen(s, "usage"),
+    })),
   activateUsagePanel: () => set({
+    ...deactivateAll,
     usagePanelActive: true,
-    settingsActive: false,
-    gitPanelActive: false,
-    commandsPanelActive: false,
-    launcherActive: false,
   }),
   deactivateUsagePanel: () => set({ usagePanelActive: false }),
   toggleUsagePanel: () =>
     set((s) => {
       if (s.usageTabOpen && s.usagePanelActive) {
-        return { usageTabOpen: false, usagePanelActive: false };
+        return { usageTabOpen: false, usagePanelActive: false, ...activateNextOpen(s, "usage") };
       }
       if (s.usageTabOpen) {
-        return {
-          usagePanelActive: true,
-          settingsActive: false,
-          gitPanelActive: false,
-          commandsPanelActive: false,
-          launcherActive: false,
-        };
+        return { ...deactivateAll, usagePanelActive: true };
       }
-      return {
-        usageTabOpen: true,
-        usagePanelActive: true,
-        settingsActive: false,
-        gitPanelActive: false,
-        commandsPanelActive: false,
-        launcherActive: false,
-      };
+      return { usageTabOpen: true, ...deactivateAll, usagePanelActive: true };
     }),
   setUsername: (name: string) => set({ username: name }),
   setComputerName: (name: string) => set({ computerName: name }),

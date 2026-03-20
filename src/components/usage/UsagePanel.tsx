@@ -9,7 +9,8 @@ import type {
 } from "../../lib/types";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
-import { formatCost, formatPercent, formatTokenCount, getProviderLabel } from "./usageHelpers";
+import { formatCost, formatPercent, formatReset, formatTokenCount, getProviderLabel, computePace, paceLabel } from "./usageHelpers";
+import type { UsageProvider, ProviderUsageSnapshot, UsageWindowSnapshot } from "../../lib/types";
 
 const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
   { key: "5h", label: "5 hour" },
@@ -373,7 +374,124 @@ function BreakdownList({
   );
 }
 
-function OverviewPanel({ overview }: { overview: UsageOverview }) {
+const TONE_COLORS: Record<string, string> = {
+  low: "rgba(52, 211, 153, 0.75)",
+  medium: "rgba(245, 158, 11, 0.75)",
+  high: "rgba(251, 146, 60, 0.85)",
+  critical: "rgba(248, 113, 113, 0.9)",
+  local: "rgba(96, 165, 250, 0.5)",
+};
+
+const TONE_TRACK: Record<string, string> = {
+  low: "rgba(52, 211, 153, 0.1)",
+  medium: "rgba(245, 158, 11, 0.1)",
+  high: "rgba(251, 146, 60, 0.12)",
+  critical: "rgba(248, 113, 113, 0.14)",
+  local: "rgba(96, 165, 250, 0.08)",
+};
+
+function barTone(pace: ReturnType<typeof computePace>, pct: number | null | undefined): string {
+  if (pct == null) return "local";
+  if (pct >= 90) return "critical";
+  if (pace?.status === "over") return pct >= 50 ? "high" : "medium";
+  if (pct >= 75) return "high";
+  if (pct >= 50) return "medium";
+  return "low";
+}
+
+const PACE_LABEL_COLORS: Record<string, string> = {
+  under: "rgba(52, 211, 153, 0.8)",
+  on: "var(--text-muted)",
+  over: "rgba(248, 113, 113, 0.8)",
+};
+
+function ProviderLimits({
+  snapshots,
+  window,
+}: {
+  snapshots: Record<string, ProviderUsageSnapshot>;
+  window: TimeWindow;
+}) {
+  if (window !== "5h" && window !== "7d") return null;
+
+  const providers = (["claude", "codex", "gemini"] as UsageProvider[]).filter((p) => {
+    const snap = snapshots[p];
+    if (!snap) return false;
+    const w = snap.summaryWindows.find((sw) => sw.window === window);
+    return w?.usedPercent != null;
+  });
+
+  if (providers.length === 0) return null;
+
+  return (
+    <>
+    <hr className="settings-divider" />
+    <section className="usage-section">
+      <div className="usage-section__header">
+        <h3 className="section-label !p-0">Rate Limits</h3>
+        <span className="usage-section__hint">{window} window</span>
+      </div>
+      <div className="usage-limits">
+        {providers.map((provider) => {
+          const snap = snapshots[provider]!;
+          const w = snap.summaryWindows.find((sw) => sw.window === window) as UsageWindowSnapshot;
+          const pct = w.usedPercent ?? 0;
+          const remaining = w.remainingPercent;
+          const pace = computePace(w);
+          const tone = barTone(pace, w.usedPercent);
+          const logoSrc = assistantLogoSrc[provider];
+
+          return (
+            <div key={provider} className="usage-limit">
+              <div className="usage-limit__header">
+                <span className="usage-limit__provider">
+                  {logoSrc ? <img src={logoSrc} alt="" className="usage-list__icon" /> : null}
+                  {getProviderLabel(provider)}
+                </span>
+                <span className="usage-limit__pct">{formatPercent(pct)} used</span>
+              </div>
+              <div className="usage-limit__bar">
+                <div
+                  className="usage-limit__bar-track"
+                  style={{ background: TONE_TRACK[tone] }}
+                />
+                <div
+                  className="usage-limit__bar-fill"
+                  style={{
+                    width: `${Math.min(pct, 100)}%`,
+                    background: TONE_COLORS[tone],
+                  }}
+                />
+                {pace && pct > 0 && (
+                  <div
+                    className="usage-limit__bar-pace"
+                    style={{ left: `${Math.min(pace.elapsedPct, 100)}%` }}
+                  />
+                )}
+              </div>
+              <div className="usage-limit__meta">
+                {remaining != null && (
+                  <span>{formatPercent(remaining)} remaining</span>
+                )}
+                {pace && (
+                  <span style={{ color: PACE_LABEL_COLORS[pace.status] }}>
+                    {paceLabel(pace.status)}
+                  </span>
+                )}
+                {w.resetAt && (
+                  <span>resets in {formatReset(w.resetAt)}</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+    </>
+  );
+}
+
+function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snapshots: Record<string, ProviderUsageSnapshot> }) {
   const chart = overview.window === "30d" || overview.window === "365d"
     ? <ActivityHeatmap trend={overview.trend} window={overview.window as TimeWindow} />
     : <ActivityBarChart trend={overview.trend} window={overview.window as TimeWindow} />;
@@ -430,6 +548,8 @@ function OverviewPanel({ overview }: { overview: UsageOverview }) {
         </div>
       </section>
 
+      <ProviderLimits snapshots={snapshots} window={overview.window as TimeWindow} />
+
       <hr className="settings-divider" />
 
       <BreakdownList
@@ -467,6 +587,7 @@ function OverviewPanel({ overview }: { overview: UsageOverview }) {
 
 export default function UsagePanel() {
   const fetchSnapshots = useUsageStore((s) => s.fetchSnapshots);
+  const snapshots = useUsageStore((s) => s.snapshots);
   const loading = useUsageStore((s) => s.loading);
   const window = useUsageStore((s) => s.window);
   const setWindow = useUsageStore((s) => s.setWindow);
@@ -532,7 +653,7 @@ export default function UsagePanel() {
 
       <div className="usage-panel">
         {overview ? (
-          <OverviewPanel overview={overview} />
+          <OverviewPanel overview={overview} snapshots={snapshots} />
         ) : (
           <div className="usage-empty">Loading usage overview…</div>
         )}
