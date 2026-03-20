@@ -22,12 +22,14 @@ Modes:
 Formats:
   jsonl     Print one JSON object per line (default)
   report    Print a human-readable report
+  normalized  Print one normalized JSON document for Shep
 
 Examples:
   scripts/probe-usage.sh
   scripts/probe-usage.sh codex local
   scripts/probe-usage.sh all live
   scripts/probe-usage.sh all live report
+  scripts/probe-usage.sh all live normalized
 
 Notes:
   - The script prints compact JSON objects, one per probe result.
@@ -374,6 +376,158 @@ fi
 EOF
 }
 
+render_normalized() {
+  local jsonl_file="$1"
+
+  jq -s '
+    def pct_window(provider_name; window_id; window_label; used; reset_at):
+      {
+        provider: provider_name,
+        window: window_id,
+        label: window_label,
+        source_type: "provider",
+        confidence: "official",
+        used_percent: used,
+        remaining_percent: (if used == null then null else (100 - used) end),
+        reset_at: reset_at,
+        token_total: null
+      };
+    def token_window(provider_name; window_id; window_label; tokens):
+      {
+        provider: provider_name,
+        window: window_id,
+        label: window_label,
+        source_type: "local",
+        confidence: "observed",
+        used_percent: null,
+        remaining_percent: null,
+        reset_at: null,
+        token_total: tokens
+      };
+    def to_entries_top(n):
+      to_entries | map({name: .key, tokens: .value}) | sort_by(-.tokens) | .[:n];
+    def codex_local:
+      map(select(.provider == "codex" and .source == "local-db" and .ok)) | first;
+    def codex_live:
+      map(select(.provider == "codex" and .source == "live-api" and .ok and .rate_limit?)) | first;
+    def claude_local:
+      map(select(.provider == "claude" and .source == "local-cli" and .ok)) | first;
+    def claude_live:
+      map(select(.provider == "claude" and .source == "live-api" and .ok and .five_hour?)) | first;
+    def gemini_local:
+      map(select(.provider == "gemini" and .source == "local-json" and .ok)) | first;
+
+    {
+      generated_at: (now | todateiso8601),
+      providers: [
+        (
+          codex_local as $local
+          | codex_live as $live
+          | {
+              provider: "codex",
+              summary_windows:
+                ([
+                  (if $live then pct_window("codex"; "5h"; "5h"; $live.rate_limit.primary_window.used_percent; ($live.rate_limit.primary_window.reset_at | tostring)) else empty end),
+                  (if $live then pct_window("codex"; "7d"; "7d"; $live.rate_limit.secondary_window.used_percent; ($live.rate_limit.secondary_window.reset_at | tostring)) else empty end),
+                  (if $local then token_window("codex"; "30d"; "30d"; $local.windows.tokens_30d) else empty end)
+                ]),
+              local_details:
+                (if $local then {
+                  source_type: "local",
+                  confidence: "observed",
+                  tokens_total: $local.summary.total_tokens_used,
+                  tokens_5h: $local.windows.tokens_5h,
+                  tokens_7d: $local.windows.tokens_7d,
+                  tokens_30d: $local.windows.tokens_30d,
+                  top_models: ($local.model_totals // [] | map({name: .model, tokens: .tokens_used}) | .[:5]),
+                  top_tasks: ($local.top_threads // [] | map({
+                    id: .id,
+                    label: .title,
+                    tokens: .tokens_used,
+                    model: (.model // null),
+                    project: .cwd,
+                    updated_at: .updated_at
+                  }) | .[:5]),
+                  top_projects: (($local.top_threads // []) | map({name: .cwd, tokens: .tokens_used}) | group_by(.name) | map({name: .[0].name, tokens: (map(.tokens) | add)}) | sort_by(-.tokens) | .[:5])
+                } else null end)
+            }
+        ),
+        (
+          claude_local as $local
+          | claude_live as $live
+          | {
+              provider: "claude",
+              summary_windows:
+                ([
+                  (if $live then pct_window("claude"; "5h"; "5h"; $live.five_hour.utilization; $live.five_hour.resets_at) else empty end),
+                  (if $live then pct_window("claude"; "7d"; "7d"; $live.seven_day.utilization; $live.seven_day.resets_at) else empty end),
+                  (if $local then token_window("claude"; "30d"; "30d"; ($local.usage.windows["30d"].input_tokens + $local.usage.windows["30d"].output_tokens + $local.usage.windows["30d"].cache_creation_input_tokens + $local.usage.windows["30d"].cache_read_input_tokens)) else empty end)
+                ]),
+              local_details:
+                (if $local then {
+                  source_type: "local",
+                  confidence: "observed",
+                  tokens_total: ($local.usage.summary.input_tokens + $local.usage.summary.output_tokens + $local.usage.summary.cache_creation_input_tokens + $local.usage.summary.cache_read_input_tokens),
+                  tokens_5h: ($local.usage.windows["5h"].input_tokens + $local.usage.windows["5h"].output_tokens + $local.usage.windows["5h"].cache_creation_input_tokens + $local.usage.windows["5h"].cache_read_input_tokens),
+                  tokens_7d: ($local.usage.windows["7d"].input_tokens + $local.usage.windows["7d"].output_tokens + $local.usage.windows["7d"].cache_creation_input_tokens + $local.usage.windows["7d"].cache_read_input_tokens),
+                  tokens_30d: ($local.usage.windows["30d"].input_tokens + $local.usage.windows["30d"].output_tokens + $local.usage.windows["30d"].cache_creation_input_tokens + $local.usage.windows["30d"].cache_read_input_tokens),
+                  top_models: ($local.usage.per_model // {} | to_entries_top(5)),
+                  top_tasks: ($local.usage.top_sessions // [] | map({
+                    id: .session_id,
+                    label: (.path | split("/") | last),
+                    tokens: .tokens,
+                    model: null,
+                    project: .path,
+                    updated_at: .updated_at
+                  }) | .[:5]),
+                  top_projects: ($local.usage.per_project // {} | to_entries_top(5))
+                } else null end),
+              extra_windows:
+                (if $live and $live.seven_day_sonnet != null then [
+                  pct_window("claude"; "7d_sonnet"; "7d sonnet"; $live.seven_day_sonnet.utilization; $live.seven_day_sonnet.resets_at)
+                ] else [] end)
+            }
+        ),
+        (
+          gemini_local as $local
+          | {
+              provider: "gemini",
+              summary_windows:
+                ([
+                  (if $local then token_window("gemini"; "5h"; "5h"; $local.windows["5h"].total) else empty end),
+                  (if $local then token_window("gemini"; "7d"; "7d"; $local.windows["7d"].total) else empty end),
+                  (if $local then token_window("gemini"; "30d"; "30d"; $local.windows["30d"].total) else empty end)
+                ]),
+              local_details:
+                (if $local then {
+                  source_type: "local",
+                  confidence: "observed",
+                  tokens_total: $local.summary.total,
+                  tokens_input: $local.summary.input,
+                  tokens_output: $local.summary.output,
+                  tokens_cached: $local.summary.cached,
+                  tokens_thoughts: $local.summary.thoughts,
+                  tokens_5h: $local.windows["5h"].total,
+                  tokens_7d: $local.windows["7d"].total,
+                  tokens_30d: $local.windows["30d"].total,
+                  top_models: ($local.per_model // {} | to_entries_top(5)),
+                  top_tasks: (($local.latest_sessions // []) | sort_by(-.tokens.total) | map({
+                    id: .session_id,
+                    label: .file,
+                    tokens: .tokens.total,
+                    model: null,
+                    project: .project,
+                    updated_at: .last_updated
+                  }) | .[:5]),
+                  top_projects: ($local.per_project // {} | to_entries | map({name: .key, tokens: .value.tokens_7d, sessions: .value.session_count}) | sort_by(-.tokens) | .[:5])
+                } else null end)
+            }
+        )
+      ]
+    }
+  ' "$jsonl_file"
+}
+
 probe_codex_local() {
   local state_db="$HOME/.codex/state_5.sqlite"
   local auth_file="$HOME/.codex/auth.json"
@@ -433,6 +587,36 @@ probe_codex_local() {
     " 2>/dev/null | jq '.'
   )"
 
+  local top_threads
+  top_threads="$(
+    sqlite3 -json "$state_db" "
+      select
+        id,
+        title,
+        tokens_used,
+        coalesce(model, '') as model,
+        cwd,
+        git_branch,
+        updated_at
+      from threads
+      order by tokens_used desc
+      limit 5;
+    " 2>/dev/null | jq '.'
+  )"
+
+  local model_totals
+  model_totals="$(
+    sqlite3 -json "$state_db" "
+      select
+        coalesce(model, 'unknown') as model,
+        sum(tokens_used) as tokens_used
+      from threads
+      group by coalesce(model, 'unknown')
+      order by sum(tokens_used) desc
+      limit 10;
+    " 2>/dev/null | jq '.'
+  )"
+
   local payload
   payload="$(
     jq -cn \
@@ -444,6 +628,8 @@ probe_codex_local() {
       --argjson summary "$summary" \
       --argjson windows "$windows" \
       --argjson latest_threads "$latest" \
+      --argjson top_threads "$top_threads" \
+      --argjson model_totals "$model_totals" \
       '{
         db: $db,
         auth_file: $auth_file,
@@ -452,7 +638,9 @@ probe_codex_local() {
         config_file_exists: $config_file_exists,
         summary: $summary,
         windows: $windows,
-        latest_threads: $latest_threads
+        latest_threads: $latest_threads,
+        top_threads: $top_threads,
+        model_totals: $model_totals
       }'
   )"
 
@@ -537,6 +725,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from collections import defaultdict
 
 projects_dir = Path(os.environ["PROJECTS_DIR"])
 now = datetime.now(timezone.utc)
@@ -553,6 +742,9 @@ windows = {
     "7d": {"seconds": 604800, "messages": 0, "input_tokens": 0, "output_tokens": 0, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0},
     "30d": {"seconds": 2592000, "messages": 0, "input_tokens": 0, "output_tokens": 0, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0},
 }
+per_model = defaultdict(int)
+per_project = defaultdict(int)
+per_session = defaultdict(lambda: {"tokens": 0, "messages": 0, "path": "", "updated_at": ""})
 
 def parse_iso(ts):
     if not ts:
@@ -581,11 +773,25 @@ for path_str in glob.glob(str(projects_dir / "*" / "*.jsonl")):
                 if ts is None:
                     continue
                 age_seconds = (now - ts).total_seconds()
+                session_id = obj.get("sessionId") or path.stem
+                per_session[session_id]["path"] = str(path)
+                per_session[session_id]["updated_at"] = obj.get("timestamp") or per_session[session_id]["updated_at"]
                 summary["messages"] += 1
                 for key in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"):
                     value = usage.get(key, 0)
                     if isinstance(value, int):
                         summary[key] += value
+                        per_session[session_id]["tokens"] += value
+                        per_project[path.parent.name] += value
+                per_session[session_id]["messages"] += 1
+                model = obj.get("message", {}).get("model")
+                if model:
+                    token_total = 0
+                    for key in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"):
+                        value = usage.get(key, 0)
+                        if isinstance(value, int):
+                            token_total += value
+                    per_model[model] += token_total
                 for info in windows.values():
                     if age_seconds <= info["seconds"]:
                         info["messages"] += 1
@@ -599,7 +805,28 @@ for path_str in glob.glob(str(projects_dir / "*" / "*.jsonl")):
 for info in windows.values():
     info.pop("seconds", None)
 
-print(json.dumps({"summary": summary, "windows": windows}))
+top_sessions = sorted(
+    (
+        {
+            "session_id": session_id,
+            "tokens": info["tokens"],
+            "messages": info["messages"],
+            "path": info["path"],
+            "updated_at": info["updated_at"],
+        }
+        for session_id, info in per_session.items()
+    ),
+    key=lambda item: item["tokens"],
+    reverse=True,
+)[:5]
+
+print(json.dumps({
+    "summary": summary,
+    "windows": windows,
+    "per_model": dict(sorted(per_model.items(), key=lambda item: item[1], reverse=True)),
+    "per_project": dict(sorted(per_project.items(), key=lambda item: item[1], reverse=True)),
+    "top_sessions": top_sessions,
+}))
 PY
   )"
 
@@ -905,7 +1132,7 @@ main() {
   esac
 
   case "$format" in
-    jsonl|report) ;;
+    jsonl|report|normalized) ;;
     *)
       echo "Invalid format: $format" >&2
       usage
@@ -963,7 +1190,11 @@ main() {
         ;;
     esac
 
-    render_report "$tmp_file"
+    if [[ "$format" == "report" ]]; then
+      render_report "$tmp_file"
+    else
+      render_normalized "$tmp_file"
+    fi
   fi
 }
 
