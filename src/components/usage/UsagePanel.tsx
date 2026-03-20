@@ -9,14 +9,20 @@ import type {
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
 import { formatCost, formatPercent, formatTokenCount, getProviderLabel } from "./usageHelpers";
+
 const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
   { key: "5h", label: "5 hour" },
   { key: "7d", label: "7 day" },
   { key: "30d", label: "30 day" },
+  { key: "365d", label: "1 year" },
 ];
 
 function presentCost(value: number | null): string {
   return value != null ? formatCost(value) : "—";
+}
+
+function formatHourLabel(date: Date): string {
+  return date.toLocaleTimeString([], { hour: "numeric" });
 }
 
 function Stat({
@@ -37,41 +43,196 @@ function Stat({
   );
 }
 
-function Heatmap({ trend }: { trend: UsageTrendBucket[] }) {
+function buildLocalDates(window: TimeWindow, count: number): Date[] {
+  const now = new Date();
+
+  if (window === "5h") {
+    const base = new Date(now);
+    base.setMinutes(0, 0, 0);
+    return Array.from({ length: count }, (_, index) => {
+      const date = new Date(base);
+      date.setHours(base.getHours() - (count - 1 - index));
+      return date;
+    });
+  }
+
+  const base = new Date(now);
+  base.setHours(0, 0, 0, 0);
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(base);
+    date.setDate(base.getDate() - (count - 1 - index));
+    return date;
+  });
+}
+
+function buildHeatmapMonthLabels(dates: Date[]) {
+  const leadingEmpty = dates[0]?.getDay() ?? 0;
+  const weekCount = Math.ceil((leadingEmpty + dates.length) / 7);
+  const seen = new Set<string>();
+
+  return Array.from({ length: weekCount }, (_, weekIndex) => {
+    const weekStart = weekIndex * 7 - leadingEmpty;
+    const weekDates = dates.filter((_, dateIndex) => dateIndex >= weekStart && dateIndex < weekStart + 7);
+    // Only label the week containing the 1st of the month
+    const firstOfMonth = weekDates.find((date) => date.getDate() === 1);
+    const labelDate = firstOfMonth ?? (weekIndex === 0 ? weekDates[0] : undefined);
+    if (!labelDate) return "";
+    const key = `${labelDate.getFullYear()}-${labelDate.getMonth()}`;
+    if (seen.has(key)) return "";
+    seen.add(key);
+    return labelDate.toLocaleDateString([], { month: "short" });
+  });
+}
+
+function ActivityBarChart({
+  trend,
+  window,
+}: {
+  trend: UsageTrendBucket[];
+  window: TimeWindow;
+}) {
   const maxTokens = Math.max(...trend.map((bucket) => bucket.tokens), 1);
+  const bucketCount = trend.length;
+  const dates = buildLocalDates(window, bucketCount);
 
   return (
-    <div className="usage-heatmap">
-      <div className="usage-heatmap__grid" aria-hidden="true">
-        {trend.map((bucket) => {
+    <div className="usage-chart">
+      <div className="usage-chart__bars" aria-hidden="true">
+        {trend.map((bucket, index) => {
+          const date = dates[index];
           const intensity = bucket.tokens === 0 ? 0 : Math.max(bucket.tokens / maxTokens, 0.12);
+          const height = bucket.tokens === 0 ? 8 : Math.max((bucket.tokens / maxTokens) * 100, 10);
           return (
-            <div key={`${bucket.start}-${bucket.end}`} className="usage-heatmap__cell-wrap">
-              <div
-                className="usage-heatmap__cell"
-                style={{
-                  background: bucket.tokens === 0
-                    ? "color-mix(in srgb, var(--text-primary), transparent 96%)"
-                    : `linear-gradient(180deg,
-                        color-mix(in srgb, var(--text-primary), transparent ${92 - intensity * 14}%),
-                        color-mix(in srgb, var(--status-running), transparent ${88 - intensity * 48}%)
-                      )`,
-                }}
-                title={`${bucket.label}: ${formatTokenCount(bucket.tokens)}`}
-              />
-              <span className="usage-heatmap__label">{bucket.label}</span>
+            <div key={`${bucket.start}-${bucket.end}`} className="usage-chart__bar-wrap">
+              <div className="usage-chart__bar-area">
+                <div
+                  className="usage-chart__bar"
+                  style={{
+                    height: `${height}%`,
+                    background: bucket.tokens === 0
+                      ? "color-mix(in srgb, var(--text-primary), transparent 96%)"
+                      : `linear-gradient(180deg,
+                          color-mix(in srgb, var(--text-primary), transparent ${92 - intensity * 14}%),
+                          color-mix(in srgb, var(--status-running), transparent ${88 - intensity * 48}%)
+                        )`,
+                  }}
+                  title={`${date.toLocaleString()}: ${formatTokenCount(bucket.tokens)}`}
+                />
+              </div>
+              <span className="usage-chart__label">
+                {window === "5h"
+                  ? formatHourLabel(date)
+                  : date.toLocaleDateString([], { weekday: "short", day: "numeric" })}
+              </span>
             </div>
           );
         })}
       </div>
-      <div className="usage-heatmap__legend">
-        <span>Low</span>
-        <div className="usage-heatmap__legend-scale">
-          <span className="usage-heatmap__legend-cell" />
-          <span className="usage-heatmap__legend-cell usage-heatmap__legend-cell--mid" />
-          <span className="usage-heatmap__legend-cell usage-heatmap__legend-cell--high" />
+      <div className="usage-chart__legend">
+        <span>Less</span>
+        <div className="usage-chart__legend-scale">
+          <span className="usage-chart__legend-bar" />
+          <span className="usage-chart__legend-bar usage-chart__legend-bar--mid" />
+          <span className="usage-chart__legend-bar usage-chart__legend-bar--high" />
         </div>
-        <span>High</span>
+        <span>More</span>
+      </div>
+    </div>
+  );
+}
+
+function ActivityHeatmap({
+  trend,
+  window,
+}: {
+  trend: UsageTrendBucket[];
+  window: TimeWindow;
+}) {
+  const dates = buildLocalDates(window, trend.length);
+  const maxTokens = Math.max(...trend.map((bucket) => bucket.tokens), 1);
+  const leadingEmpty = dates[0]?.getDay() ?? 0;
+  const monthLabels = buildHeatmapMonthLabels(dates);
+  const isYear = window === "365d";
+  const cellSize = isYear ? 13 : 14;
+  const cellGap = isYear ? 3 : 4;
+
+  return (
+    <div className={`usage-heatmap ${isYear ? "usage-heatmap--year" : ""}`}>
+      <div className="usage-heatmap__scroll">
+        <div
+          className="usage-heatmap__month-row"
+          style={{
+            gridTemplateColumns: `repeat(${monthLabels.length}, ${cellSize}px)`,
+            gap: `${cellGap}px`,
+          }}
+          aria-hidden="true"
+        >
+          {monthLabels.map((label, index) => (
+            <span key={`month-${index}`} className="usage-heatmap__month-label">
+              {label}
+            </span>
+          ))}
+        </div>
+
+        <div className="usage-heatmap__frame">
+          <div
+            className="usage-heatmap__weekday-col"
+            style={{ gridTemplateRows: `repeat(7, ${cellSize}px)`, gap: `${cellGap}px` }}
+            aria-hidden="true"
+          >
+            <span />
+            <span>Mon</span>
+            <span />
+            <span>Wed</span>
+            <span />
+            <span>Fri</span>
+            <span />
+          </div>
+          <div
+            className="usage-heatmap__grid"
+            style={{
+              gridTemplateRows: `repeat(7, ${cellSize}px)`,
+              gridAutoColumns: `${cellSize}px`,
+              gridAutoFlow: "column",
+              gap: `${cellGap}px`,
+            }}
+            aria-hidden="true"
+          >
+            {Array.from({ length: leadingEmpty }).map((_, index) => (
+              <span key={`empty-${index}`} className="usage-heatmap__empty" />
+            ))}
+            {trend.map((bucket, index) => {
+              const intensity = bucket.tokens === 0 ? 0 : Math.max(bucket.tokens / maxTokens, 0.12);
+              const date = dates[index];
+              return (
+                <span
+                  key={`${bucket.start}-${bucket.end}`}
+                  className="usage-heatmap__cell"
+                  style={{
+                    width: cellSize,
+                    height: cellSize,
+                    background: bucket.tokens === 0
+                      ? "color-mix(in srgb, var(--text-primary), transparent 96%)"
+                      : `linear-gradient(180deg,
+                          color-mix(in srgb, var(--text-primary), transparent ${92 - intensity * 14}%),
+                          color-mix(in srgb, var(--status-running), transparent ${88 - intensity * 48}%)
+                        )`,
+                  }}
+                  title={`${date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}: ${formatTokenCount(bucket.tokens)}`}
+                />
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <div className="usage-chart__legend">
+        <span>Less</span>
+        <div className="usage-chart__legend-scale">
+          <span className="usage-chart__legend-bar" />
+          <span className="usage-chart__legend-bar usage-chart__legend-bar--mid" />
+          <span className="usage-chart__legend-bar usage-chart__legend-bar--high" />
+        </div>
+        <span>More</span>
       </div>
     </div>
   );
@@ -154,19 +315,29 @@ function BreakdownList({
 }
 
 function OverviewPanel({ overview }: { overview: UsageOverview }) {
+  const chart = overview.window === "30d" || overview.window === "365d"
+    ? <ActivityHeatmap trend={overview.trend} window={overview.window as TimeWindow} />
+    : <ActivityBarChart trend={overview.trend} window={overview.window as TimeWindow} />;
+
   return (
     <>
       <section className="usage-section">
         <div className="usage-section__header">
           <h3 className="section-label !p-0">Activity</h3>
         </div>
-        <div className="usage-stats">
-          <Stat label="Total Tokens" value={formatTokenCount(overview.totalTokens)} meta="tokens" />
-          <Stat label="Estimated Cost" value={presentCost(overview.totalCost)} />
-          <Stat label="Active Projects" value={`${overview.activeProjects}`} />
-          <Stat label="Active Sessions" value={`${overview.activeSessions}`} />
+        <div className="usage-activity">
+          <div className="usage-activity__summary">
+            <div className="usage-stats">
+              <Stat label="Total Tokens" value={formatTokenCount(overview.totalTokens)} />
+              <Stat label="Estimated Cost" value={presentCost(overview.totalCost)} />
+              <Stat label="Active Projects" value={`${overview.activeProjects}`} />
+              <Stat label="Active Sessions" value={`${overview.activeSessions}`} />
+            </div>
+          </div>
+          <div className="usage-activity__chart">
+            {chart}
+          </div>
         </div>
-        <Heatmap trend={overview.trend} />
       </section>
 
       <hr className="settings-divider" />

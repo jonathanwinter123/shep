@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { getAllUsageSnapshots } from "../lib/tauri";
 import type { ProviderUsageSnapshot, UsageProvider } from "../lib/types";
 
-export type TimeWindow = "5h" | "7d" | "30d";
+export type TimeWindow = "5h" | "7d" | "30d" | "365d";
 
 interface UsageStore {
   snapshots: Record<string, ProviderUsageSnapshot>;
