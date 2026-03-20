@@ -12,6 +12,7 @@ import type {
   TerminalSettings,
   PreferredEditor,
   ProviderUsageSnapshot,
+  LocalUsageDetails,
 } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -202,4 +203,8 @@ export function getAllUsageSnapshots(): Promise<ProviderUsageSnapshot[]> {
 
 export function getUsageSnapshot(provider: string): Promise<ProviderUsageSnapshot> {
   return invoke("get_usage_snapshot", { provider });
+}
+
+export function getUsageDetails(provider: string, window: string): Promise<LocalUsageDetails> {
+  return invoke("get_usage_details", { provider, window });
 }

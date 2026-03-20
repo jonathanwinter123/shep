@@ -8,7 +8,7 @@ use crate::git;
 use crate::git::{ChangedFile, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::PtyOutput;
-use crate::usage::ProviderUsageSnapshot;
+use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb};
 use crate::workspace::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, WorkspaceConfig};
 use crate::workspace::manager::WorkspaceManager;
 
@@ -277,13 +277,18 @@ pub fn check_command_exists(command: &str) -> bool {
 }
 
 #[tauri::command]
-pub fn get_all_usage_snapshots() -> Vec<ProviderUsageSnapshot> {
-    crate::usage::get_all_usage_snapshots()
+pub fn get_all_usage_snapshots(db: State<'_, UsageDb>) -> Vec<ProviderUsageSnapshot> {
+    crate::usage::get_all_usage_snapshots(&db)
 }
 
 #[tauri::command]
-pub fn get_usage_snapshot(provider: &str) -> Result<ProviderUsageSnapshot, String> {
-    crate::usage::get_usage_snapshot(provider)
+pub fn get_usage_snapshot(db: State<'_, UsageDb>, provider: &str) -> Result<ProviderUsageSnapshot, String> {
+    crate::usage::get_usage_snapshot(&db, provider)
+}
+
+#[tauri::command]
+pub fn get_usage_details(db: State<'_, UsageDb>, provider: &str, window: &str) -> Result<LocalUsageDetails, String> {
+    crate::usage::get_windowed_details(&db, provider, window)
 }
 
 fn open_path_in_editor(repo_path: &str, editor_id: &str) -> Result<(), String> {

@@ -29,8 +29,9 @@ export function formatPercent(value: number | null): string {
 
 export function formatTokenCount(value: number | null): string {
   if (value == null) return "n/a";
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  if (value >= 1_000) return `${Math.round(value / 1_000)}K`;
   return `${value}`;
 }
 
@@ -60,4 +61,46 @@ export function usageTone(window: UsageWindowSnapshot | null): "low" | "medium" 
   if (window.usedPercent >= 75) return "high";
   if (window.usedPercent >= 50) return "medium";
   return "low";
+}
+
+// ── Pace helpers ─────────────────────────────────────────
+
+const WINDOW_DURATIONS_MS: Record<string, number> = {
+  "5h": 5 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+};
+
+export type PaceStatus = "under" | "on" | "over";
+
+/**
+ * Compare usage % against elapsed % of the window to determine pace.
+ * Returns null if we can't compute (no reset time, no percent, or unknown window).
+ */
+export function computePace(w: UsageWindowSnapshot | null): { status: PaceStatus; elapsedPct: number } | null {
+  if (!w || w.usedPercent == null || !w.resetAt) return null;
+  const durationMs = WINDOW_DURATIONS_MS[w.window];
+  if (!durationMs) return null;
+
+  const millis = Number(w.resetAt);
+  const resetTime = Number.isFinite(millis) ? millis * 1000 : new Date(w.resetAt).getTime();
+  if (Number.isNaN(resetTime)) return null;
+
+  const now = Date.now();
+  const windowStart = resetTime - durationMs;
+  const elapsed = now - windowStart;
+  const elapsedPct = Math.min(Math.max((elapsed / durationMs) * 100, 0), 100);
+
+  const used = w.usedPercent;
+  // Give a 10% buffer around the elapsed line for "on pace"
+  if (used <= elapsedPct * 0.8) return { status: "under", elapsedPct };
+  if (used >= elapsedPct * 1.2) return { status: "over", elapsedPct };
+  return { status: "on", elapsedPct };
+}
+
+export function paceLabel(status: PaceStatus): string {
+  switch (status) {
+    case "under": return "under pace";
+    case "on": return "on pace";
+    case "over": return "over pace";
+  }
 }

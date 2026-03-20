@@ -1,21 +1,14 @@
-import { useUsageStore } from "../../stores/useUsageStore";
+import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
 import { useUIStore } from "../../stores/useUIStore";
 import type { UsageProvider } from "../../lib/types";
-import { getPrimaryWindow, getProviderLabel, formatPercent, formatTokenCount } from "../usage/usageHelpers";
-import SectionHeader from "./SectionHeader";
+import { getProviderLabel, formatPercent, formatTokenCount, computePace } from "../usage/usageHelpers";
 
-const PROVIDERS: UsageProvider[] = ["codex", "claude", "gemini"];
-
-/** Determine bar color based on 5h usage AND whether it exceeds 7d pacing. */
-function barTone(pct5h: number | null | undefined, pct7d: number | null | undefined): string {
-  if (pct5h == null) return "local";
-  // If short-term usage is outpacing the weekly rate, escalate
-  const overPacing = pct7d != null && pct5h > pct7d;
-  if (pct5h >= 90) return "critical";
-  if (pct5h >= 75 || (overPacing && pct5h >= 50)) return "high";
-  if (pct5h >= 50 || overPacing) return "medium";
-  return "low";
-}
+const PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini"];
+const WINDOWS: { key: TimeWindow; label: string }[] = [
+  { key: "5h", label: "5h" },
+  { key: "7d", label: "7d" },
+  { key: "30d", label: "30d" },
+];
 
 const TONE_COLORS: Record<string, string> = {
   low: "rgba(52, 211, 153, 0.75)",
@@ -33,8 +26,20 @@ const TONE_TRACK: Record<string, string> = {
   local: "rgba(96, 165, 250, 0.08)",
 };
 
+/** Bar tone based on pace status rather than raw thresholds. */
+function barTone(pace: ReturnType<typeof computePace>, pct: number | null | undefined): string {
+  if (pct == null) return "local";
+  if (pct >= 90) return "critical";
+  if (pace?.status === "over") return pct >= 50 ? "high" : "medium";
+  if (pct >= 75) return "high";
+  if (pct >= 50) return "medium";
+  return "low";
+}
+
 export default function SidebarUsage() {
   const snapshots = useUsageStore((s) => s.snapshots);
+  const window = useUsageStore((s) => s.window);
+  const setWindow = useUsageStore((s) => s.setWindow);
   const toggleUsagePanel = useUIStore((s) => s.toggleUsagePanel);
 
   const hasData = Object.keys(snapshots).length > 0;
@@ -42,20 +47,39 @@ export default function SidebarUsage() {
 
   return (
     <div className="sidebar-usage">
-      <SectionHeader label="Usage" />
+      <div className="sidebar-usage__header">
+        <div className="section-label !p-0">Usage</div>
+        <div className="sidebar-usage__window-toggle">
+          {WINDOWS.map((tw) => (
+            <button
+              key={tw.key}
+              type="button"
+              className={`sidebar-usage__window-btn ${window === tw.key ? "sidebar-usage__window-btn--active" : ""}`}
+              onClick={() => setWindow(tw.key)}
+            >
+              {tw.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="sidebar-usage__providers">
         {PROVIDERS.map((provider) => {
           const snapshot = snapshots[provider] ?? null;
-          const w = getPrimaryWindow(snapshot);
+          if (!snapshot) return null;
+
+          const w = snapshot.summaryWindows.find((sw) => sw.window === window) ?? null;
           const pct = w?.usedPercent;
           const hasPercent = pct != null;
           const clampedPct = hasPercent ? Math.min(pct, 100) : 0;
 
-          const w7d = snapshot?.summaryWindows.find((sw) => sw.window === "7d") ?? null;
-          const pct7d = w7d?.usedPercent;
+          const pace = computePace(w);
+          const tone = barTone(pace, pct);
 
-          const tone = barTone(pct, pct7d);
+          const local = snapshot.localDetails;
+          const tokens = local
+            ? window === "5h" ? local.tokens5h : window === "7d" ? local.tokens7d : local.tokens30d
+            : w?.tokenTotal ?? null;
 
           return (
             <button
@@ -79,10 +103,11 @@ export default function SidebarUsage() {
                       background: TONE_COLORS[tone],
                     }}
                   />
-                  {pct7d != null && hasPercent && (
+                  {pace && pct != null && pct > 0 && (
                     <div
                       className="sidebar-usage__bar-pace"
-                      style={{ left: `${Math.min(pct7d, 100)}%` }}
+                      style={{ left: `${Math.min(pace.elapsedPct, 100)}%` }}
+                      title={`${Math.round(pace.elapsedPct)}% of window elapsed`}
                     />
                   )}
                 </div>
@@ -92,7 +117,7 @@ export default function SidebarUsage() {
                 {hasPercent ? formatPercent(pct) : "—"}
               </span>
               <span className="sidebar-usage__tokens">
-                {formatTokenCount(snapshot?.localDetails?.tokens5h ?? w?.tokenTotal ?? null)}
+                {formatTokenCount(tokens)}
               </span>
             </button>
           );

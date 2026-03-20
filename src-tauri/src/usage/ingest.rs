@@ -1,0 +1,529 @@
+use rusqlite::{params, Connection};
+use serde_json::Value;
+use std::fs;
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
+
+use super::helpers::{as_u64, home_join, now_epoch_seconds, walk_files};
+
+/// Maximum files to process per ingest cycle to keep startup snappy.
+const MAX_FILES_PER_CYCLE: usize = 50;
+
+/// Run incremental ingestion for all providers.
+/// Returns true if all providers are fully caught up (no remaining work).
+pub fn ingest_all(conn: &Connection) -> bool {
+    let mut all_done = true;
+
+    match ingest_claude(conn, MAX_FILES_PER_CYCLE) {
+        Ok(done) => { if !done { all_done = false; } }
+        Err(e) => eprintln!("Claude ingest error: {e}"),
+    }
+    match ingest_gemini(conn, MAX_FILES_PER_CYCLE) {
+        Ok(done) => { if !done { all_done = false; } }
+        Err(e) => eprintln!("Gemini ingest error: {e}"),
+    }
+    if let Err(e) = ingest_codex(conn) {
+        eprintln!("Codex ingest error: {e}");
+    }
+    if let Err(e) = prune_old_messages(conn) {
+        eprintln!("Prune error: {e}");
+    }
+
+    all_done
+}
+
+// ── Claude ────────────────────────────────────────────────
+
+/// Returns Ok(true) if fully caught up, Ok(false) if more files remain.
+fn ingest_claude(conn: &Connection, budget: usize) -> Result<bool, String> {
+    let projects_dir = home_join(".claude/projects")?;
+    if !projects_dir.exists() {
+        return Ok(true);
+    }
+
+    let files = walk_files(&projects_dir);
+    let jsonl_files: Vec<_> = files
+        .into_iter()
+        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl"))
+        .collect();
+
+    conn.execute_batch("BEGIN").map_err(|e| e.to_string())?;
+
+    let mut processed = 0;
+    let mut skipped_remaining = false;
+
+    for path in &jsonl_files {
+        if processed >= budget {
+            skipped_remaining = true;
+            break;
+        }
+        // Check if file actually needs work before counting against budget
+        let path_str = path.to_string_lossy().to_string();
+        let meta = match fs::metadata(path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let file_size = meta.len() as i64;
+        let mtime = file_mtime(&meta);
+        let cursor = get_cursor(conn, &path_str);
+        let needs_work = match &cursor {
+            Some((size, _, mt)) => *size != file_size || *mt != mtime,
+            None => true,
+        };
+        if !needs_work {
+            continue;
+        }
+
+        processed += 1;
+        if let Err(e) = ingest_claude_file(conn, path) {
+            eprintln!("Claude ingest error for {}: {e}", path.display());
+        }
+    }
+
+    // Only clean cursors when fully caught up
+    if !skipped_remaining {
+        clean_cursors(conn, "claude", &jsonl_files);
+    }
+
+    conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+    Ok(!skipped_remaining)
+}
+
+fn ingest_claude_file(conn: &Connection, path: &Path) -> Result<(), String> {
+    let path_str = path.to_string_lossy().to_string();
+    let meta = fs::metadata(path).map_err(|e| e.to_string())?;
+    let file_size = meta.len() as i64;
+    let mtime = file_mtime(&meta);
+
+    // Check cursor
+    let cursor = get_cursor(conn, &path_str);
+    let offset = match &cursor {
+        Some((size, off, mt)) => {
+            if *size == file_size && *mt == mtime {
+                return Ok(()); // No change
+            }
+            *off
+        }
+        None => 0,
+    };
+
+    let project_name = path
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let session_id = path
+        .file_stem()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default()
+        .to_string();
+
+    let file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut reader = BufReader::new(file);
+    reader.seek(SeekFrom::Start(offset as u64)).map_err(|e| e.to_string())?;
+
+    let mut new_offset = offset;
+    let mut line = String::new();
+
+    loop {
+        line.clear();
+        let bytes_read = reader.read_line(&mut line).map_err(|e| e.to_string())?;
+        if bytes_read == 0 {
+            break;
+        }
+        new_offset += bytes_read as i64;
+
+        let row: Value = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let usage = match row.get("message").and_then(|m| m.get("usage")) {
+            Some(v) if v.is_object() => v,
+            _ => continue,
+        };
+
+        let input = as_u64(usage.get("input_tokens"));
+        let output = as_u64(usage.get("output_tokens"));
+        let cache_write = as_u64(usage.get("cache_creation_input_tokens"));
+        let cache_read = as_u64(usage.get("cache_read_input_tokens"));
+        let total = input + output + cache_write + cache_read;
+
+        let model = row
+            .get("message")
+            .and_then(|m| m.get("model"))
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+
+        let ts = row
+            .get("timestamp")
+            .and_then(Value::as_str)
+            .and_then(parse_iso_timestamp)
+            .unwrap_or(0);
+
+        conn.execute(
+            "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10)",
+            params![
+                "claude", session_id, project_name, model, ts as i64,
+                input as i64, output as i64, cache_write as i64, cache_read as i64, total as i64
+            ],
+        ).map_err(|e| e.to_string())?;
+    }
+
+    upsert_cursor(conn, &path_str, "claude", file_size, new_offset, mtime)?;
+    Ok(())
+}
+
+// ── Gemini ────────────────────────────────────────────────
+
+/// Returns Ok(true) if fully caught up, Ok(false) if more files remain.
+fn ingest_gemini(conn: &Connection, budget: usize) -> Result<bool, String> {
+    let tmp_dir = home_join(".gemini/tmp")?;
+    if !tmp_dir.exists() {
+        return Ok(true);
+    }
+
+    let files = walk_files(&tmp_dir);
+    let json_files: Vec<_> = files
+        .into_iter()
+        .filter(|p| {
+            p.extension().and_then(|e| e.to_str()) == Some("json")
+                && p.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()) == Some("chats")
+        })
+        .collect();
+
+    conn.execute_batch("BEGIN").map_err(|e| e.to_string())?;
+
+    let mut processed = 0;
+    let mut skipped_remaining = false;
+
+    for path in &json_files {
+        if processed >= budget {
+            skipped_remaining = true;
+            break;
+        }
+        let path_str = path.to_string_lossy().to_string();
+        let meta = match fs::metadata(path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let file_size = meta.len() as i64;
+        let mtime = file_mtime(&meta);
+        let cursor = get_cursor(conn, &path_str);
+        let needs_work = match &cursor {
+            Some((size, _, mt)) => *size != file_size || *mt != mtime,
+            None => true,
+        };
+        if !needs_work {
+            continue;
+        }
+
+        processed += 1;
+        if let Err(e) = ingest_gemini_file(conn, path) {
+            eprintln!("Gemini ingest error for {}: {e}", path.display());
+        }
+    }
+
+    if !skipped_remaining {
+        clean_cursors(conn, "gemini", &json_files);
+    }
+
+    conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+    Ok(!skipped_remaining)
+}
+
+fn ingest_gemini_file(conn: &Connection, path: &Path) -> Result<(), String> {
+    let path_str = path.to_string_lossy().to_string();
+    let meta = fs::metadata(path).map_err(|e| e.to_string())?;
+    let file_size = meta.len() as i64;
+    let mtime = file_mtime(&meta);
+
+    let cursor = get_cursor(conn, &path_str);
+    if let Some((size, _, mt)) = &cursor {
+        if *size == file_size && *mt == mtime {
+            return Ok(()); // No change
+        }
+    }
+
+    let contents = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let json: Value = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+
+    let session_id = json
+        .get("sessionId")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+
+    let project = path
+        .parent()
+        .and_then(Path::parent)
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    // Delete old rows for this session and re-insert
+    conn.execute(
+        "DELETE FROM usage_messages WHERE provider = 'gemini' AND session_id = ?1",
+        params![session_id],
+    ).map_err(|e| e.to_string())?;
+
+    let updated_at_str = json
+        .get("lastUpdated")
+        .and_then(Value::as_str)
+        .or_else(|| json.get("startTime").and_then(Value::as_str));
+    let session_ts = updated_at_str.and_then(parse_iso_timestamp).unwrap_or(0);
+
+    let messages = json.get("messages").and_then(Value::as_array);
+    if let Some(messages) = messages {
+        for message in messages {
+            let tokens = match message.get("tokens") {
+                Some(v) if v.is_object() => v,
+                _ => continue,
+            };
+
+            let input = as_u64(tokens.get("input"));
+            let output = as_u64(tokens.get("output"));
+            let cached = as_u64(tokens.get("cached"));
+            let thoughts = as_u64(tokens.get("thoughts"));
+            let total = as_u64(tokens.get("total"));
+
+            let model = message
+                .get("model")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+
+            conn.execute(
+                "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total)
+                 VALUES ('gemini', ?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9)",
+                params![
+                    session_id, project, model, session_ts as i64,
+                    input as i64, output as i64, cached as i64, thoughts as i64, total as i64
+                ],
+            ).map_err(|e| e.to_string())?;
+        }
+    }
+
+    upsert_cursor(conn, &path_str, "gemini", file_size, file_size, mtime)?;
+    Ok(())
+}
+
+// ── Codex ─────────────────────────────────────────────────
+
+fn ingest_codex(conn: &Connection) -> Result<(), String> {
+    let db_path = home_join(".codex/state_5.sqlite")?;
+    if !db_path.exists() {
+        return Ok(());
+    }
+
+    let cursor_key = "codex:state_5";
+    let last_updated: i64 = get_cursor(conn, cursor_key)
+        .map(|(_, off, _)| off)
+        .unwrap_or(0);
+
+    let codex_conn = rusqlite::Connection::open_with_flags(
+        &db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ).map_err(|e| format!("Failed to open Codex DB: {e}"))?;
+
+    let mut stmt = codex_conn
+        .prepare(
+            "SELECT id, coalesce(title, ''), tokens_used, coalesce(model, 'unknown'), coalesce(cwd, ''), updated_at
+             FROM threads
+             WHERE updated_at > ?1
+             ORDER BY updated_at ASC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let mut max_updated = last_updated;
+
+    let rows = stmt
+        .query_map(params![last_updated], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, i64>(5)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    conn.execute_batch("BEGIN").map_err(|e| e.to_string())?;
+
+    for row in rows {
+        let (id, _title, tokens, model, cwd, updated_at) = row.map_err(|e| e.to_string())?;
+
+        // Codex only has total tokens, no input/output split.
+        // Delete old row for this thread and re-insert with latest total.
+        conn.execute(
+            "DELETE FROM usage_messages WHERE provider = 'codex' AND session_id = ?1",
+            params![id],
+        ).map_err(|e| e.to_string())?;
+
+        let project = cwd.split('/').filter(|s| !s.is_empty()).last().unwrap_or("unknown");
+
+        conn.execute(
+            "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total)
+             VALUES ('codex', ?1, ?2, ?3, ?4, 0, 0, 0, 0, 0, ?5)",
+            params![id, project, model, updated_at, tokens],
+        ).map_err(|e| e.to_string())?;
+
+        if updated_at > max_updated {
+            max_updated = updated_at;
+        }
+    }
+
+    upsert_cursor(conn, cursor_key, "codex", 0, max_updated, 0)?;
+    conn.execute_batch("COMMIT").map_err(|e| e.to_string())
+}
+
+// ── Maintenance ───────────────────────────────────────────
+
+fn prune_old_messages(conn: &Connection) -> Result<(), String> {
+    let cutoff = now_epoch_seconds() as i64 - 2_592_000; // 30 days
+
+    // Roll up old messages into daily aggregates
+    conn.execute(
+        "INSERT OR REPLACE INTO usage_daily (provider, date, model, project, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total, message_count)
+         SELECT provider, date(timestamp, 'unixepoch') as d, model, project,
+                SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_write), SUM(tokens_cache_read), SUM(tokens_thoughts), SUM(tokens_total), COUNT(*)
+         FROM usage_messages
+         WHERE timestamp < ?1
+         GROUP BY provider, d, model, project",
+        params![cutoff],
+    ).map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "DELETE FROM usage_messages WHERE timestamp < ?1",
+        params![cutoff],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+// ── Cursor helpers ────────────────────────────────────────
+
+fn get_cursor(conn: &Connection, file_path: &str) -> Option<(i64, i64, i64)> {
+    conn.query_row(
+        "SELECT file_size, byte_offset, last_modified FROM ingest_cursors WHERE file_path = ?1",
+        params![file_path],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    ).ok()
+}
+
+fn upsert_cursor(conn: &Connection, file_path: &str, provider: &str, file_size: i64, offset: i64, mtime: i64) -> Result<(), String> {
+    let now = now_epoch_seconds() as i64;
+    conn.execute(
+        "INSERT INTO ingest_cursors (file_path, provider, file_size, byte_offset, last_modified, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(file_path) DO UPDATE SET file_size=?3, byte_offset=?4, last_modified=?5, updated_at=?6",
+        params![file_path, provider, file_size, offset, mtime, now],
+    ).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn clean_cursors(conn: &Connection, provider: &str, valid_files: &[PathBuf]) {
+    let mut stmt = conn
+        .prepare("SELECT file_path FROM ingest_cursors WHERE provider = ?1")
+        .unwrap();
+    let paths: Vec<String> = stmt
+        .query_map(params![provider], |row| row.get(0))
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect();
+
+    for path in paths {
+        let still_exists = valid_files.iter().any(|f| f.to_string_lossy() == path);
+        if !still_exists {
+            let _ = conn.execute(
+                "DELETE FROM ingest_cursors WHERE file_path = ?1",
+                params![path],
+            );
+            // Also clean up messages from deleted files
+            let _ = conn.execute(
+                "DELETE FROM usage_messages WHERE provider = ?1 AND session_id IN (
+                    SELECT DISTINCT session_id FROM usage_messages WHERE provider = ?1
+                )",
+                params![provider],
+            );
+        }
+    }
+}
+
+// ── Timestamp parsing ─────────────────────────────────────
+
+fn parse_iso_timestamp(s: &str) -> Option<u64> {
+    // Handle common ISO 8601 formats without shelling out to `date`
+    // 2025-01-15T10:30:00Z
+    // 2025-01-15T10:30:00.123Z
+    // 2025-01-15T10:30:00+00:00
+    let s = s.trim();
+
+    // Parse the date/time components directly
+    let clean = s.replace('Z', "").replace('T', " ");
+    let clean = clean.split('+').next().unwrap_or(&clean);
+    let clean = if clean.matches('-').count() > 2 {
+        // Has timezone offset like -05:00
+        let last_dash = clean.rfind('-')?;
+        &clean[..last_dash]
+    } else {
+        clean
+    };
+
+    // Strip fractional seconds
+    let clean = clean.split('.').next().unwrap_or(clean);
+
+    let parts: Vec<&str> = clean.split(' ').collect();
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let date_parts: Vec<u64> = parts[0].split('-').filter_map(|s| s.parse().ok()).collect();
+    let time_parts: Vec<u64> = parts[1].split(':').filter_map(|s| s.parse().ok()).collect();
+
+    if date_parts.len() != 3 || time_parts.len() < 2 {
+        return None;
+    }
+
+    let (year, month, day) = (date_parts[0], date_parts[1], date_parts[2]);
+    let (hour, minute) = (time_parts[0], time_parts[1]);
+    let second = time_parts.get(2).copied().unwrap_or(0);
+
+    // Simple epoch calculation (good enough for usage tracking, assumes UTC)
+    let days = days_from_epoch(year, month, day)?;
+    Some(days * 86400 + hour * 3600 + minute * 60 + second)
+}
+
+fn days_from_epoch(year: u64, month: u64, day: u64) -> Option<u64> {
+    if year < 1970 || month < 1 || month > 12 || day < 1 || day > 31 {
+        return None;
+    }
+    // Days from 1970-01-01
+    let mut y = year;
+    let mut m = month as i64;
+    if m <= 2 {
+        y -= 1;
+        m += 9;
+    } else {
+        m -= 3;
+    }
+    let era = y / 400;
+    let yoe = y - era * 400;
+    let doy = (153 * m as u64 + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146097 + doe - 719468;
+    Some(days)
+}
+
+fn file_mtime(meta: &fs::Metadata) -> i64 {
+    meta.modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}

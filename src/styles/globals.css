@@ -894,6 +894,44 @@ select {
 
 .sidebar-usage {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 4px;
+  padding-bottom: 8px;
+}
+
+.sidebar-usage__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 8px;
+}
+
+.sidebar-usage__window-toggle {
+  display: flex;
+  gap: 1px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+
+.sidebar-usage__window-btn {
+  padding: 2px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 140ms ease;
+}
+
+.sidebar-usage__window-btn:hover {
+  color: var(--text-secondary);
+}
+
+.sidebar-usage__window-btn--active {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-usage__providers {
@@ -970,17 +1008,27 @@ select {
   font-size: var(--text-body);
   font-weight: 600;
   color: var(--text-secondary);
-  min-width: 32px;
+  width: 36px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 .sidebar-usage__tokens {
   font-size: var(--text-body);
   color: var(--text-muted);
-  min-width: 38px;
+  width: 42px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.sidebar-usage__pace {
+  font-size: 9px;
+  font-weight: 500;
+  min-width: 56px;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .app-shell__frame {
@@ -1086,6 +1134,39 @@ select {
   border-bottom-color: rgba(255, 255, 255, 0.4);
 }
 
+/* ── Time window selector ──────────────────────────────── */
+
+.usage-window-tabs {
+  display: flex;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.usage-window-tab {
+  padding: 4px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 160ms ease;
+  border-radius: 6px;
+}
+
+.usage-window-tab:hover {
+  color: var(--text-secondary);
+}
+
+.usage-window-tab--active {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
 /* ── Provider card ─────────────────────────────────────── */
 
 .usage-card {
@@ -1133,6 +1214,13 @@ select {
   color: rgb(253, 230, 138);
 }
 
+.usage-card__window-total {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
 .usage-card__error {
   margin: 6px 0 0;
   font-size: 11px;
@@ -1178,6 +1266,11 @@ select {
   font-size: 10px;
   color: var(--text-muted);
 }
+
+.usage-window__pace { font-weight: 500; }
+.usage-window__pace--under { color: rgba(52, 211, 153, 0.8); }
+.usage-window__pace--on { color: var(--text-muted); }
+.usage-window__pace--over { color: rgba(248, 113, 113, 0.8); }
 
 /* ── Progress bar ──────────────────────────────────────── */
 

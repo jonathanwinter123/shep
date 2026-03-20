@@ -171,6 +171,14 @@ export default function AppShell() {
     return () => window.clearInterval(timer);
   }, [fetchUsageSnapshots]);
 
+  // Auto-refresh when background ingest completes
+  useEffect(() => {
+    const unlisten = listen("usage-ingest-complete", () => {
+      void fetchUsageSnapshots();
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, [fetchUsageSnapshots]);
+
   const handleSelectRepo = useCallback(
     async (repoPath: string) => {
       if (repoPath === activeRepoPath) return;
