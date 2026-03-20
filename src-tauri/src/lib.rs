@@ -100,6 +100,7 @@ pub fn run() {
             commands::get_usage_snapshot,
             commands::get_usage_details,
             commands::get_usage_overview,
+            commands::refresh_usage_data,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

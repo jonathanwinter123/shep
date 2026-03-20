@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { useGitStore } from "../../stores/useGitStore";
-import { GitBranch, Terminal, Sparkles, SquareTerminal } from "lucide-react";
+import { GitBranch, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined } from "lucide-react";
 import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
@@ -174,19 +174,25 @@ export default function TabBar({
   const activateCommandsPanel = useUIStore((s) => s.activateCommandsPanel);
   const closeCommandsPanel = useUIStore((s) => s.closeCommandsPanel);
 
+  const usageTabOpen = useUIStore((s) => s.usageTabOpen);
+  const usagePanelActive = useUIStore((s) => s.usagePanelActive);
+  const activateUsagePanel = useUIStore((s) => s.activateUsagePanel);
+  const closeUsageTab = useUIStore((s) => s.closeUsageTab);
+
   // Git status for the active tab
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
   const activeTabCwd = activeTab?.worktreePath ?? activeTab?.repoPath ?? null;
   const projectGitStatus = useGitStore((s) => s.projectGitStatus);
   const gitStatus = activeTabCwd ? projectGitStatus[activeTabCwd] : null;
 
-  const anyOverlay = settingsActive || launcherActive || gitPanelActive || commandsPanelActive;
+  const anyOverlay = settingsActive || launcherActive || gitPanelActive || commandsPanelActive || usagePanelActive;
 
   const handleSelectTab = (tabId: string) => {
     useUIStore.getState().deactivateSettings();
     useUIStore.getState().deactivateLauncher();
     useUIStore.getState().deactivateGitPanel();
     useUIStore.getState().deactivateCommandsPanel();
+    useUIStore.getState().deactivateUsagePanel();
     setActiveTab(tabId);
     const tab = tabs.find((t) => t.id === tabId);
     if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
@@ -345,6 +351,31 @@ export default function TabBar({
               onClick={(e) => {
                 e.stopPropagation();
                 closeCommandsPanel();
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {usageTabOpen && (
+          <div
+            className={`tab ${usagePanelActive ? "active" : ""}`}
+            onClick={activateUsagePanel}
+            onKeyDown={(event) => handleActionKey(event, activateUsagePanel)}
+            role="tab"
+            tabIndex={0}
+            aria-selected={usagePanelActive}
+            aria-label="Open usage panel"
+          >
+            <ChartNoAxesCombined size={12} />
+            <span>Usage</span>
+            <button
+              className="icon-btn ml-0.5"
+              aria-label="Close usage panel"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeUsageTab();
               }}
             >
               ×

@@ -1291,14 +1291,26 @@ select {
   color: var(--text-muted);
 }
 
+.usage-chart__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  min-height: 22px;
+}
+
+.usage-chart__footer-left {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .usage-chart__legend {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 8px;
-  margin-top: 10px;
   font-size: 10px;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .usage-chart__legend-scale {
@@ -1476,6 +1488,35 @@ select {
 .usage-list__pace--under { color: rgba(52, 211, 153, 0.8); }
 .usage-list__pace--on { color: var(--text-muted); }
 .usage-list__pace--over { color: rgba(248, 113, 113, 0.8); }
+
+.usage-tooltip {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.usage-tooltip__label {
+  color: var(--text-secondary);
+}
+
+.usage-tooltip__sep {
+  margin: 0 6px;
+  opacity: 0.3;
+}
+
+.usage-tooltip__value {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-tooltip__cost {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
 
 .usage-empty {
   font-size: 12px;

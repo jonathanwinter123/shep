@@ -222,3 +222,7 @@ export function getUsageDetails(provider: string, window: string): Promise<Local
 export function getUsageOverview(window: string): Promise<UsageOverview> {
   return invoke("get_usage_overview", { window });
 }
+
+export function refreshUsageData(): Promise<void> {
+  return invoke("refresh_usage_data");
+}

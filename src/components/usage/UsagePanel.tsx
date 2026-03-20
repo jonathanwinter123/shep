@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCcw } from "lucide-react";
-import { getUsageOverview } from "../../lib/tauri";
+import { listen } from "@tauri-apps/api/event";
+import { getUsageOverview, refreshUsageData } from "../../lib/tauri";
 import type {
   UsageBreakdownItem,
   UsageOverview,
@@ -23,6 +24,44 @@ function presentCost(value: number | null): string {
 
 function formatHourLabel(date: Date): string {
   return date.toLocaleTimeString([], { hour: "numeric" });
+}
+
+interface TooltipData {
+  label: string;
+  tokens: string;
+  cost: string | null;
+}
+
+function useChartTooltip() {
+  const [tip, setTip] = useState<TooltipData | null>(null);
+
+  const show = useCallback((_e: React.MouseEvent, label: string, tokens: number, cost: number | null) => {
+    setTip({
+      label,
+      tokens: formatTokenCount(tokens),
+      cost: cost != null ? formatCost(cost) : null,
+    });
+  }, []);
+
+  const hide = useCallback(() => setTip(null), []);
+
+  return { tip, show, hide };
+}
+
+function ChartTooltip({ tip }: { tip: TooltipData }) {
+  return (
+    <div className="usage-tooltip">
+      <span className="usage-tooltip__label">{tip.label}</span>
+      <span className="usage-tooltip__sep">/</span>
+      <span className="usage-tooltip__value">{tip.tokens}</span>
+      {tip.cost && (
+        <>
+          <span className="usage-tooltip__sep">/</span>
+          <span className="usage-tooltip__cost">{tip.cost}</span>
+        </>
+      )}
+    </div>
+  );
 }
 
 function Stat({
@@ -94,6 +133,7 @@ function ActivityBarChart({
   const maxTokens = Math.max(...trend.map((bucket) => bucket.tokens), 1);
   const bucketCount = trend.length;
   const dates = buildLocalDates(window, bucketCount);
+  const { tip, show, hide } = useChartTooltip();
 
   return (
     <div className="usage-chart">
@@ -102,6 +142,9 @@ function ActivityBarChart({
           const date = dates[index];
           const intensity = bucket.tokens === 0 ? 0 : Math.max(bucket.tokens / maxTokens, 0.12);
           const height = bucket.tokens === 0 ? 8 : Math.max((bucket.tokens / maxTokens) * 100, 10);
+          const dateLabel = window === "5h"
+            ? date.toLocaleString([], { month: "short", day: "numeric", hour: "numeric" })
+            : date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
           return (
             <div key={`${bucket.start}-${bucket.end}`} className="usage-chart__bar-wrap">
               <div className="usage-chart__bar-area">
@@ -116,7 +159,9 @@ function ActivityBarChart({
                           color-mix(in srgb, var(--status-running), transparent ${88 - intensity * 48}%)
                         )`,
                   }}
-                  title={`${date.toLocaleString()}: ${formatTokenCount(bucket.tokens)}`}
+                  onMouseEnter={(e) => show(e, dateLabel, bucket.tokens, bucket.cost)}
+                  onMouseMove={(e) => show(e, dateLabel, bucket.tokens, bucket.cost)}
+                  onMouseLeave={hide}
                 />
               </div>
               <span className="usage-chart__label">
@@ -128,14 +173,19 @@ function ActivityBarChart({
           );
         })}
       </div>
-      <div className="usage-chart__legend">
-        <span>Less</span>
-        <div className="usage-chart__legend-scale">
-          <span className="usage-chart__legend-bar" />
-          <span className="usage-chart__legend-bar usage-chart__legend-bar--mid" />
-          <span className="usage-chart__legend-bar usage-chart__legend-bar--high" />
+      <div className="usage-chart__footer">
+        <div className="usage-chart__footer-left">
+          {tip && <ChartTooltip tip={tip} />}
         </div>
-        <span>More</span>
+        <div className="usage-chart__legend">
+          <span>Less</span>
+          <div className="usage-chart__legend-scale">
+            <span className="usage-chart__legend-bar" />
+            <span className="usage-chart__legend-bar usage-chart__legend-bar--mid" />
+            <span className="usage-chart__legend-bar usage-chart__legend-bar--high" />
+          </div>
+          <span>More</span>
+        </div>
       </div>
     </div>
   );
@@ -155,6 +205,7 @@ function ActivityHeatmap({
   const isYear = window === "365d";
   const cellSize = isYear ? 13 : 14;
   const cellGap = isYear ? 3 : 4;
+  const { tip, show, hide } = useChartTooltip();
 
   return (
     <div className={`usage-heatmap ${isYear ? "usage-heatmap--year" : ""}`}>
@@ -204,6 +255,7 @@ function ActivityHeatmap({
             {trend.map((bucket, index) => {
               const intensity = bucket.tokens === 0 ? 0 : Math.max(bucket.tokens / maxTokens, 0.12);
               const date = dates[index];
+              const dateLabel = date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" });
               return (
                 <span
                   key={`${bucket.start}-${bucket.end}`}
@@ -218,21 +270,28 @@ function ActivityHeatmap({
                           color-mix(in srgb, var(--status-running), transparent ${88 - intensity * 48}%)
                         )`,
                   }}
-                  title={`${date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}: ${formatTokenCount(bucket.tokens)}`}
+                  onMouseEnter={(e) => show(e, dateLabel, bucket.tokens, bucket.cost)}
+                  onMouseMove={(e) => show(e, dateLabel, bucket.tokens, bucket.cost)}
+                  onMouseLeave={hide}
                 />
               );
             })}
           </div>
         </div>
       </div>
-      <div className="usage-chart__legend">
-        <span>Less</span>
-        <div className="usage-chart__legend-scale">
-          <span className="usage-chart__legend-bar" />
-          <span className="usage-chart__legend-bar usage-chart__legend-bar--mid" />
-          <span className="usage-chart__legend-bar usage-chart__legend-bar--high" />
+      <div className="usage-chart__footer">
+        <div className="usage-chart__footer-left">
+          {tip && <ChartTooltip tip={tip} />}
         </div>
-        <span>More</span>
+        <div className="usage-chart__legend">
+          <span>Less</span>
+          <div className="usage-chart__legend-scale">
+            <span className="usage-chart__legend-bar" />
+            <span className="usage-chart__legend-bar usage-chart__legend-bar--mid" />
+            <span className="usage-chart__legend-bar usage-chart__legend-bar--high" />
+          </div>
+          <span>More</span>
+        </div>
       </div>
     </div>
   );
@@ -428,7 +487,16 @@ export default function UsagePanel() {
     void fetchOverview();
   }, [fetchOverview]);
 
-  const handleRefresh = useCallback(() => {
+  // Auto-refresh when background ingest completes
+  useEffect(() => {
+    const unlisten = listen("usage-ingest-complete", () => {
+      void fetchOverview();
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, [fetchOverview]);
+
+  const handleRefresh = useCallback(async () => {
+    await refreshUsageData();
     void fetchSnapshots();
     void fetchOverview();
   }, [fetchOverview, fetchSnapshots]);

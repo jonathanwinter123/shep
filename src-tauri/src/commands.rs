@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 use tauri::ipc::Channel;
-use tauri::State;
+use tauri::{Emitter, State};
 
 use crate::git;
 use crate::git::{ChangedFile, GitStatus, WorktreeEntry};
@@ -309,6 +309,15 @@ pub fn get_usage_details(db: State<'_, UsageDb>, provider: &str, window: &str) -
 #[tauri::command]
 pub fn get_usage_overview(db: State<'_, UsageDb>, window: &str) -> Result<UsageOverview, String> {
     crate::usage::get_usage_overview(&db, window)
+}
+
+#[tauri::command]
+pub fn refresh_usage_data(db: State<'_, UsageDb>, app: tauri::AppHandle) {
+    let db = db.inner().clone();
+    std::thread::spawn(move || {
+        crate::usage::run_background_ingest(&db);
+        let _ = app.emit("usage-ingest-complete", ());
+    });
 }
 
 fn open_path_in_editor(repo_path: &str, editor_id: &str) -> Result<(), String> {

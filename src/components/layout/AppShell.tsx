@@ -21,7 +21,7 @@ import { useGitPolling } from "../../hooks/useGitPolling";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
 import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit } from "../../lib/tauri";
+import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit, refreshUsageData } from "../../lib/tauri";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { useUsageStore } from "../../stores/useUsageStore";
@@ -169,6 +169,7 @@ export default function AppShell() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
+      void refreshUsageData();
       void fetchUsageSnapshots();
     }, 60_000);
     return () => window.clearInterval(timer);
@@ -282,7 +283,7 @@ export default function AppShell() {
     useUIStore.getState().deactivateGitPanel();
     useUIStore.getState().deactivateCommandsPanel();
     useUIStore.getState().deactivateLauncher();
-    useUIStore.getState().closeUsagePanel();
+    useUIStore.getState().deactivateUsagePanel();
     setActiveTab(tabId);
     const tab = tabs.find((t) => t.id === tabId);
     if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
@@ -310,7 +311,7 @@ export default function AppShell() {
     useUIStore.getState().deactivateLauncher();
     useUIStore.getState().deactivateGitPanel();
     useUIStore.getState().deactivateCommandsPanel();
-    useUIStore.getState().closeUsagePanel();
+    useUIStore.getState().deactivateUsagePanel();
     const { cols, rows } = getTerminalDimensions();
     spawnBlankShell(cols, rows);
   }, [spawnBlankShell, getTerminalDimensions]);

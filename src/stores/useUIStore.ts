@@ -9,6 +9,7 @@ interface UIStore {
   commandsPanelActive: boolean; // commands panel is the active view
   launcherOpen: boolean;      // launcher tab visible in tab bar
   launcherActive: boolean;    // launcher panel is the active view
+  usageTabOpen: boolean;      // usage tab visible in tab bar
   usagePanelActive: boolean;  // usage panel is the active view
   username: string | null;
   computerName: string | null;
@@ -32,7 +33,9 @@ interface UIStore {
   activateLauncher: () => void;
   deactivateLauncher: () => void;
   openUsagePanel: () => void;
-  closeUsagePanel: () => void;
+  closeUsageTab: () => void;
+  activateUsagePanel: () => void;
+  deactivateUsagePanel: () => void;
   toggleUsagePanel: () => void;
   setUsername: (name: string) => void;
   setComputerName: (name: string) => void;
@@ -47,6 +50,7 @@ export const useUIStore = create<UIStore>((set) => ({
   commandsPanelActive: false,
   launcherOpen: false,
   launcherActive: false,
+  usageTabOpen: false,
   usagePanelActive: false,
   username: null,
   computerName: null,
@@ -188,23 +192,45 @@ export const useUIStore = create<UIStore>((set) => ({
   }),
   deactivateLauncher: () => set({ launcherActive: false }),
   openUsagePanel: () => set({
+    usageTabOpen: true,
     usagePanelActive: true,
     settingsActive: false,
     gitPanelActive: false,
     commandsPanelActive: false,
     launcherActive: false,
   }),
-  closeUsagePanel: () => set({ usagePanelActive: false }),
+  closeUsageTab: () => set({ usageTabOpen: false, usagePanelActive: false }),
+  activateUsagePanel: () => set({
+    usagePanelActive: true,
+    settingsActive: false,
+    gitPanelActive: false,
+    commandsPanelActive: false,
+    launcherActive: false,
+  }),
+  deactivateUsagePanel: () => set({ usagePanelActive: false }),
   toggleUsagePanel: () =>
-    set((s) => ({
-      usagePanelActive: !s.usagePanelActive,
-      ...(s.usagePanelActive ? {} : {
+    set((s) => {
+      if (s.usageTabOpen && s.usagePanelActive) {
+        return { usageTabOpen: false, usagePanelActive: false };
+      }
+      if (s.usageTabOpen) {
+        return {
+          usagePanelActive: true,
+          settingsActive: false,
+          gitPanelActive: false,
+          commandsPanelActive: false,
+          launcherActive: false,
+        };
+      }
+      return {
+        usageTabOpen: true,
+        usagePanelActive: true,
         settingsActive: false,
         gitPanelActive: false,
         commandsPanelActive: false,
         launcherActive: false,
-      }),
-    })),
+      };
+    }),
   setUsername: (name: string) => set({ username: name }),
   setComputerName: (name: string) => set({ computerName: name }),
 }));
