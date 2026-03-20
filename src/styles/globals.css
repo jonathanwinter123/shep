@@ -915,11 +915,11 @@ select {
 }
 
 .sidebar-usage__window-btn {
-  padding: 2px 10px;
+  padding: 3px 10px;
   border: none;
   background: transparent;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--text-label);
   font-weight: 500;
   cursor: pointer;
   border-radius: 4px;
@@ -938,8 +938,8 @@ select {
 .sidebar-usage__providers {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 0 4px 4px 12px;
+  gap: 0;
+  padding: 0 4px 4px;
 }
 
 .sidebar-usage__row {
@@ -947,7 +947,7 @@ select {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 4px 8px;
+  padding: 3px 8px;
   min-height: 28px;
   border: none;
   background: transparent;
@@ -961,8 +961,8 @@ select {
 }
 
 .sidebar-usage__icon {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   opacity: 0.7;
 }
@@ -981,15 +981,15 @@ select {
 
 .sidebar-usage__bar {
   position: relative;
-  height: 14px;
-  border-radius: 7px;
+  height: 18px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .sidebar-usage__bar-track {
   position: absolute;
   inset: 0;
-  border-radius: 7px;
+  border-radius: 3px;
 }
 
 .sidebar-usage__bar-fill {
@@ -997,7 +997,7 @@ select {
   top: 0;
   left: 0;
   height: 100%;
-  border-radius: 7px;
+  border-radius: 3px;
   transition: width 400ms ease;
 }
 
