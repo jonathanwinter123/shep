@@ -5,6 +5,7 @@ import { useCommandStore } from "../../stores/useCommandStore";
 import SectionHeader from "./SectionHeader";
 import ProjectList from "./ProjectList";
 import SidebarFooter from "./SidebarFooter";
+import SidebarUsage from "./SidebarUsage";
 
 interface SidebarProps {
   repos: RepoInfo[];
@@ -87,6 +88,7 @@ export default function Sidebar({
           onNewShell={onNewShell}
         />
       </div>
+      <SidebarUsage />
       <SidebarFooter
         activeRepoPath={activeRepoPath}
         onOpenInEditor={onOpenInEditor}

@@ -9,9 +9,7 @@ import GitPanel from "../git/GitPanel";
 import CommandsPanel from "../commands/CommandsPanel";
 import SessionLauncher from "../session/SessionLauncher";
 import NoticeCenter from "../shared/NoticeCenter";
-import UsageHeader from "../usage/UsageHeader";
 import UsagePanel from "../usage/UsagePanel";
-// Logo removed — usage indicators now occupy the drag region
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -449,9 +447,8 @@ export default function AppShell() {
             }
           }
         }}
-      >
-        <UsageHeader />
-      </div>
+      />
+
       <div className="app-shell__frame">
         <Sidebar
           repos={repos}

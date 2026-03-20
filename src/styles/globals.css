@@ -890,91 +890,97 @@ select {
   justify-content: center;
 }
 
-/* ── Usage header (in drag region) ──────────────────────── */
+/* ── Sidebar usage section ─────────────────────────────── */
 
-.usage-header {
-  position: absolute;
-  right: 80px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 11;
+.sidebar-usage {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-usage__providers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 4px 4px 12px;
+}
+
+.sidebar-usage__row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
-  background: rgba(18, 20, 28, 0.55);
-  padding: 5px 12px;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 8px;
+  min-height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  pointer-events: auto;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition: background 160ms ease;
 }
 
-.usage-header:hover {
-  background: rgba(18, 20, 28, 0.72);
-  border-color: rgba(255, 255, 255, 0.1);
+.sidebar-usage__row:hover {
+  background: var(--surface-hover);
 }
 
-.usage-header__indicators {
-  display: flex;
-  align-items: center;
-  gap: 14px;
+.sidebar-usage__name {
+  font-size: var(--text-body);
+  color: var(--text-secondary);
+  min-width: 50px;
+  text-align: left;
 }
 
-.usage-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.sidebar-usage__bar-wrap {
+  flex: 1;
+  min-width: 0;
 }
 
-.usage-indicator__label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  min-width: 38px;
-}
-
-.usage-indicator__bar {
+.sidebar-usage__bar {
   position: relative;
-  width: 48px;
-  height: 4px;
-  border-radius: 2px;
+  height: 14px;
+  border-radius: 7px;
   overflow: hidden;
 }
 
-.usage-indicator__track {
+.sidebar-usage__bar-track {
   position: absolute;
   inset: 0;
-  border-radius: 2px;
+  border-radius: 7px;
 }
 
-.usage-indicator__fill {
+.sidebar-usage__bar-fill {
   position: absolute;
   top: 0;
   left: 0;
   height: 100%;
-  border-radius: 2px;
+  border-radius: 7px;
   transition: width 400ms ease;
 }
 
-.usage-indicator__value {
-  font-size: 10px;
+.sidebar-usage__bar-pace {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 1px;
+  transform: translateX(-1px);
+  transition: left 400ms ease;
+}
+
+.sidebar-usage__value {
+  font-size: var(--text-body);
   font-weight: 600;
   color: var(--text-secondary);
-  min-width: 28px;
+  min-width: 32px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-.usage-header__loading {
-  display: inline-flex;
+.sidebar-usage__tokens {
+  font-size: var(--text-body);
   color: var(--text-muted);
-  animation: usage-spin 1.2s linear infinite;
-}
-
-@keyframes usage-spin {
-  to { transform: rotate(360deg); }
+  min-width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .app-shell__frame {
