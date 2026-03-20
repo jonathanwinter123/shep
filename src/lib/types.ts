@@ -134,3 +134,68 @@ export interface ChangedFile {
 export type PtyOutput =
   | { event: "data"; data: string }
   | { event: "exit"; data: { code: number } };
+
+// ── Usage ──────────────────────────────────────────────────────────
+
+export type UsageProvider = "codex" | "claude" | "gemini";
+export type UsageSourceType = "provider" | "local";
+export type UsageConfidence = "official" | "observed" | "estimated";
+
+export interface UsageWindowSnapshot {
+  provider: UsageProvider;
+  window: string;
+  label: string;
+  sourceType: UsageSourceType;
+  confidence: UsageConfidence;
+  usedPercent: number | null;
+  remainingPercent: number | null;
+  resetAt: string | null;
+  tokenTotal: number | null;
+  paceStatus: string | null;
+}
+
+export interface UsageNamedTokens {
+  name: string;
+  tokens: number;
+}
+
+export interface UsageTask {
+  id: string;
+  label: string;
+  tokens: number;
+  model: string | null;
+  project: string | null;
+  updatedAt: string | null;
+}
+
+export interface UsageProject {
+  name: string;
+  tokens: number;
+  sessions: number | null;
+}
+
+export interface LocalUsageDetails {
+  sourceType: "local";
+  confidence: UsageConfidence;
+  tokensTotal: number;
+  tokensInput: number | null;
+  tokensOutput: number | null;
+  tokensCached: number | null;
+  tokensThoughts: number | null;
+  tokens5h: number;
+  tokens7d: number;
+  tokens30d: number;
+  topModels: UsageNamedTokens[];
+  topTasks: UsageTask[];
+  topProjects: UsageProject[];
+}
+
+export interface ProviderUsageSnapshot {
+  provider: UsageProvider;
+  status: string;
+  fetchedAt: string;
+  summaryWindows: UsageWindowSnapshot[];
+  extraWindows: UsageWindowSnapshot[];
+  localDetails: LocalUsageDetails | null;
+  error: string | null;
+}

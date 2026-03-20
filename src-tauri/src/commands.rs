@@ -8,6 +8,7 @@ use crate::git;
 use crate::git::{ChangedFile, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::PtyOutput;
+use crate::usage::ProviderUsageSnapshot;
 use crate::workspace::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, WorkspaceConfig};
 use crate::workspace::manager::WorkspaceManager;
 
@@ -273,6 +274,16 @@ pub fn check_command_exists(command: &str) -> bool {
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
+}
+
+#[tauri::command]
+pub fn get_all_usage_snapshots() -> Vec<ProviderUsageSnapshot> {
+    crate::usage::get_all_usage_snapshots()
+}
+
+#[tauri::command]
+pub fn get_usage_snapshot(provider: &str) -> Result<ProviderUsageSnapshot, String> {
+    crate::usage::get_usage_snapshot(provider)
 }
 
 fn open_path_in_editor(repo_path: &str, editor_id: &str) -> Result<(), String> {

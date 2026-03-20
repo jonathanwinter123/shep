@@ -9,6 +9,7 @@ interface UIStore {
   commandsPanelActive: boolean; // commands panel is the active view
   launcherOpen: boolean;      // launcher tab visible in tab bar
   launcherActive: boolean;    // launcher panel is the active view
+  usagePanelActive: boolean;  // usage panel is the active view
   username: string | null;
   computerName: string | null;
   openSettings: () => void;
@@ -30,6 +31,9 @@ interface UIStore {
   closeLauncher: () => void;
   activateLauncher: () => void;
   deactivateLauncher: () => void;
+  openUsagePanel: () => void;
+  closeUsagePanel: () => void;
+  toggleUsagePanel: () => void;
   setUsername: (name: string) => void;
   setComputerName: (name: string) => void;
 }
@@ -43,6 +47,7 @@ export const useUIStore = create<UIStore>((set) => ({
   commandsPanelActive: false,
   launcherOpen: false,
   launcherActive: false,
+  usagePanelActive: false,
   username: null,
   computerName: null,
   openSettings: () => set({
@@ -51,6 +56,7 @@ export const useUIStore = create<UIStore>((set) => ({
     launcherActive: false,
     gitPanelActive: false,
     commandsPanelActive: false,
+    usagePanelActive: false,
   }),
   closeSettingsTab: () => set({ settingsTabOpen: false, settingsActive: false }),
   activateSettings: () => set({
@@ -58,6 +64,7 @@ export const useUIStore = create<UIStore>((set) => ({
     launcherActive: false,
     gitPanelActive: false,
     commandsPanelActive: false,
+    usagePanelActive: false,
   }),
   deactivateSettings: () => set({ settingsActive: false }),
   toggleSettings: () =>
@@ -71,6 +78,7 @@ export const useUIStore = create<UIStore>((set) => ({
           launcherActive: false,
           gitPanelActive: false,
           commandsPanelActive: false,
+          usagePanelActive: false,
         };
       }
       return {
@@ -79,6 +87,7 @@ export const useUIStore = create<UIStore>((set) => ({
         launcherActive: false,
         gitPanelActive: false,
         commandsPanelActive: false,
+        usagePanelActive: false,
       };
     }),
   openGitPanel: () => set({
@@ -87,6 +96,7 @@ export const useUIStore = create<UIStore>((set) => ({
     settingsActive: false,
     launcherActive: false,
     commandsPanelActive: false,
+    usagePanelActive: false,
   }),
   closeGitPanel: () => set({ gitPanelOpen: false, gitPanelActive: false }),
   activateGitPanel: () => set({
@@ -94,6 +104,7 @@ export const useUIStore = create<UIStore>((set) => ({
     settingsActive: false,
     launcherActive: false,
     commandsPanelActive: false,
+    usagePanelActive: false,
   }),
   deactivateGitPanel: () => set({ gitPanelActive: false }),
   toggleGitPanel: () =>
@@ -107,6 +118,7 @@ export const useUIStore = create<UIStore>((set) => ({
           settingsActive: false,
           launcherActive: false,
           commandsPanelActive: false,
+          usagePanelActive: false,
         };
       }
       return {
@@ -115,6 +127,7 @@ export const useUIStore = create<UIStore>((set) => ({
         settingsActive: false,
         launcherActive: false,
         commandsPanelActive: false,
+        usagePanelActive: false,
       };
     }),
   openCommandsPanel: () => set({
@@ -123,6 +136,7 @@ export const useUIStore = create<UIStore>((set) => ({
     settingsActive: false,
     gitPanelActive: false,
     launcherActive: false,
+    usagePanelActive: false,
   }),
   closeCommandsPanel: () => set({ commandsPanelOpen: false, commandsPanelActive: false }),
   activateCommandsPanel: () => set({
@@ -130,6 +144,7 @@ export const useUIStore = create<UIStore>((set) => ({
     settingsActive: false,
     gitPanelActive: false,
     launcherActive: false,
+    usagePanelActive: false,
   }),
   deactivateCommandsPanel: () => set({ commandsPanelActive: false }),
   toggleCommandsPanel: () =>
@@ -143,6 +158,7 @@ export const useUIStore = create<UIStore>((set) => ({
           settingsActive: false,
           gitPanelActive: false,
           launcherActive: false,
+          usagePanelActive: false,
         };
       }
       return {
@@ -151,6 +167,7 @@ export const useUIStore = create<UIStore>((set) => ({
         settingsActive: false,
         gitPanelActive: false,
         launcherActive: false,
+        usagePanelActive: false,
       };
     }),
   openLauncher: () => set({
@@ -159,6 +176,7 @@ export const useUIStore = create<UIStore>((set) => ({
     settingsActive: false,
     gitPanelActive: false,
     commandsPanelActive: false,
+    usagePanelActive: false,
   }),
   closeLauncher: () => set({ launcherOpen: false, launcherActive: false }),
   activateLauncher: () => set({
@@ -166,8 +184,27 @@ export const useUIStore = create<UIStore>((set) => ({
     settingsActive: false,
     gitPanelActive: false,
     commandsPanelActive: false,
+    usagePanelActive: false,
   }),
   deactivateLauncher: () => set({ launcherActive: false }),
+  openUsagePanel: () => set({
+    usagePanelActive: true,
+    settingsActive: false,
+    gitPanelActive: false,
+    commandsPanelActive: false,
+    launcherActive: false,
+  }),
+  closeUsagePanel: () => set({ usagePanelActive: false }),
+  toggleUsagePanel: () =>
+    set((s) => ({
+      usagePanelActive: !s.usagePanelActive,
+      ...(s.usagePanelActive ? {} : {
+        settingsActive: false,
+        gitPanelActive: false,
+        commandsPanelActive: false,
+        launcherActive: false,
+      }),
+    })),
   setUsername: (name: string) => set({ username: name }),
   setComputerName: (name: string) => set({ computerName: name }),
 }));

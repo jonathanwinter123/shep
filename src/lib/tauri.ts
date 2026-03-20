@@ -11,6 +11,7 @@ import type {
   KeybindingSettings,
   TerminalSettings,
   PreferredEditor,
+  ProviderUsageSnapshot,
 } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -193,4 +194,12 @@ export function getComputerName(): Promise<string> {
 
 export function checkCommandExists(command: string): Promise<boolean> {
   return invoke("check_command_exists", { command });
+}
+
+export function getAllUsageSnapshots(): Promise<ProviderUsageSnapshot[]> {
+  return invoke("get_all_usage_snapshots");
+}
+
+export function getUsageSnapshot(provider: string): Promise<ProviderUsageSnapshot> {
+  return invoke("get_usage_snapshot", { provider });
 }

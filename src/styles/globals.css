@@ -890,11 +890,91 @@ select {
   justify-content: center;
 }
 
-.drag-region__logo {
-  pointer-events: none;
-  user-select: none;
-  color: rgba(255, 255, 255, 0.45);
+/* ── Usage header (in drag region) ──────────────────────── */
+
+.usage-header {
+  position: absolute;
+  right: 80px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 11;
   display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background: rgba(18, 20, 28, 0.55);
+  padding: 5px 12px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.usage-header:hover {
+  background: rgba(18, 20, 28, 0.72);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.usage-header__indicators {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.usage-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.usage-indicator__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  min-width: 38px;
+}
+
+.usage-indicator__bar {
+  position: relative;
+  width: 48px;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.usage-indicator__track {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+}
+
+.usage-indicator__fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 400ms ease;
+}
+
+.usage-indicator__value {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-header__loading {
+  display: inline-flex;
+  color: var(--text-muted);
+  animation: usage-spin 1.2s linear infinite;
+}
+
+@keyframes usage-spin {
+  to { transform: rotate(360deg); }
 }
 
 .app-shell__frame {
@@ -966,6 +1046,241 @@ select {
   border: none;
   border-radius: 0;
   background: transparent;
+}
+
+/* ── Usage filter tabs ─────────────────────────────────── */
+
+.usage-filter-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.usage-filter-tab {
+  padding: 6px 14px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 160ms ease;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.usage-filter-tab:hover {
+  color: var(--text-secondary);
+}
+
+.usage-filter-tab--active {
+  color: var(--text-primary);
+  border-bottom-color: rgba(255, 255, 255, 0.4);
+}
+
+/* ── Provider card ─────────────────────────────────────── */
+
+.usage-card {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.usage-card__header {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.usage-card__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.usage-card__name {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.usage-card__status {
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.usage-card__status--ready {
+  background: rgba(52, 211, 153, 0.1);
+  color: rgb(167, 243, 208);
+}
+
+.usage-card__status--partial,
+.usage-card__status--unavailable {
+  background: rgba(245, 158, 11, 0.1);
+  color: rgb(253, 230, 138);
+}
+
+.usage-card__error {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: rgba(248, 113, 113, 0.8);
+}
+
+/* ── Windows (rate limit periods) ──────────────────────── */
+
+.usage-card__windows {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.usage-window {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.usage-window__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.usage-window__label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.usage-window__value {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-window__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ── Progress bar ──────────────────────────────────────── */
+
+.usage-progress {
+  height: 4px;
+}
+
+.usage-progress__track {
+  position: relative;
+  height: 100%;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.usage-progress__fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 400ms ease;
+}
+
+/* ── Card sections ─────────────────────────────────────── */
+
+.usage-card__section {
+  padding: 10px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.usage-tokens {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.usage-tokens__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.usage-tokens__row span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.usage-tokens__row strong {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-tokens__model {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.usage-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.usage-task {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.usage-task__info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.usage-task__label {
+  font-size: 11px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usage-task__project {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.usage-task__tokens {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 .terminal-stage::before {

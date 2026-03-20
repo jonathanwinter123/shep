@@ -9,7 +9,9 @@ import GitPanel from "../git/GitPanel";
 import CommandsPanel from "../commands/CommandsPanel";
 import SessionLauncher from "../session/SessionLauncher";
 import NoticeCenter from "../shared/NoticeCenter";
-import ShepLogo from "../sidebar/icons/ShepLogo";
+import UsageHeader from "../usage/UsageHeader";
+import UsagePanel from "../usage/UsagePanel";
+// Logo removed — usage indicators now occupy the drag region
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -24,6 +26,7 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit } from "../../lib/tauri";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
+import { useUsageStore } from "../../stores/useUsageStore";
 import { initNotifications } from "../../lib/notifications";
 import { getErrorMessage } from "../../lib/errors";
 import { useNoticeStore } from "../../stores/useNoticeStore";
@@ -148,17 +151,27 @@ export default function AppShell() {
   const gitPanelActive = useUIStore((s) => s.gitPanelActive);
   const commandsPanelActive = useUIStore((s) => s.commandsPanelActive);
   const launcherActive = useUIStore((s) => s.launcherActive);
+  const usagePanelActive = useUIStore((s) => s.usagePanelActive);
   const loadEditorSettings = useEditorStore((s) => s.loadSettings);
   const loadTerminalSettings = useTerminalSettingsStore((s) => s.loadSettings);
+  const fetchUsageSnapshots = useUsageStore((s) => s.fetchSnapshots);
 
   useEffect(() => {
     fetchRepos();
     void loadEditorSettings();
     void loadTerminalSettings();
+    void fetchUsageSnapshots();
     void initNotifications();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));
-  }, [fetchRepos, loadEditorSettings, loadTerminalSettings]);
+  }, [fetchRepos, loadEditorSettings, loadTerminalSettings, fetchUsageSnapshots]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void fetchUsageSnapshots();
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [fetchUsageSnapshots]);
 
   const handleSelectRepo = useCallback(
     async (repoPath: string) => {
@@ -260,6 +273,7 @@ export default function AppShell() {
     useUIStore.getState().deactivateGitPanel();
     useUIStore.getState().deactivateCommandsPanel();
     useUIStore.getState().deactivateLauncher();
+    useUIStore.getState().closeUsagePanel();
     setActiveTab(tabId);
     const tab = tabs.find((t) => t.id === tabId);
     if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
@@ -287,6 +301,7 @@ export default function AppShell() {
     useUIStore.getState().deactivateLauncher();
     useUIStore.getState().deactivateGitPanel();
     useUIStore.getState().deactivateCommandsPanel();
+    useUIStore.getState().closeUsagePanel();
     const { cols, rows } = getTerminalDimensions();
     spawnBlankShell(cols, rows);
   }, [spawnBlankShell, getTerminalDimensions]);
@@ -417,7 +432,7 @@ export default function AppShell() {
     return () => { unlisten.then((f) => f()); };
   }, []);
 
-  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive;
+  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive;
 
   return (
     <div className="app-shell">
@@ -435,7 +450,7 @@ export default function AppShell() {
           }
         }}
       >
-        <span className="drag-region__logo"><ShepLogo size={18} /></span>
+        <UsageHeader />
       </div>
       <div className="app-shell__frame">
         <Sidebar
@@ -477,6 +492,7 @@ export default function AppShell() {
               />
             )}
             {launcherActive && <SessionLauncher onStartSession={handleStartSession} />}
+            {usagePanelActive && <UsagePanel />}
 
             {!showOverlay && tabs.length === 0 && (
               <div className="terminal-empty">
