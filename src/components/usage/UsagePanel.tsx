@@ -1,248 +1,268 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { RefreshCcw } from "lucide-react";
+import { getUsageOverview } from "../../lib/tauri";
+import type {
+  UsageBreakdownItem,
+  UsageOverview,
+  UsageTrendBucket,
+} from "../../lib/types";
+import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
-import { getUsageDetails } from "../../lib/tauri";
-import type { ProviderUsageSnapshot, UsageProvider, LocalUsageDetails } from "../../lib/types";
-import { formatPercent, formatReset, formatTokenCount, formatCost, usageTone, computePace, paceLabel } from "./usageHelpers";
-
-type FilterTab = "all" | UsageProvider;
-
-const PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini"];
-const FILTER_TABS: { key: FilterTab; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "claude", label: "Claude" },
-  { key: "codex", label: "Codex" },
-  { key: "gemini", label: "Gemini" },
-];
+import { formatCost, formatPercent, formatTokenCount, getProviderLabel } from "./usageHelpers";
 const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
   { key: "5h", label: "5 hour" },
   { key: "7d", label: "7 day" },
   { key: "30d", label: "30 day" },
 ];
 
-const TONE_COLORS: Record<string, string> = {
-  low: "rgba(52, 211, 153, 0.7)",
-  medium: "rgba(245, 158, 11, 0.7)",
-  high: "rgba(251, 146, 60, 0.8)",
-  critical: "rgba(248, 113, 113, 0.85)",
-  local: "rgba(96, 165, 250, 0.5)",
-};
+function presentCost(value: number | null): string {
+  return value != null ? formatCost(value) : "—";
+}
 
-const TONE_TRACK: Record<string, string> = {
-  low: "rgba(52, 211, 153, 0.08)",
-  medium: "rgba(245, 158, 11, 0.08)",
-  high: "rgba(251, 146, 60, 0.1)",
-  critical: "rgba(248, 113, 113, 0.12)",
-  local: "rgba(96, 165, 250, 0.06)",
-};
-
-function ProgressBar({ percent, tone }: { percent: number | null; tone: string }) {
-  const pct = percent != null ? Math.min(percent, 100) : 0;
+function Stat({
+  label,
+  value,
+  meta,
+}: {
+  label: string;
+  value: string;
+  meta?: string;
+}) {
   return (
-    <div className="usage-progress">
-      <div className="usage-progress__track" style={{ background: TONE_TRACK[tone] }}>
-        <div
-          className="usage-progress__fill"
-          style={{ width: `${pct}%`, background: TONE_COLORS[tone] }}
-        />
+    <div className="usage-stat">
+      <span className="usage-stat__label">{label}</span>
+      <strong className="usage-stat__value">{value}</strong>
+      {meta && <span className="usage-stat__meta">{meta}</span>}
+    </div>
+  );
+}
+
+function Heatmap({ trend }: { trend: UsageTrendBucket[] }) {
+  const maxTokens = Math.max(...trend.map((bucket) => bucket.tokens), 1);
+
+  return (
+    <div className="usage-heatmap">
+      <div className="usage-heatmap__grid" aria-hidden="true">
+        {trend.map((bucket) => {
+          const intensity = bucket.tokens === 0 ? 0 : Math.max(bucket.tokens / maxTokens, 0.12);
+          return (
+            <div key={`${bucket.start}-${bucket.end}`} className="usage-heatmap__cell-wrap">
+              <div
+                className="usage-heatmap__cell"
+                style={{
+                  background: bucket.tokens === 0
+                    ? "color-mix(in srgb, var(--text-primary), transparent 96%)"
+                    : `linear-gradient(180deg,
+                        color-mix(in srgb, var(--text-primary), transparent ${92 - intensity * 14}%),
+                        color-mix(in srgb, var(--status-running), transparent ${88 - intensity * 48}%)
+                      )`,
+                }}
+                title={`${bucket.label}: ${formatTokenCount(bucket.tokens)}`}
+              />
+              <span className="usage-heatmap__label">{bucket.label}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="usage-heatmap__legend">
+        <span>Low</span>
+        <div className="usage-heatmap__legend-scale">
+          <span className="usage-heatmap__legend-cell" />
+          <span className="usage-heatmap__legend-cell usage-heatmap__legend-cell--mid" />
+          <span className="usage-heatmap__legend-cell usage-heatmap__legend-cell--high" />
+        </div>
+        <span>High</span>
       </div>
     </div>
   );
 }
 
-function RateLimitWindows({ snapshot }: { snapshot: ProviderUsageSnapshot }) {
-  const allWindows = [...snapshot.summaryWindows, ...snapshot.extraWindows];
-  if (allWindows.length === 0) return null;
+function Sparkline({
+  values,
+}: {
+  values: number[];
+}) {
+  const width = 96;
+  const height = 26;
+  const max = Math.max(...values, 1);
+  const points = values.map((value, index) => {
+    const x = values.length === 1 ? width : (index / (values.length - 1)) * width;
+    const y = height - (value / max) * (height - 4) - 2;
+    return `${x},${y}`;
+  }).join(" ");
 
   return (
-    <div className="usage-card__windows">
-      {allWindows.map((w) => {
-        const tone = usageTone(w);
-        const hasPercent = w.usedPercent != null;
-        const pace = computePace(w);
-        return (
-          <div key={`${snapshot.provider}-${w.window}`} className="usage-window">
-            <div className="usage-window__header">
-              <span className="usage-window__label">{w.label}</span>
-              <span className="usage-window__value">
-                {hasPercent ? formatPercent(w.usedPercent) : formatTokenCount(w.tokenTotal)}
-              </span>
-            </div>
-            {hasPercent && <ProgressBar percent={w.usedPercent} tone={tone} />}
-            <div className="usage-window__meta">
-              {hasPercent ? (
-                <>
-                  <span>{formatPercent(w.remainingPercent)} remaining</span>
-                  {pace && <span className={`usage-window__pace usage-window__pace--${pace.status}`}>{paceLabel(pace.status)}</span>}
-                  <span>resets {formatReset(w.resetAt)}</span>
-                </>
-              ) : (
-                <span>{w.sourceType} observed</span>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+    <svg className="usage-sparkline" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+      <polyline
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        points={points}
+      />
+    </svg>
   );
 }
 
-function WindowedDetails({ details }: { details: LocalUsageDetails }) {
+function BreakdownList({
+  title,
+  emptyLabel,
+  items,
+  showSessions = false,
+  withSparklines = false,
+}: {
+  title: string;
+  emptyLabel: string;
+  items: UsageBreakdownItem[];
+  showSessions?: boolean;
+  withSparklines?: boolean;
+}) {
+  return (
+    <section className="usage-section">
+      <div className="usage-section__header">
+        <h3 className="section-label !p-0">{title}</h3>
+      </div>
+      {items.length > 0 ? (
+        <div className="usage-list">
+          {items.map((item) => (
+            <div key={`${item.provider}-${item.label}`} className="usage-list__row">
+              <div className="usage-list__info">
+                <span className="usage-list__label">{item.label}</span>
+                <span className="usage-list__meta">
+                  {getProviderLabel(item.provider)}
+                  {showSessions && item.sessions != null ? ` • ${item.sessions} sessions` : ""}
+                </span>
+              </div>
+              <div className="usage-list__values">
+                {withSparklines && (
+                  <div className="usage-list__sparkline-wrap">
+                    <Sparkline values={item.trend} />
+                  </div>
+                )}
+                <span className="usage-list__metric">{presentCost(item.cost)}</span>
+                <strong className="usage-list__metric usage-list__metric--primary">{formatTokenCount(item.tokens)}</strong>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="usage-empty">{emptyLabel}</div>
+      )}
+    </section>
+  );
+}
+
+function OverviewPanel({ overview }: { overview: UsageOverview }) {
   return (
     <>
-      {(details.tokensInput != null || details.tokensOutput != null) && (
-        <div className="usage-card__section">
-          <h4 className="section-label !p-0">By Type</h4>
-          <div className="usage-tokens">
-            {details.tokensInput != null && <div className="usage-tokens__row"><span>Input</span><strong>{formatTokenCount(details.tokensInput)}</strong></div>}
-            {details.tokensOutput != null && <div className="usage-tokens__row"><span>Output</span><strong>{formatTokenCount(details.tokensOutput)}</strong></div>}
-            {details.tokensCached != null && <div className="usage-tokens__row"><span>Cached</span><strong>{formatTokenCount(details.tokensCached)}</strong></div>}
-            {details.tokensThoughts != null && <div className="usage-tokens__row"><span>Thoughts</span><strong>{formatTokenCount(details.tokensThoughts)}</strong></div>}
-          </div>
+      <section className="usage-section">
+        <div className="usage-section__header">
+          <h3 className="section-label !p-0">Activity</h3>
         </div>
-      )}
+        <div className="usage-stats">
+          <Stat label="Total Tokens" value={formatTokenCount(overview.totalTokens)} meta="tokens" />
+          <Stat label="Estimated Cost" value={presentCost(overview.totalCost)} />
+          <Stat label="Active Projects" value={`${overview.activeProjects}`} />
+          <Stat label="Active Sessions" value={`${overview.activeSessions}`} />
+        </div>
+        <Heatmap trend={overview.trend} />
+      </section>
 
-      {details.topModels.length > 0 && (
-        <div className="usage-card__section">
-          <h4 className="section-label !p-0">Models</h4>
-          <div className="usage-tokens">
-            {details.topModels.map((m) => (
-              <div key={m.name} className="usage-tokens__row">
-                <span className="usage-tokens__model">{m.name}</span>
-                <div className="usage-tokens__values">
-                  {m.cost != null && <span className="usage-tokens__cost">{formatCost(m.cost)}</span>}
-                  <strong>{formatTokenCount(m.tokens)}</strong>
+      <hr className="settings-divider" />
+
+      <section className="usage-section">
+        <div className="usage-section__header">
+          <h3 className="section-label !p-0">Providers</h3>
+        </div>
+        <div className="usage-list">
+          {overview.providers.map((provider) => {
+            const logoSrc = assistantLogoSrc[provider.provider];
+            return (
+              <div key={provider.provider} className="usage-list__row">
+                <div className="usage-list__info">
+                  <span className="usage-list__label usage-list__label--provider">
+                    {logoSrc ? <img src={logoSrc} alt="" className="usage-list__icon" /> : null}
+                    {getProviderLabel(provider.provider)}
+                  </span>
+                  <span className="usage-list__meta">{formatPercent(provider.sharePercent)} of total</span>
+                </div>
+                <div className="usage-list__values">
+                  <div className="usage-list__sparkline-wrap">
+                    <Sparkline values={provider.trend} />
+                  </div>
+                  <span className="usage-list__metric">{presentCost(provider.cost)}</span>
+                  <strong className="usage-list__metric usage-list__metric--primary">{formatTokenCount(provider.tokens)}</strong>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      )}
+      </section>
 
-      {details.topTasks.length > 0 && (
-        <div className="usage-card__section">
-          <h4 className="section-label !p-0">Sessions</h4>
-          <div className="usage-tasks">
-            {details.topTasks.map((t) => (
-              <div key={t.id} className="usage-task">
-                <div className="usage-task__info">
-                  <span className="usage-task__label">{t.label}</span>
-                  <span className="usage-task__project">{t.project ?? "—"}</span>
-                </div>
-                <div className="usage-task__values">
-                  {t.cost != null && <span className="usage-task__cost">{formatCost(t.cost)}</span>}
-                  <strong className="usage-task__tokens">{formatTokenCount(t.tokens)}</strong>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <hr className="settings-divider" />
 
-      {details.topProjects.length > 0 && (
-        <div className="usage-card__section">
-          <h4 className="section-label !p-0">Projects</h4>
-          <div className="usage-tokens">
-            {details.topProjects.map((p) => (
-              <div key={p.name} className="usage-tokens__row">
-                <span>{p.name}</span>
-                <div className="usage-tokens__values">
-                  {p.cost != null && <span className="usage-tokens__cost">{formatCost(p.cost)}</span>}
-                  <strong>{formatTokenCount(p.tokens)}</strong>
-                </div>
-              </div>
-            ))}
-          </div>
+      <BreakdownList
+        title="Tool Breakdown"
+        emptyLabel="No model activity yet for this window."
+        items={overview.topModels}
+        withSparklines
+      />
+
+      <hr className="settings-divider" />
+
+      <BreakdownList
+        title="Project Breakdown"
+        emptyLabel="No project activity yet for this window."
+        items={overview.topProjects}
+        showSessions
+        withSparklines
+      />
+
+      <hr className="settings-divider" />
+
+      <section className="usage-section">
+        <div className="usage-section__header">
+          <h3 className="section-label !p-0">Methodology</h3>
         </div>
-      )}
+        <ul className="usage-methodology">
+          <li>Usage totals and breakdowns on this screen are based on locally observed activity from this machine.</li>
+          <li>Provider percentages shown in the sidebar summary come from provider-reported usage windows when available, so they are not always directly comparable to the local totals shown here.</li>
+          <li>In practice, that means the sidebar percentage and this detail view can differ because they are measuring related but not identical sources.</li>
+        </ul>
+      </section>
     </>
   );
 }
 
-function ProviderCard({
-  snapshot,
-  details,
-  window,
-}: {
-  snapshot: ProviderUsageSnapshot | null;
-  details: LocalUsageDetails | null;
-  window: TimeWindow;
-}) {
-  if (!snapshot) return null;
-
-  const windowTotal = details
-    ? window === "5h" ? details.tokens5h : window === "7d" ? details.tokens7d : details.tokens30d
-    : null;
-  const windowCost = details
-    ? window === "5h" ? details.cost5h : window === "7d" ? details.cost7d : details.cost30d
-    : null;
-
-  return (
-    <div className="usage-card">
-      <div className="usage-card__header">
-        <div className="flex items-center justify-between">
-          <span className={`usage-card__status usage-card__status--${snapshot.status}`}>{snapshot.status}</span>
-          <div className="usage-card__header-stats">
-            {windowCost != null && <span className="usage-card__window-cost">{formatCost(windowCost)}</span>}
-            {windowTotal != null && (
-              <span className="usage-card__window-total">{formatTokenCount(windowTotal)} tokens</span>
-            )}
-          </div>
-        </div>
-        {snapshot.error && <p className="usage-card__error">{snapshot.error}</p>}
-      </div>
-
-      <RateLimitWindows snapshot={snapshot} />
-
-      {details && <WindowedDetails details={details} />}
-    </div>
-  );
-}
-
 export default function UsagePanel() {
-  const snapshots = useUsageStore((s) => s.snapshots);
   const fetchSnapshots = useUsageStore((s) => s.fetchSnapshots);
   const loading = useUsageStore((s) => s.loading);
   const window = useUsageStore((s) => s.window);
   const setWindow = useUsageStore((s) => s.setWindow);
-  const [filter, setFilter] = useState<FilterTab>("all");
-  const [detailsMap, setDetailsMap] = useState<Record<string, LocalUsageDetails>>({});
-  const [detailsLoading, setDetailsLoading] = useState(false);
 
-  const visibleProviders = useMemo(() => {
-    if (filter === "all") return PROVIDERS;
-    return [filter];
-  }, [filter]);
+  const [overview, setOverview] = useState<UsageOverview | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
 
-  // Fetch windowed details when window or filter changes
-  const fetchDetails = useCallback(async () => {
-    setDetailsLoading(true);
-    const results: Record<string, LocalUsageDetails> = {};
-    const providers = filter === "all" ? PROVIDERS : [filter];
-    await Promise.all(
-      providers.map(async (provider) => {
-        try {
-          results[provider] = await getUsageDetails(provider, window);
-        } catch {
-          // Provider may not have data — that's fine
-        }
-      }),
-    );
-    setDetailsMap(results);
-    setDetailsLoading(false);
-  }, [filter, window]);
-
-  useEffect(() => {
-    void fetchDetails();
-  }, [fetchDetails]);
-
-  // Re-fetch details when snapshots update (e.g. after ingest or refresh)
-  const snapshotKeys = Object.keys(snapshots).join(",");
-  useEffect(() => {
-    if (snapshotKeys) {
-      void fetchDetails();
+  const fetchOverview = useCallback(async () => {
+    setOverviewLoading(true);
+    try {
+      setOverview(await getUsageOverview(window));
+    } finally {
+      setOverviewLoading(false);
     }
-  }, [snapshotKeys, fetchDetails]);
+  }, [window]);
+
+  useEffect(() => {
+    void fetchOverview();
+  }, [fetchOverview]);
+
+  const handleRefresh = useCallback(() => {
+    void fetchSnapshots();
+    void fetchOverview();
+  }, [fetchOverview, fetchSnapshots]);
+
+  const isBusy = loading || overviewLoading;
 
   return (
     <div className="absolute inset-0 overflow-y-auto p-6">
@@ -251,50 +271,32 @@ export default function UsagePanel() {
         <button
           type="button"
           className="icon-btn"
-          onClick={() => { void fetchSnapshots(); void fetchDetails(); }}
+          onClick={handleRefresh}
           aria-label="Refresh usage"
         >
-          <RefreshCcw size={14} className={loading || detailsLoading ? "animate-spin" : ""} />
+          <RefreshCcw size={14} className={isBusy ? "animate-spin" : ""} />
         </button>
       </div>
 
-      <div className="usage-filter-tabs">
-        {FILTER_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            className={`usage-filter-tab ${filter === tab.key ? "usage-filter-tab--active" : ""}`}
-            onClick={() => setFilter(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
       <div className="usage-window-tabs">
-        {TIME_WINDOWS.map((tw) => (
+        {TIME_WINDOWS.map((timeWindow) => (
           <button
-            key={tw.key}
+            key={timeWindow.key}
             type="button"
-            className={`usage-window-tab ${window === tw.key ? "usage-window-tab--active" : ""}`}
-            onClick={() => setWindow(tw.key)}
+            className={`usage-window-tab ${window === timeWindow.key ? "usage-window-tab--active" : ""}`}
+            onClick={() => setWindow(timeWindow.key)}
           >
-            {tw.label}
+            {timeWindow.label}
           </button>
         ))}
       </div>
 
-      <div className="flex flex-col gap-5 mt-5">
-        {visibleProviders.map((provider) => {
-          const snapshot = snapshots[provider] ?? null;
-          const details = detailsMap[provider] ?? null;
-          return (
-            <div key={provider}>
-              <h3 className="section-label !p-0 mb-3">{provider === "codex" ? "Codex" : provider === "claude" ? "Claude" : "Gemini"}</h3>
-              <ProviderCard snapshot={snapshot} details={details} window={window} />
-            </div>
-          );
-        })}
+      <div className="usage-panel">
+        {overview ? (
+          <OverviewPanel overview={overview} />
+        ) : (
+          <div className="usage-empty">Loading usage overview…</div>
+        )}
       </div>
     </div>
   );

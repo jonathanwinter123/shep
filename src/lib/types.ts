@@ -183,6 +183,50 @@ export interface UsageProject {
   sessions: number | null;
 }
 
+export interface UsageTrendProviderValue {
+  provider: UsageProvider;
+  tokens: number;
+  cost: number | null;
+}
+
+export interface UsageTrendBucket {
+  start: number;
+  end: number;
+  label: string;
+  tokens: number;
+  cost: number | null;
+  providers: UsageTrendProviderValue[];
+}
+
+export interface UsageOverviewProvider {
+  provider: UsageProvider;
+  tokens: number;
+  cost: number | null;
+  sharePercent: number;
+  trend: number[];
+}
+
+export interface UsageBreakdownItem {
+  provider: UsageProvider;
+  label: string;
+  tokens: number;
+  cost: number | null;
+  sessions: number | null;
+  trend: number[];
+}
+
+export interface UsageOverview {
+  window: string;
+  totalTokens: number;
+  totalCost: number | null;
+  activeProjects: number;
+  activeSessions: number;
+  providers: UsageOverviewProvider[];
+  trend: UsageTrendBucket[];
+  topModels: UsageBreakdownItem[];
+  topProjects: UsageBreakdownItem[];
+}
+
 export interface LocalUsageDetails {
   sourceType: "local";
   confidence: UsageConfidence;

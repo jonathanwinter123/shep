@@ -31,6 +31,60 @@ pub struct UsageProject {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UsageTrendProviderValue {
+    pub provider: String,
+    pub tokens: u64,
+    pub cost: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageTrendBucket {
+    pub start: i64,
+    pub end: i64,
+    pub label: String,
+    pub tokens: u64,
+    pub cost: Option<f64>,
+    pub providers: Vec<UsageTrendProviderValue>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageOverviewProvider {
+    pub provider: String,
+    pub tokens: u64,
+    pub cost: Option<f64>,
+    pub share_percent: f64,
+    pub trend: Vec<u64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageBreakdownItem {
+    pub provider: String,
+    pub label: String,
+    pub tokens: u64,
+    pub cost: Option<f64>,
+    pub sessions: Option<u64>,
+    pub trend: Vec<u64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageOverview {
+    pub window: String,
+    pub total_tokens: u64,
+    pub total_cost: Option<f64>,
+    pub active_projects: u64,
+    pub active_sessions: u64,
+    pub providers: Vec<UsageOverviewProvider>,
+    pub trend: Vec<UsageTrendBucket>,
+    pub top_models: Vec<UsageBreakdownItem>,
+    pub top_projects: Vec<UsageBreakdownItem>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UsageWindowSnapshot {
     pub provider: String,
     pub window: String,

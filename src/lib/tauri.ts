@@ -14,6 +14,7 @@ import type {
   ProviderUsageSnapshot,
   LocalUsageDetails,
   UsageSettings,
+  UsageOverview,
 } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -216,4 +217,8 @@ export function getUsageSnapshot(provider: string): Promise<ProviderUsageSnapsho
 
 export function getUsageDetails(provider: string, window: string): Promise<LocalUsageDetails> {
   return invoke("get_usage_details", { provider, window });
+}
+
+export function getUsageOverview(window: string): Promise<UsageOverview> {
+  return invoke("get_usage_overview", { window });
 }

@@ -6,7 +6,7 @@ mod queries;
 pub mod types;
 
 pub use db::UsageDb;
-pub use types::{LocalUsageDetails, ProviderUsageSnapshot};
+pub use types::{LocalUsageDetails, ProviderUsageSnapshot, UsageOverview};
 
 use std::sync::Mutex;
 use types::UsageWindowSnapshot;
@@ -62,6 +62,12 @@ pub fn get_windowed_details(db: &UsageDb, provider: &str, window: &str) -> Resul
     let conn = db.conn.lock().unwrap();
     queries::windowed_details(&conn, provider, window)
         .ok_or_else(|| format!("No data for {provider}/{window}"))
+}
+
+pub fn get_usage_overview(db: &UsageDb, window: &str) -> Result<UsageOverview, String> {
+    let conn = db.conn.lock().unwrap();
+    queries::usage_overview(&conn, window)
+        .ok_or_else(|| format!("Unsupported usage overview window: {window}"))
 }
 
 /// Run background ingestion in a loop until fully caught up.

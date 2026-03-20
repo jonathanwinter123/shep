@@ -8,7 +8,7 @@ use crate::git;
 use crate::git::{ChangedFile, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::PtyOutput;
-use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb};
+use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
 use crate::workspace::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig};
 use crate::workspace::manager::WorkspaceManager;
 
@@ -304,6 +304,11 @@ pub fn save_usage_settings(
 #[tauri::command]
 pub fn get_usage_details(db: State<'_, UsageDb>, provider: &str, window: &str) -> Result<LocalUsageDetails, String> {
     crate::usage::get_windowed_details(&db, provider, window)
+}
+
+#[tauri::command]
+pub fn get_usage_overview(db: State<'_, UsageDb>, window: &str) -> Result<UsageOverview, String> {
+    crate::usage::get_usage_overview(&db, window)
 }
 
 fn open_path_in_editor(repo_path: &str, editor_id: &str) -> Result<(), String> {
