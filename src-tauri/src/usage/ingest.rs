@@ -23,8 +23,9 @@ pub fn ingest_all(conn: &Connection) -> bool {
         Ok(done) => { if !done { all_done = false; } }
         Err(e) => eprintln!("Gemini ingest error: {e}"),
     }
-    if let Err(e) = ingest_codex(conn) {
-        eprintln!("Codex ingest error: {e}");
+    match ingest_codex(conn, MAX_FILES_PER_CYCLE) {
+        Ok(done) => { if !done { all_done = false; } }
+        Err(e) => eprintln!("Codex ingest error: {e}"),
     }
     if let Err(e) = prune_old_messages(conn) {
         eprintln!("Prune error: {e}");
@@ -313,73 +314,168 @@ fn ingest_gemini_file(conn: &Connection, path: &Path) -> Result<(), String> {
 
 // ── Codex ─────────────────────────────────────────────────
 
-fn ingest_codex(conn: &Connection) -> Result<(), String> {
-    let db_path = home_join(".codex/state_5.sqlite")?;
-    if !db_path.exists() {
-        return Ok(());
+/// Returns Ok(true) if fully caught up, Ok(false) if more files remain.
+fn ingest_codex(conn: &Connection, budget: usize) -> Result<bool, String> {
+    let sessions_dir = home_join(".codex/sessions")?;
+    if !sessions_dir.exists() {
+        return Ok(true);
     }
 
-    let cursor_key = "codex:state_5";
-    let last_updated: i64 = get_cursor(conn, cursor_key)
-        .map(|(_, off, _)| off)
-        .unwrap_or(0);
-
-    let codex_conn = rusqlite::Connection::open_with_flags(
-        &db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    ).map_err(|e| format!("Failed to open Codex DB: {e}"))?;
-
-    let mut stmt = codex_conn
-        .prepare(
-            "SELECT id, coalesce(title, ''), tokens_used, coalesce(model, 'unknown'), coalesce(cwd, ''), updated_at
-             FROM threads
-             WHERE updated_at > ?1
-             ORDER BY updated_at ASC",
-        )
-        .map_err(|e| e.to_string())?;
-
-    let mut max_updated = last_updated;
-
-    let rows = stmt
-        .query_map(params![last_updated], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, i64>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, i64>(5)?,
-            ))
-        })
-        .map_err(|e| e.to_string())?;
+    let files = walk_files(&sessions_dir);
+    let jsonl_files: Vec<_> = files
+        .into_iter()
+        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl"))
+        .collect();
 
     conn.execute_batch("BEGIN").map_err(|e| e.to_string())?;
 
-    for row in rows {
-        let (id, _title, tokens, model, cwd, updated_at) = row.map_err(|e| e.to_string())?;
+    let mut processed = 0;
+    let mut skipped_remaining = false;
 
-        // Codex only has total tokens, no input/output split.
-        // Delete old row for this thread and re-insert with latest total.
-        conn.execute(
-            "DELETE FROM usage_messages WHERE provider = 'codex' AND session_id = ?1",
-            params![id],
-        ).map_err(|e| e.to_string())?;
+    for path in &jsonl_files {
+        if processed >= budget {
+            skipped_remaining = true;
+            break;
+        }
+        let path_str = path.to_string_lossy().to_string();
+        let meta = match fs::metadata(path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let file_size = meta.len() as i64;
+        let mtime = file_mtime(&meta);
+        let cursor = get_cursor(conn, &path_str);
+        let needs_work = match &cursor {
+            Some((size, _, mt)) => *size != file_size || *mt != mtime,
+            None => true,
+        };
+        if !needs_work {
+            continue;
+        }
 
-        let project = cwd.split('/').filter(|s| !s.is_empty()).last().unwrap_or("unknown");
-
-        conn.execute(
-            "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total)
-             VALUES ('codex', ?1, ?2, ?3, ?4, 0, 0, 0, 0, 0, ?5)",
-            params![id, project, model, updated_at, tokens],
-        ).map_err(|e| e.to_string())?;
-
-        if updated_at > max_updated {
-            max_updated = updated_at;
+        processed += 1;
+        if let Err(e) = ingest_codex_file(conn, path) {
+            eprintln!("Codex ingest error for {}: {e}", path.display());
         }
     }
 
-    upsert_cursor(conn, cursor_key, "codex", 0, max_updated, 0)?;
-    conn.execute_batch("COMMIT").map_err(|e| e.to_string())
+    if !skipped_remaining {
+        clean_cursors(conn, "codex", &jsonl_files);
+    }
+
+    conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+    Ok(!skipped_remaining)
+}
+
+fn ingest_codex_file(conn: &Connection, path: &Path) -> Result<(), String> {
+    let path_str = path.to_string_lossy().to_string();
+    let meta = fs::metadata(path).map_err(|e| e.to_string())?;
+    let file_size = meta.len() as i64;
+    let mtime = file_mtime(&meta);
+
+    let cursor = get_cursor(conn, &path_str);
+    if let Some((size, _, mt)) = &cursor {
+        if *size == file_size && *mt == mtime {
+            return Ok(()); // No change
+        }
+    }
+
+    let contents = fs::read_to_string(path).map_err(|e| e.to_string())?;
+
+    // Extract session metadata and final token totals from JSONL events
+    let mut session_id = String::new();
+    let mut project = String::new();
+    let mut model = "unknown".to_string();
+    let mut timestamp: u64 = 0;
+    let mut input: u64 = 0;
+    let mut cached_input: u64 = 0;
+    let mut output: u64 = 0;
+    let mut reasoning: u64 = 0;
+    let mut total: u64 = 0;
+    let mut has_tokens = false;
+
+    for line in contents.lines() {
+        let row: Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let event_type = row.get("type").and_then(Value::as_str).unwrap_or_default();
+
+        match event_type {
+            "session_meta" => {
+                if let Some(payload) = row.get("payload") {
+                    session_id = payload.get("id")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_string();
+                    project = payload.get("cwd")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .split('/')
+                        .filter(|s| !s.is_empty())
+                        .last()
+                        .unwrap_or("unknown")
+                        .to_string();
+                }
+                if let Some(ts_str) = row.get("timestamp").and_then(Value::as_str) {
+                    timestamp = parse_iso_timestamp(ts_str).unwrap_or(0);
+                }
+            }
+            "turn_context" => {
+                if let Some(payload) = row.get("payload") {
+                    if let Some(m) = payload.get("model").and_then(Value::as_str) {
+                        model = m.to_string();
+                    }
+                }
+            }
+            "event_msg" => {
+                let payload = match row.get("payload") {
+                    Some(p) => p,
+                    None => continue,
+                };
+                if payload.get("type").and_then(Value::as_str) != Some("token_count") {
+                    continue;
+                }
+                // Use total_token_usage (cumulative) — last one wins
+                if let Some(info) = payload.get("info").and_then(|i| i.get("total_token_usage")) {
+                    input = as_u64(info.get("input_tokens"));
+                    cached_input = as_u64(info.get("cached_input_tokens"));
+                    output = as_u64(info.get("output_tokens"));
+                    reasoning = as_u64(info.get("reasoning_output_tokens"));
+                    total = as_u64(info.get("total_tokens"));
+                    has_tokens = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if !has_tokens || session_id.is_empty() {
+        upsert_cursor(conn, &path_str, "codex", file_size, file_size, mtime)?;
+        return Ok(());
+    }
+
+    // Non-cached input = total input minus cached portion
+    let non_cached_input = input.saturating_sub(cached_input);
+
+    // Delete old rows for this session and re-insert with full breakdown
+    conn.execute(
+        "DELETE FROM usage_messages WHERE provider = 'codex' AND session_id = ?1",
+        params![session_id],
+    ).map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total)
+         VALUES ('codex', ?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9)",
+        params![
+            session_id, project, model, timestamp as i64,
+            non_cached_input as i64, output as i64, cached_input as i64, reasoning as i64, total as i64
+        ],
+    ).map_err(|e| e.to_string())?;
+
+    upsert_cursor(conn, &path_str, "codex", file_size, file_size, mtime)?;
+    Ok(())
 }
 
 // ── Maintenance ───────────────────────────────────────────
@@ -443,13 +539,6 @@ fn clean_cursors(conn: &Connection, provider: &str, valid_files: &[PathBuf]) {
             let _ = conn.execute(
                 "DELETE FROM ingest_cursors WHERE file_path = ?1",
                 params![path],
-            );
-            // Also clean up messages from deleted files
-            let _ = conn.execute(
-                "DELETE FROM usage_messages WHERE provider = ?1 AND session_id IN (
-                    SELECT DISTINCT session_id FROM usage_messages WHERE provider = ?1
-                )",
-                params![provider],
             );
         }
     }

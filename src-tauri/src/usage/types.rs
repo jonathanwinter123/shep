@@ -5,6 +5,7 @@ use serde::Serialize;
 pub struct UsageNamedTokens {
     pub name: String,
     pub tokens: u64,
+    pub cost: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -13,6 +14,7 @@ pub struct UsageTask {
     pub id: String,
     pub label: String,
     pub tokens: u64,
+    pub cost: Option<f64>,
     pub model: Option<String>,
     pub project: Option<String>,
     pub updated_at: Option<String>,
@@ -23,6 +25,7 @@ pub struct UsageTask {
 pub struct UsageProject {
     pub name: String,
     pub tokens: u64,
+    pub cost: Option<f64>,
     pub sessions: Option<u64>,
 }
 
@@ -54,6 +57,10 @@ pub struct LocalUsageDetails {
     pub tokens_5h: u64,
     pub tokens_7d: u64,
     pub tokens_30d: u64,
+    pub cost_total: Option<f64>,
+    pub cost_5h: Option<f64>,
+    pub cost_7d: Option<f64>,
+    pub cost_30d: Option<f64>,
     pub top_models: Vec<UsageNamedTokens>,
     pub top_tasks: Vec<UsageTask>,
     pub top_projects: Vec<UsageProject>,

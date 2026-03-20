@@ -89,5 +89,64 @@ fn migrate(conn: &Connection) -> Result<(), String> {
         ).map_err(|e| format!("Failed to run migration v1: {e}"))?;
     }
 
+    if version < 2 {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS model_pricing (
+                model_pattern TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                input_per_m REAL NOT NULL DEFAULT 0,
+                output_per_m REAL NOT NULL DEFAULT 0,
+                cache_read_per_m REAL NOT NULL DEFAULT 0,
+                cache_write_per_m REAL NOT NULL DEFAULT 0,
+                thoughts_per_m REAL NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL DEFAULT '2026-03-20'
+            );"
+        ).map_err(|e| format!("Failed to create model_pricing table: {e}"))?;
+
+        seed_pricing(conn)?;
+
+        // Clear old codex data so it re-ingests from JSONL with full token breakdown
+        conn.execute_batch(
+            "DELETE FROM usage_messages WHERE provider = 'codex';
+             DELETE FROM ingest_cursors WHERE provider = 'codex';
+             INSERT INTO schema_version (version) VALUES (2);"
+        ).map_err(|e| format!("Failed to run migration v2: {e}"))?;
+    }
+
+    Ok(())
+}
+
+fn seed_pricing(conn: &Connection) -> Result<(), String> {
+    let prices: &[(&str, &str, f64, f64, f64, f64, f64)] = &[
+        // Claude models — per million tokens
+        ("claude-opus-4-5",   "claude",  5.0,  25.0, 0.50, 6.25, 0.0),
+        ("claude-opus-4-6",   "claude",  5.0,  25.0, 0.50, 6.25, 0.0),
+        ("claude-sonnet-4-5", "claude",  3.0,  15.0, 0.30, 3.75, 0.0),
+        ("claude-sonnet-4-6", "claude",  3.0,  15.0, 0.30, 3.75, 0.0),
+        ("claude-haiku-4-5",  "claude",  1.0,   5.0, 0.10, 1.25, 0.0),
+
+        // OpenAI / Codex models — per million tokens
+        ("gpt-5.4",           "codex",   2.50, 10.0, 1.25, 0.0, 0.0),
+        ("gpt-5.4-mini",      "codex",   0.40,  1.60, 0.20, 0.0, 0.0),
+        ("gpt-5.4-nano",      "codex",   0.15,  0.60, 0.075, 0.0, 0.0),
+        ("gpt-5.4-pro",       "codex",  10.0,  40.0, 5.0,  0.0, 0.0),
+        ("gpt-5",             "codex",   1.25, 10.0, 0.125, 0.0, 0.0),
+        ("gpt-5-mini",        "codex",   0.30,  1.25, 0.15, 0.0, 0.0),
+
+        // Gemini models — per million tokens
+        ("gemini-3-flash",    "gemini",  0.50,  3.0,  0.05, 1.0, 0.0),
+        ("gemini-3.1-pro",    "gemini",  2.0,  12.0,  0.20, 0.0, 0.0),
+        ("gemini-2.5-pro",    "gemini",  1.25, 10.0,  0.315, 0.0, 0.0),
+        ("gemini-2.5-flash",  "gemini",  0.15,  0.60, 0.0375, 0.0, 0.0),
+    ];
+
+    for (pattern, provider, input, output, cache_read, cache_write, thoughts) in prices {
+        conn.execute(
+            "INSERT OR REPLACE INTO model_pricing (model_pattern, provider, input_per_m, output_per_m, cache_read_per_m, cache_write_per_m, thoughts_per_m)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![pattern, provider, input, output, cache_read, cache_write, thoughts],
+        ).map_err(|e| format!("Failed to seed pricing: {e}"))?;
+    }
+
     Ok(())
 }

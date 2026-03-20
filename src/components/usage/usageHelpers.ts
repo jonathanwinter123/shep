@@ -35,6 +35,16 @@ export function formatTokenCount(value: number | null): string {
   return `${value}`;
 }
 
+export function formatCost(value: number | null): string {
+  if (value == null) return "";
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  if (value >= 100) return `$${Math.round(value)}`;
+  if (value >= 10) return `$${value.toFixed(1)}`;
+  if (value >= 0.01) return `$${value.toFixed(2)}`;
+  if (value > 0) return "<$0.01";
+  return "$0";
+}
+
 export function formatReset(resetAt: string | null): string {
   if (!resetAt) return "No reset";
 

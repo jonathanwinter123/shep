@@ -905,6 +905,7 @@ select {
   padding: 8px 12px 8px;
 }
 
+
 .sidebar-usage__window-toggle {
   display: flex;
   gap: 1px;
@@ -957,6 +958,13 @@ select {
 
 .sidebar-usage__row:hover {
   background: var(--surface-hover);
+}
+
+.sidebar-usage__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.7;
 }
 
 .sidebar-usage__name {
@@ -1014,7 +1022,7 @@ select {
   flex-shrink: 0;
 }
 
-.sidebar-usage__tokens {
+.sidebar-usage__cost {
   font-size: var(--text-body);
   color: var(--text-muted);
   width: 42px;
@@ -1023,12 +1031,13 @@ select {
   flex-shrink: 0;
 }
 
-.sidebar-usage__pace {
-  font-size: 9px;
-  font-weight: 500;
-  min-width: 56px;
+.sidebar-usage__tokens {
+  font-size: var(--text-body);
+  color: var(--text-muted);
+  width: 42px;
   text-align: right;
-  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 .app-shell__frame {
@@ -1214,6 +1223,19 @@ select {
   color: rgb(253, 230, 138);
 }
 
+.usage-card__header-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.usage-card__window-cost {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgba(52, 211, 153, 0.9);
+}
+
 .usage-card__window-total {
   font-size: 12px;
   font-weight: 600;
@@ -1336,6 +1358,21 @@ select {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 200px;
+}
+
+.usage-tokens__values,
+.usage-task__values {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.usage-tokens__cost,
+.usage-task__cost {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(52, 211, 153, 0.7);
+  font-variant-numeric: tabular-nums;
 }
 
 .usage-tasks {

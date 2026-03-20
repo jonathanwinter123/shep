@@ -3,7 +3,7 @@ import { RefreshCcw } from "lucide-react";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
 import { getUsageDetails } from "../../lib/tauri";
 import type { ProviderUsageSnapshot, UsageProvider, LocalUsageDetails } from "../../lib/types";
-import { formatPercent, formatReset, formatTokenCount, usageTone, computePace, paceLabel } from "./usageHelpers";
+import { formatPercent, formatReset, formatTokenCount, formatCost, usageTone, computePace, paceLabel } from "./usageHelpers";
 
 type FilterTab = "all" | UsageProvider;
 
@@ -109,7 +109,10 @@ function WindowedDetails({ details }: { details: LocalUsageDetails }) {
             {details.topModels.map((m) => (
               <div key={m.name} className="usage-tokens__row">
                 <span className="usage-tokens__model">{m.name}</span>
-                <strong>{formatTokenCount(m.tokens)}</strong>
+                <div className="usage-tokens__values">
+                  {m.cost != null && <span className="usage-tokens__cost">{formatCost(m.cost)}</span>}
+                  <strong>{formatTokenCount(m.tokens)}</strong>
+                </div>
               </div>
             ))}
           </div>
@@ -126,7 +129,10 @@ function WindowedDetails({ details }: { details: LocalUsageDetails }) {
                   <span className="usage-task__label">{t.label}</span>
                   <span className="usage-task__project">{t.project ?? "—"}</span>
                 </div>
-                <strong className="usage-task__tokens">{formatTokenCount(t.tokens)}</strong>
+                <div className="usage-task__values">
+                  {t.cost != null && <span className="usage-task__cost">{formatCost(t.cost)}</span>}
+                  <strong className="usage-task__tokens">{formatTokenCount(t.tokens)}</strong>
+                </div>
               </div>
             ))}
           </div>
@@ -140,7 +146,10 @@ function WindowedDetails({ details }: { details: LocalUsageDetails }) {
             {details.topProjects.map((p) => (
               <div key={p.name} className="usage-tokens__row">
                 <span>{p.name}</span>
-                <strong>{formatTokenCount(p.tokens)}</strong>
+                <div className="usage-tokens__values">
+                  {p.cost != null && <span className="usage-tokens__cost">{formatCost(p.cost)}</span>}
+                  <strong>{formatTokenCount(p.tokens)}</strong>
+                </div>
               </div>
             ))}
           </div>
@@ -161,9 +170,11 @@ function ProviderCard({
 }) {
   if (!snapshot) return null;
 
-  // Show the token total for the selected window from whatever details we have
   const windowTotal = details
     ? window === "5h" ? details.tokens5h : window === "7d" ? details.tokens7d : details.tokens30d
+    : null;
+  const windowCost = details
+    ? window === "5h" ? details.cost5h : window === "7d" ? details.cost7d : details.cost30d
     : null;
 
   return (
@@ -171,9 +182,12 @@ function ProviderCard({
       <div className="usage-card__header">
         <div className="flex items-center justify-between">
           <span className={`usage-card__status usage-card__status--${snapshot.status}`}>{snapshot.status}</span>
-          {windowTotal != null && (
-            <span className="usage-card__window-total">{formatTokenCount(windowTotal)} tokens</span>
-          )}
+          <div className="usage-card__header-stats">
+            {windowCost != null && <span className="usage-card__window-cost">{formatCost(windowCost)}</span>}
+            {windowTotal != null && (
+              <span className="usage-card__window-total">{formatTokenCount(windowTotal)} tokens</span>
+            )}
+          </div>
         </div>
         {snapshot.error && <p className="usage-card__error">{snapshot.error}</p>}
       </div>

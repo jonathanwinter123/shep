@@ -157,12 +157,14 @@ export interface UsageWindowSnapshot {
 export interface UsageNamedTokens {
   name: string;
   tokens: number;
+  cost: number | null;
 }
 
 export interface UsageTask {
   id: string;
   label: string;
   tokens: number;
+  cost: number | null;
   model: string | null;
   project: string | null;
   updatedAt: string | null;
@@ -171,6 +173,7 @@ export interface UsageTask {
 export interface UsageProject {
   name: string;
   tokens: number;
+  cost: number | null;
   sessions: number | null;
 }
 
@@ -185,6 +188,10 @@ export interface LocalUsageDetails {
   tokens5h: number;
   tokens7d: number;
   tokens30d: number;
+  costTotal: number | null;
+  cost5h: number | null;
+  cost7d: number | null;
+  cost30d: number | null;
   topModels: UsageNamedTokens[];
   topTasks: UsageTask[];
   topProjects: UsageProject[];

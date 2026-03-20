@@ -1,7 +1,8 @@
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
 import { useUIStore } from "../../stores/useUIStore";
 import type { UsageProvider } from "../../lib/types";
-import { getProviderLabel, formatPercent, formatTokenCount, computePace } from "../usage/usageHelpers";
+import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { formatPercent, formatTokenCount, formatCost, computePace } from "../usage/usageHelpers";
 
 const PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini"];
 const WINDOWS: { key: TimeWindow; label: string }[] = [
@@ -26,7 +27,6 @@ const TONE_TRACK: Record<string, string> = {
   local: "rgba(96, 165, 250, 0.08)",
 };
 
-/** Bar tone based on pace status rather than raw thresholds. */
 function barTone(pace: ReturnType<typeof computePace>, pct: number | null | undefined): string {
   if (pct == null) return "local";
   if (pct >= 90) return "critical";
@@ -80,6 +80,11 @@ export default function SidebarUsage() {
           const tokens = local
             ? window === "5h" ? local.tokens5h : window === "7d" ? local.tokens7d : local.tokens30d
             : w?.tokenTotal ?? null;
+          const cost = local
+            ? window === "5h" ? local.cost5h : window === "7d" ? local.cost7d : local.cost30d
+            : null;
+
+          const logoSrc = assistantLogoSrc[provider];
 
           return (
             <button
@@ -88,7 +93,11 @@ export default function SidebarUsage() {
               className="sidebar-usage__row"
               onClick={toggleUsagePanel}
             >
-              <span className="sidebar-usage__name">{getProviderLabel(provider)}</span>
+              {logoSrc ? (
+                <img src={logoSrc} alt={provider} className="sidebar-usage__icon" />
+              ) : (
+                <span className="sidebar-usage__name">{provider}</span>
+              )}
 
               <div className="sidebar-usage__bar-wrap">
                 <div className="sidebar-usage__bar">
@@ -115,6 +124,9 @@ export default function SidebarUsage() {
 
               <span className="sidebar-usage__value">
                 {hasPercent ? formatPercent(pct) : "—"}
+              </span>
+              <span className="sidebar-usage__cost">
+                {cost != null ? formatCost(cost) : ""}
               </span>
               <span className="sidebar-usage__tokens">
                 {formatTokenCount(tokens)}
