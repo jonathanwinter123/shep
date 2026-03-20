@@ -25,6 +25,7 @@ import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQ
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { useUsageStore } from "../../stores/useUsageStore";
+import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { initNotifications } from "../../lib/notifications";
 import { getErrorMessage } from "../../lib/errors";
 import { useNoticeStore } from "../../stores/useNoticeStore";
@@ -153,16 +154,18 @@ export default function AppShell() {
   const loadEditorSettings = useEditorStore((s) => s.loadSettings);
   const loadTerminalSettings = useTerminalSettingsStore((s) => s.loadSettings);
   const fetchUsageSnapshots = useUsageStore((s) => s.fetchSnapshots);
+  const loadUsageSettings = useUsageSettingsStore((s) => s.loadSettings);
 
   useEffect(() => {
     fetchRepos();
     void loadEditorSettings();
     void loadTerminalSettings();
+    void loadUsageSettings();
     void fetchUsageSnapshots();
     void initNotifications();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));
-  }, [fetchRepos, loadEditorSettings, loadTerminalSettings, fetchUsageSnapshots]);
+  }, [fetchRepos, loadEditorSettings, loadTerminalSettings, loadUsageSettings, fetchUsageSnapshots]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {

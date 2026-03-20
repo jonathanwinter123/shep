@@ -1,14 +1,15 @@
+import { useMemo } from "react";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
+import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUIStore } from "../../stores/useUIStore";
 import type { UsageProvider } from "../../lib/types";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { formatPercent, formatTokenCount, formatCost, computePace } from "../usage/usageHelpers";
 
-const PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini"];
+const ALL_PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini"];
 const WINDOWS: { key: TimeWindow; label: string }[] = [
   { key: "5h", label: "5h" },
   { key: "7d", label: "7d" },
-  { key: "30d", label: "30d" },
 ];
 
 const TONE_COLORS: Record<string, string> = {
@@ -40,10 +41,18 @@ export default function SidebarUsage() {
   const snapshots = useUsageStore((s) => s.snapshots);
   const window = useUsageStore((s) => s.window);
   const setWindow = useUsageStore((s) => s.setWindow);
+  const usageSettings = useUsageSettingsStore((s) => s.settings);
   const toggleUsagePanel = useUIStore((s) => s.toggleUsagePanel);
 
+  const providers = useMemo(() => ALL_PROVIDERS.filter((p) => {
+    if (p === "claude") return usageSettings.showClaude;
+    if (p === "codex") return usageSettings.showCodex;
+    if (p === "gemini") return usageSettings.showGemini;
+    return true;
+  }), [usageSettings]);
+
   const hasData = Object.keys(snapshots).length > 0;
-  if (!hasData) return null;
+  if (!hasData || providers.length === 0) return null;
 
   return (
     <div className="sidebar-usage">
@@ -64,7 +73,7 @@ export default function SidebarUsage() {
       </div>
 
       <div className="sidebar-usage__providers">
-        {PROVIDERS.map((provider) => {
+        {providers.map((provider) => {
           const snapshot = snapshots[provider] ?? null;
           if (!snapshot) return null;
 
@@ -123,13 +132,13 @@ export default function SidebarUsage() {
               </div>
 
               <span className="sidebar-usage__value">
-                {hasPercent ? formatPercent(pct) : "—"}
+                {hasPercent && pct > 0 ? formatPercent(pct) : ""}
               </span>
               <span className="sidebar-usage__cost">
-                {cost != null ? formatCost(cost) : ""}
+                {cost != null && cost > 0 ? formatCost(cost) : ""}
               </span>
               <span className="sidebar-usage__tokens">
-                {formatTokenCount(tokens)}
+                {tokens != null && tokens > 0 ? formatTokenCount(tokens) : ""}
               </span>
             </button>
           );

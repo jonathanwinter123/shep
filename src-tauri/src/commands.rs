@@ -9,7 +9,7 @@ use crate::git::{ChangedFile, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::PtyOutput;
 use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb};
-use crate::workspace::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, WorkspaceConfig};
+use crate::workspace::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig};
 use crate::workspace::manager::WorkspaceManager;
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -284,6 +284,21 @@ pub fn get_all_usage_snapshots(db: State<'_, UsageDb>) -> Vec<ProviderUsageSnaps
 #[tauri::command]
 pub fn get_usage_snapshot(db: State<'_, UsageDb>, provider: &str) -> Result<ProviderUsageSnapshot, String> {
     crate::usage::get_usage_snapshot(&db, provider)
+}
+
+#[tauri::command]
+pub fn get_usage_settings(
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<UsageSettings, String> {
+    workspace.load_usage_settings()
+}
+
+#[tauri::command]
+pub fn save_usage_settings(
+    settings: UsageSettings,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<(), String> {
+    workspace.save_usage_settings(&settings)
 }
 
 #[tauri::command]

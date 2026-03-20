@@ -15,6 +15,8 @@ pub struct GlobalConfig {
     pub keybindings: KeybindingSettings,
     #[serde(default)]
     pub terminal: TerminalSettings,
+    #[serde(default)]
+    pub usage: UsageSettings,
 }
 
 fn default_version() -> u32 {
@@ -29,6 +31,7 @@ impl Default for GlobalConfig {
             editor: EditorSettings::default(),
             keybindings: KeybindingSettings::default(),
             terminal: TerminalSettings::default(),
+            usage: UsageSettings::default(),
         }
     }
 }
@@ -87,6 +90,26 @@ impl Default for TerminalSettings {
             cursor_style: default_cursor_style(),
             cursor_blink: true,
             scrollback: default_scrollback(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UsageSettings {
+    #[serde(default = "default_true", rename = "showClaude")]
+    pub show_claude: bool,
+    #[serde(default = "default_true", rename = "showCodex")]
+    pub show_codex: bool,
+    #[serde(default = "default_true", rename = "showGemini")]
+    pub show_gemini: bool,
+}
+
+impl Default for UsageSettings {
+    fn default() -> Self {
+        UsageSettings {
+            show_claude: true,
+            show_codex: true,
+            show_gemini: true,
         }
     }
 }

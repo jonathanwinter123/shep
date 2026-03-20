@@ -1,4 +1,4 @@
-use super::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, WorkspaceConfig};
+use super::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig};
 use super::loader;
 
 pub struct WorkspaceManager;
@@ -58,5 +58,13 @@ impl WorkspaceManager {
 
     pub fn save_terminal_settings(&self, settings: &TerminalSettings) -> Result<(), String> {
         loader::save_terminal_settings(settings)
+    }
+
+    pub fn load_usage_settings(&self) -> Result<UsageSettings, String> {
+        loader::load_usage_settings()
+    }
+
+    pub fn save_usage_settings(&self, settings: &UsageSettings) -> Result<(), String> {
+        loader::save_usage_settings(settings)
     }
 }

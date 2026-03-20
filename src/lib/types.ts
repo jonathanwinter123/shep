@@ -138,6 +138,12 @@ export type PtyOutput =
 // ── Usage ──────────────────────────────────────────────────────────
 
 export type UsageProvider = "codex" | "claude" | "gemini";
+
+export interface UsageSettings {
+  showClaude: boolean;
+  showCodex: boolean;
+  showGemini: boolean;
+}
 export type UsageSourceType = "provider" | "local";
 export type UsageConfidence = "official" | "observed" | "estimated";
 

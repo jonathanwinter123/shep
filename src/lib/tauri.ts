@@ -13,6 +13,7 @@ import type {
   PreferredEditor,
   ProviderUsageSnapshot,
   LocalUsageDetails,
+  UsageSettings,
 } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -195,6 +196,14 @@ export function getComputerName(): Promise<string> {
 
 export function checkCommandExists(command: string): Promise<boolean> {
   return invoke("check_command_exists", { command });
+}
+
+export function getUsageSettings(): Promise<UsageSettings> {
+  return invoke("get_usage_settings");
+}
+
+export function saveUsageSettings(settings: UsageSettings): Promise<void> {
+  return invoke("save_usage_settings", { settings });
 }
 
 export function getAllUsageSnapshots(): Promise<ProviderUsageSnapshot[]> {

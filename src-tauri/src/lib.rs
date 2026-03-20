@@ -94,6 +94,8 @@ pub fn run() {
             commands::git_switch_branch,
             commands::git_create_branch,
             commands::check_command_exists,
+            commands::get_usage_settings,
+            commands::save_usage_settings,
             commands::get_all_usage_snapshots,
             commands::get_usage_snapshot,
             commands::get_usage_details,
