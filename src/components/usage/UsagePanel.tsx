@@ -604,9 +604,11 @@ export default function UsagePanel() {
     }
   }, [window]);
 
+  // Fetch overview on initial mount
   useEffect(() => {
     void fetchOverview();
-  }, [fetchOverview]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-refresh when background ingest completes
   useEffect(() => {
@@ -644,7 +646,13 @@ export default function UsagePanel() {
             key={timeWindow.key}
             type="button"
             className={`usage-window-tab ${window === timeWindow.key ? "usage-window-tab--active" : ""}`}
-            onClick={() => setWindow(timeWindow.key)}
+            onClick={() => {
+              setWindow(timeWindow.key);
+              // fetchOverview depends on window via its useCallback dep —
+              // but the store hasn't flushed yet, so build a fresh fetcher inline.
+              setOverviewLoading(true);
+              getUsageOverview(timeWindow.key).then(setOverview).finally(() => setOverviewLoading(false));
+            }}
           >
             {timeWindow.label}
           </button>

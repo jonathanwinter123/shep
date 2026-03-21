@@ -67,28 +67,11 @@ export default function SettingsPanel() {
   const setProviderEnabled = useUsageSettingsStore((s) => s.setProviderEnabled);
 
   useEffect(() => {
-    if (!hasLoaded) {
-      void loadSettings();
-    }
-  }, [hasLoaded, loadSettings]);
-
-  useEffect(() => {
-    if (!kbHasLoaded) {
-      void loadKbSettings();
-    }
-  }, [kbHasLoaded, loadKbSettings]);
-
-  useEffect(() => {
-    if (!termHasLoaded) {
-      void loadTermSettings();
-    }
-  }, [termHasLoaded, loadTermSettings]);
-
-  useEffect(() => {
-    if (!usageHasLoaded) {
-      void loadUsageSettings();
-    }
-  }, [usageHasLoaded, loadUsageSettings]);
+    if (!hasLoaded) void loadSettings();
+    if (!kbHasLoaded) void loadKbSettings();
+    if (!termHasLoaded) void loadTermSettings();
+    if (!usageHasLoaded) void loadUsageSettings();
+  }, [hasLoaded, loadSettings, kbHasLoaded, loadKbSettings, termHasLoaded, loadTermSettings, usageHasLoaded, loadUsageSettings]);
 
   useEffect(() => {
     let cancelled = false;

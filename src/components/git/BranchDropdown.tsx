@@ -46,18 +46,11 @@ export default function BranchDropdown({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  // Fetch branches when opening
-  useEffect(() => {
-    if (!open) return;
+  const fetchBranches = useCallback(() => {
     gitListBranches(repoPath)
       .then(setBranches)
       .catch(() => setBranches([]));
-  }, [open, repoPath]);
-
-  // Focus input when creating
-  useEffect(() => {
-    if (creating) inputRef.current?.focus();
-  }, [creating]);
+  }, [repoPath]);
 
   const handleSwitch = useCallback(
     async (branch: string) => {
@@ -128,6 +121,7 @@ export default function BranchDropdown({
       <button
         className="branch-dropdown__trigger"
         onClick={() => {
+          if (!open) fetchBranches();
           setOpen(!open);
           setCreating(false);
           setError(null);
@@ -185,6 +179,7 @@ export default function BranchDropdown({
                   ref={inputRef}
                   className="branch-dropdown__input"
                   type="text"
+                  autoFocus
                   placeholder="new-branch-name"
                   value={newBranchName}
                   onChange={(e) => setNewBranchName(e.target.value)}

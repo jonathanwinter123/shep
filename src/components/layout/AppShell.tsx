@@ -191,6 +191,8 @@ export default function AppShell() {
         const isFirstVisit = !useCommandStore.getState().hasProject(repoPath);
 
         const config = await openRepo(repoPath);
+        restoreAttemptedRef.current = true;
+        window.localStorage.setItem(LAST_REPO_STORAGE_KEY, repoPath);
         useTerminalStore.getState().switchProject(repoPath);
         useCommandStore.getState().switchProject(repoPath);
 
@@ -221,6 +223,8 @@ export default function AppShell() {
         const config = await addRepo(repoPath);
         // addRepo sets activeRepoPath in the repo store, get the canonical path
         const canonicalPath = useRepoStore.getState().activeRepoPath!;
+        restoreAttemptedRef.current = true;
+        window.localStorage.setItem(LAST_REPO_STORAGE_KEY, canonicalPath);
         useTerminalStore.getState().switchProject(canonicalPath);
         useCommandStore.getState().switchProject(canonicalPath);
         useCommandStore.getState().loadCommands(canonicalPath, config.commands);
@@ -397,13 +401,6 @@ export default function AppShell() {
       });
     }
   }, [pushNotice]);
-
-  useEffect(() => {
-    if (activeRepoPath) {
-      restoreAttemptedRef.current = true;
-      window.localStorage.setItem(LAST_REPO_STORAGE_KEY, activeRepoPath);
-    }
-  }, [activeRepoPath]);
 
   useEffect(() => {
     if (restoreAttemptedRef.current || activeRepoPath || repos.length === 0) return;
