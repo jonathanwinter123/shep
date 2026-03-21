@@ -147,6 +147,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   }, [branchPickerOpen]);
 
   const usesWorktree = mode === "worktree" || mode === "yolo";
+
   // Auto-generate branch name when mode or assistant changes
   useEffect(() => {
     if (!selectedAssistant || !isGit || useCurrentBranch) {
@@ -157,16 +158,12 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
     setBranchName(uniqueBranchName(base, branches));
   }, [mode, selectedAssistant, isGit, useCurrentBranch, branches]);
 
-  // Reset "use current branch" when switching to worktree/yolo (always needs a new branch)
-  useEffect(() => {
-    if (usesWorktree) setUseCurrentBranch(false);
-  }, [usesWorktree]);
-
-  useEffect(() => {
-    if (isGit || mode !== "standard") {
-      setInitializeGitOnLaunch(false);
-    }
-  }, [isGit, mode]);
+  const handleModeChange = (m: SessionMode) => {
+    setMode(m);
+    const nextUsesWorktree = m === "worktree" || m === "yolo";
+    if (nextUsesWorktree) setUseCurrentBranch(false);
+    if (isGit || m !== "standard") setInitializeGitOnLaunch(false);
+  };
 
   const handleStart = async () => {
     if (!selectedAssistant || !activeRepoPath || launching) return;
@@ -287,7 +284,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
               <button
                 key={m}
                 className={`option-card ${mode === m ? "selected" : ""}`}
-                onClick={() => setMode(m)}
+                onClick={() => handleModeChange(m)}
               >
                 {MODE_ICONS[m]}
                 {MODE_LABELS[m]}

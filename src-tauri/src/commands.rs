@@ -2,13 +2,14 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 use tauri::ipc::Channel;
-use tauri::State;
+use tauri::{Emitter, State};
 
 use crate::git;
 use crate::git::{ChangedFile, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::PtyOutput;
-use crate::workspace::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, WorkspaceConfig};
+use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
+use crate::workspace::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig};
 use crate::workspace::manager::WorkspaceManager;
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -273,6 +274,50 @@ pub fn check_command_exists(command: &str) -> bool {
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
+}
+
+#[tauri::command]
+pub fn get_all_usage_snapshots(db: State<'_, UsageDb>) -> Vec<ProviderUsageSnapshot> {
+    crate::usage::get_all_usage_snapshots(&db)
+}
+
+#[tauri::command]
+pub fn get_usage_snapshot(db: State<'_, UsageDb>, provider: &str) -> Result<ProviderUsageSnapshot, String> {
+    crate::usage::get_usage_snapshot(&db, provider)
+}
+
+#[tauri::command]
+pub fn get_usage_settings(
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<UsageSettings, String> {
+    workspace.load_usage_settings()
+}
+
+#[tauri::command]
+pub fn save_usage_settings(
+    settings: UsageSettings,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<(), String> {
+    workspace.save_usage_settings(&settings)
+}
+
+#[tauri::command]
+pub fn get_usage_details(db: State<'_, UsageDb>, provider: &str, window: &str) -> Result<LocalUsageDetails, String> {
+    crate::usage::get_windowed_details(&db, provider, window)
+}
+
+#[tauri::command]
+pub fn get_usage_overview(db: State<'_, UsageDb>, window: &str) -> Result<UsageOverview, String> {
+    crate::usage::get_usage_overview(&db, window)
+}
+
+#[tauri::command]
+pub fn refresh_usage_data(db: State<'_, UsageDb>, app: tauri::AppHandle) {
+    let db = db.inner().clone();
+    std::thread::spawn(move || {
+        crate::usage::run_background_ingest(&db);
+        let _ = app.emit("usage-ingest-complete", ());
+    });
 }
 
 fn open_path_in_editor(repo_path: &str, editor_id: &str) -> Result<(), String> {

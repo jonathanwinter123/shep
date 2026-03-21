@@ -122,10 +122,6 @@ export default function TerminalView({
     const size = { cols: cached.term.cols, rows: cached.term.rows };
     const lastSize = lastSizeRef.current;
 
-    // Always refresh the viewport so scroll state is restored after
-    // visibility changes (e.g. closing settings overlay).
-    cached.term.refresh(0, cached.term.rows - 1);
-
     if (
       lastSize &&
       lastSize.cols === size.cols &&
@@ -186,6 +182,11 @@ export default function TerminalView({
       // Theme changes that occurred while hidden were deferred to avoid
       // corrupting xterm's scroll state.
       term.options.theme = createTerminalTheme(useThemeStore.getState().theme);
+
+      // Refresh the viewport so rendering is restored after visibility
+      // changes (e.g. closing settings overlay). Only done here, not on
+      // every resize, to avoid resetting scroll position.
+      term.refresh(0, term.rows - 1);
 
       await fitAndResize();
       if (disposed) return;

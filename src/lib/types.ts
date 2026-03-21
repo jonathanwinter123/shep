@@ -134,3 +134,125 @@ export interface ChangedFile {
 export type PtyOutput =
   | { event: "data"; data: string }
   | { event: "exit"; data: { code: number } };
+
+// ── Usage ──────────────────────────────────────────────────────────
+
+export type UsageProvider = "codex" | "claude" | "gemini";
+
+export interface UsageSettings {
+  showClaude: boolean;
+  showCodex: boolean;
+  showGemini: boolean;
+}
+export type UsageSourceType = "provider" | "local";
+export type UsageConfidence = "official" | "observed" | "estimated";
+
+export interface UsageWindowSnapshot {
+  provider: UsageProvider;
+  window: string;
+  label: string;
+  sourceType: UsageSourceType;
+  confidence: UsageConfidence;
+  usedPercent: number | null;
+  remainingPercent: number | null;
+  resetAt: string | null;
+  tokenTotal: number | null;
+  paceStatus: string | null;
+}
+
+export interface UsageNamedTokens {
+  name: string;
+  tokens: number;
+  cost: number | null;
+}
+
+export interface UsageTask {
+  id: string;
+  label: string;
+  tokens: number;
+  cost: number | null;
+  model: string | null;
+  project: string | null;
+  updatedAt: string | null;
+}
+
+export interface UsageProject {
+  name: string;
+  tokens: number;
+  cost: number | null;
+  sessions: number | null;
+}
+
+export interface UsageTrendProviderValue {
+  provider: UsageProvider;
+  tokens: number;
+  cost: number | null;
+}
+
+export interface UsageTrendBucket {
+  start: number;
+  end: number;
+  label: string;
+  tokens: number;
+  cost: number | null;
+  providers: UsageTrendProviderValue[];
+}
+
+export interface UsageOverviewProvider {
+  provider: UsageProvider;
+  tokens: number;
+  cost: number | null;
+  sharePercent: number;
+  trend: number[];
+}
+
+export interface UsageBreakdownItem {
+  provider: UsageProvider;
+  label: string;
+  tokens: number;
+  cost: number | null;
+  sessions: number | null;
+  trend: number[];
+}
+
+export interface UsageOverview {
+  window: string;
+  totalTokens: number;
+  totalCost: number | null;
+  activeProjects: number;
+  activeSessions: number;
+  providers: UsageOverviewProvider[];
+  trend: UsageTrendBucket[];
+  topModels: UsageBreakdownItem[];
+  topProjects: UsageBreakdownItem[];
+}
+
+export interface LocalUsageDetails {
+  sourceType: "local";
+  confidence: UsageConfidence;
+  tokensTotal: number;
+  tokensInput: number | null;
+  tokensOutput: number | null;
+  tokensCached: number | null;
+  tokensThoughts: number | null;
+  tokens5h: number;
+  tokens7d: number;
+  tokens30d: number;
+  costTotal: number | null;
+  cost5h: number | null;
+  cost7d: number | null;
+  cost30d: number | null;
+  topModels: UsageNamedTokens[];
+  topTasks: UsageTask[];
+  topProjects: UsageProject[];
+}
+
+export interface ProviderUsageSnapshot {
+  provider: UsageProvider;
+  status: string;
+  fetchedAt: string;
+  summaryWindows: UsageWindowSnapshot[];
+  extraWindows: UsageWindowSnapshot[];
+  localDetails: LocalUsageDetails | null;
+  error: string | null;
+}

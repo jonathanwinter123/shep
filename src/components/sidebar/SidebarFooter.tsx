@@ -1,4 +1,4 @@
-import { CodeXml } from "lucide-react";
+import { CodeXml, ChartNoAxesCombined } from "lucide-react";
 import { useUIStore } from "../../stores/useUIStore";
 import GearIcon from "./icons/GearIcon";
 
@@ -13,6 +13,8 @@ export default function SidebarFooter({
 }: SidebarFooterProps) {
   const settingsTabOpen = useUIStore((s) => s.settingsTabOpen);
   const toggleSettings = useUIStore((s) => s.toggleSettings);
+  const usageTabOpen = useUIStore((s) => s.usageTabOpen);
+  const toggleUsagePanel = useUIStore((s) => s.toggleUsagePanel);
   const editorDisabled = !activeRepoPath;
   const footerButtonClass = "tab !flex-1 !shrink !justify-center !gap-0.5 !px-2 !py-1.5 flex-col min-w-0";
 
@@ -26,6 +28,14 @@ export default function SidebarFooter({
         >
           <GearIcon size={20} />
           <span className="text-[10px]">Settings</span>
+        </button>
+        <button
+          onClick={toggleUsagePanel}
+          className={`${footerButtonClass} ${usageTabOpen ? "active" : ""}`}
+          aria-label="Open usage"
+        >
+          <ChartNoAxesCombined size={18} />
+          <span className="text-[10px]">Usage</span>
         </button>
         <button
           onClick={() => {

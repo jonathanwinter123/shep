@@ -44,11 +44,7 @@ export default function GitPanel() {
     }
   }, [activeProjectPath, pushNotice]);
 
-  useEffect(() => {
-    fetchWorktrees();
-  }, [fetchWorktrees]);
-
-  // Re-fetch worktrees when any git status changes (catches new/removed worktrees)
+  // Fetch worktrees on mount and when git status changes (catches new/removed worktrees)
   const allStatusKeys = useMemo(() => {
     return Object.keys(projectGitStatus).sort().join(",");
   }, [projectGitStatus]);
@@ -67,15 +63,21 @@ export default function GitPanel() {
     return map;
   }, [worktreeEntries]);
 
+  // Clear viewing path if the worktree it pointed to no longer exists
+  const validViewingPath =
+    viewingPath && worktreeEntries.some((w) => w.path === viewingPath)
+      ? viewingPath
+      : null;
+
   // Label for the currently-viewed worktree branch
   const viewingBranch = useMemo(() => {
-    if (!viewingPath) return null;
-    const entry = worktreeEntries.find((w) => w.path === viewingPath);
+    if (!validViewingPath) return null;
+    const entry = worktreeEntries.find((w) => w.path === validViewingPath);
     return entry?.branch ?? null;
-  }, [viewingPath, worktreeEntries]);
+  }, [validViewingPath, worktreeEntries]);
 
   // Effective path: worktree path when viewing one, otherwise main repo
-  const effectivePath = viewingPath ?? activeProjectPath;
+  const effectivePath = validViewingPath ?? activeProjectPath;
 
   // Git status for the effective path
   const gitStatus = effectivePath ? projectGitStatus[effectivePath] : null;
@@ -85,27 +87,20 @@ export default function GitPanel() {
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [diffContent, setDiffContent] = useState<string>("");
 
-  // Poll git status for the viewed worktree (not covered by AppShell polling)
-  useEffect(() => {
-    if (!viewingPath) return;
-    refreshStatus(viewingPath);
-    const id = setInterval(() => refreshStatus(viewingPath), 5_000);
-    return () => clearInterval(id);
-  }, [viewingPath, refreshStatus]);
-
-  // Reset viewing state if the viewed worktree disappears
-  useEffect(() => {
-    if (viewingPath && !worktreeEntries.some((w) => w.path === viewingPath)) {
-      setViewingPath(null);
-    }
-  }, [viewingPath, worktreeEntries]);
-
-  // Reset selection when switching between main repo and worktree
-  useEffect(() => {
+  const handleSetViewingPath = useCallback((path: string | null) => {
+    setViewingPath(path);
     setSelectedPath(null);
     setSelectedArea(null);
     setDiffContent("");
-  }, [viewingPath]);
+  }, []);
+
+  // Poll git status for the viewed worktree (not covered by AppShell polling)
+  useEffect(() => {
+    if (!validViewingPath) return;
+    refreshStatus(validViewingPath);
+    const id = setInterval(() => refreshStatus(validViewingPath), 5_000);
+    return () => clearInterval(id);
+  }, [validViewingPath, refreshStatus]);
 
   const fetchFiles = useCallback(async () => {
     if (!effectivePath) return;
@@ -122,21 +117,13 @@ export default function GitPanel() {
     }
   }, [effectivePath, pushNotice]);
 
-  // Fetch file list on mount and when effective path changes
-  useEffect(() => {
-    fetchFiles();
-    setSelectedPath(null);
-    setSelectedArea(null);
-    setDiffContent("");
-  }, [fetchFiles]);
-
-  // Re-fetch when git status counts change (from polling)
+  // Fetch file list when effective path or git status changes
   const statusKey = gitStatus
     ? `${gitStatus.staged}:${gitStatus.unstaged}:${gitStatus.untracked}`
     : "";
   useEffect(() => {
-    if (statusKey) fetchFiles();
-  }, [statusKey, fetchFiles]);
+    fetchFiles();
+  }, [fetchFiles, statusKey]);
 
   const handleSelect = useCallback(
     async (file: ChangedFile) => {
@@ -224,16 +211,16 @@ export default function GitPanel() {
   return (
     <div className="git-panel">
       <div className="git-panel__header">
-        {viewingPath ? (
+        {validViewingPath ? (
           /* Viewing a worktree — show branch name + back button */
           <>
             <GitFork size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
             <span className="git-panel__worktree-label">
-              {viewingBranch ?? viewingPath.split("/").pop() ?? "Worktree"}
+              {viewingBranch ?? validViewingPath.split("/").pop() ?? "Worktree"}
             </span>
             <button
               className="icon-btn git-panel__back-btn"
-              onClick={() => setViewingPath(null)}
+              onClick={() => handleSetViewingPath(null)}
               title="Back to main repo"
             >
               <X size={12} />
@@ -249,7 +236,7 @@ export default function GitPanel() {
               isWorktree={false}
               onBranchChanged={handleBranchChanged}
               worktreeMap={worktreeMap.size > 0 ? worktreeMap : undefined}
-              onViewWorktree={setViewingPath}
+              onViewWorktree={handleSetViewingPath}
             />
           </>
         )}
@@ -265,7 +252,7 @@ export default function GitPanel() {
                 : "rgb(74, 222, 128)",
           }}
         />
-        {!viewingPath && (mainGitStatus.ahead > 0 || mainGitStatus.behind > 0) && (
+        {!validViewingPath && (mainGitStatus.ahead > 0 || mainGitStatus.behind > 0) && (
           <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 4, flexShrink: 0 }}>
             {mainGitStatus.ahead > 0 && `↑${mainGitStatus.ahead}`}
             {mainGitStatus.ahead > 0 && mainGitStatus.behind > 0 && " "}

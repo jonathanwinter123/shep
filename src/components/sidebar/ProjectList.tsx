@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import type { RepoInfo, TerminalTab, CommandState } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Sparkles, SquareTerminal } from "lucide-react";
@@ -44,14 +44,12 @@ export default function ProjectList({
 }: ProjectListProps) {
   const [expandedPath, setExpandedPath] = useState<string | null>(activeRepoPath);
 
-  // Auto-expand when active project changes (e.g. first load, switching projects)
-  useEffect(() => {
-    setExpandedPath(activeRepoPath);
-  }, [activeRepoPath]);
+  // Derive: always expand the active project if the stored expandedPath doesn't match
+  const effectiveExpandedPath = expandedPath === activeRepoPath ? expandedPath : activeRepoPath;
 
   const handleProjectClick = (repoPath: string) => {
     if (repoPath === activeRepoPath) {
-      setExpandedPath(expandedPath === repoPath ? null : repoPath);
+      setExpandedPath(effectiveExpandedPath === repoPath ? null : repoPath);
     } else {
       onSelectRepo(repoPath);
     }
@@ -84,7 +82,7 @@ export default function ProjectList({
     <div className="flex flex-col gap-0.5 px-2 pb-2">
       {[...repos].sort((a, b) => a.name.localeCompare(b.name)).map((repo) => {
         const isActive = repo.path === activeRepoPath;
-        const isExpanded = isActive && expandedPath === repo.path;
+        const isExpanded = isActive && effectiveExpandedPath === repo.path;
         return (
           <div key={repo.path}>
             <ProjectItem

@@ -266,7 +266,7 @@ export function usePty() {
         const id = nextTabId();
         addTab({
           id,
-          label: "Shell",
+          label: "Terminal",
           ptyId,
           repoPath: activeRepoPath,
           commandName: null,
@@ -307,6 +307,15 @@ export function usePty() {
       let command = assistant.command;
       if (mode === "yolo" && assistant.yoloFlag) {
         command = `${command} ${assistant.yoloFlag}`;
+      }
+
+      // Ensure OpenCode uses the "system" theme so its ANSI colors
+      // match the active Shep terminal theme. Only writes the config
+      // if it doesn't already exist (respects user overrides).
+      if (assistantId === "opencode") {
+        const tuiDir = "$HOME/.config/opencode";
+        const tuiFile = `${tuiDir}/tui.json`;
+        command = `mkdir -p ${tuiDir} && [ ! -f ${tuiFile} ] && echo '{"$schema":"https://opencode.ai/tui.json","theme":"system"}' > ${tuiFile}; ${command}`;
       }
 
       const cwd = worktreePath ?? activeRepoPath;

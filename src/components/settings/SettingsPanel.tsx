@@ -7,7 +7,9 @@ import { useEditorStore } from "../../stores/useEditorStore";
 import { useThemeStore } from "../../stores/useThemeStore";
 import { useKeybindingStore } from "../../stores/useKeybindingStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
-import type { CursorStyle } from "../../lib/types";
+import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
+import { assistantLogoSrc } from "../../lib/assistantLogos";
+import type { CursorStyle, UsageProvider } from "../../lib/types";
 import { getErrorMessage } from "../../lib/errors";
 
 interface AppMeta {
@@ -57,23 +59,19 @@ export default function SettingsPanel() {
   const loadTermSettings = useTerminalSettingsStore((s) => s.loadSettings);
   const updateTermSettings = useTerminalSettingsStore((s) => s.updateSettings);
 
-  useEffect(() => {
-    if (!hasLoaded) {
-      void loadSettings();
-    }
-  }, [hasLoaded, loadSettings]);
+  const usageSettings = useUsageSettingsStore((s) => s.settings);
+  const usageHasLoaded = useUsageSettingsStore((s) => s.hasLoaded);
+  const usageIsSaving = useUsageSettingsStore((s) => s.isSaving);
+  const usageError = useUsageSettingsStore((s) => s.error);
+  const loadUsageSettings = useUsageSettingsStore((s) => s.loadSettings);
+  const setProviderEnabled = useUsageSettingsStore((s) => s.setProviderEnabled);
 
   useEffect(() => {
-    if (!kbHasLoaded) {
-      void loadKbSettings();
-    }
-  }, [kbHasLoaded, loadKbSettings]);
-
-  useEffect(() => {
-    if (!termHasLoaded) {
-      void loadTermSettings();
-    }
-  }, [termHasLoaded, loadTermSettings]);
+    if (!hasLoaded) void loadSettings();
+    if (!kbHasLoaded) void loadKbSettings();
+    if (!termHasLoaded) void loadTermSettings();
+    if (!usageHasLoaded) void loadUsageSettings();
+  }, [hasLoaded, loadSettings, kbHasLoaded, loadKbSettings, termHasLoaded, loadTermSettings, usageHasLoaded, loadUsageSettings]);
 
   useEffect(() => {
     let cancelled = false;
@@ -244,6 +242,33 @@ export default function SettingsPanel() {
 
       {termIsSaving && <div className="mt-2 text-xs text-white/40">Saving terminal settings...</div>}
       {termError && <div className="mt-2 text-sm text-red-300">{termError}</div>}
+
+      <hr className="settings-divider" />
+
+      {/* ── Usage ──────────────────────────────────────────── */}
+      <h2 className="section-label !p-0 mb-4">Usage Providers</h2>
+
+      <div className="flex flex-wrap gap-3">
+        {(["claude", "codex", "gemini"] as UsageProvider[]).map((provider) => {
+          const key = provider === "claude" ? "showClaude" : provider === "codex" ? "showCodex" : "showGemini";
+          const active = usageSettings[key];
+          const logo = assistantLogoSrc[provider];
+          const label = provider === "claude" ? "Claude" : provider === "codex" ? "Codex" : "Gemini";
+          return (
+            <button
+              key={provider}
+              onClick={() => void setProviderEnabled(provider, !active)}
+              className={`${optionClass} ${active ? "selected" : ""}`}
+            >
+              {logo && <img src={logo} alt="" width={20} height={20} className="shrink-0" />}
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {usageIsSaving && <div className="mt-2 text-xs text-white/40">Saving...</div>}
+      {usageError && <div className="mt-2 text-sm text-red-300">{usageError}</div>}
 
       <p className="text-xs text-white/30 mt-6">
         Settings are saved to ~/.shep/config.yml

@@ -9,7 +9,7 @@ import GitPanel from "../git/GitPanel";
 import CommandsPanel from "../commands/CommandsPanel";
 import SessionLauncher from "../session/SessionLauncher";
 import NoticeCenter from "../shared/NoticeCenter";
-import ShepLogo from "../sidebar/icons/ShepLogo";
+import UsagePanel from "../usage/UsagePanel";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -21,9 +21,11 @@ import { useGitPolling } from "../../hooks/useGitPolling";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
 import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit } from "../../lib/tauri";
+import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit, refreshUsageData } from "../../lib/tauri";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
+import { useUsageStore } from "../../stores/useUsageStore";
+import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { initNotifications } from "../../lib/notifications";
 import { getErrorMessage } from "../../lib/errors";
 import { useNoticeStore } from "../../stores/useNoticeStore";
@@ -148,17 +150,38 @@ export default function AppShell() {
   const gitPanelActive = useUIStore((s) => s.gitPanelActive);
   const commandsPanelActive = useUIStore((s) => s.commandsPanelActive);
   const launcherActive = useUIStore((s) => s.launcherActive);
+  const usagePanelActive = useUIStore((s) => s.usagePanelActive);
   const loadEditorSettings = useEditorStore((s) => s.loadSettings);
   const loadTerminalSettings = useTerminalSettingsStore((s) => s.loadSettings);
+  const fetchUsageSnapshots = useUsageStore((s) => s.fetchSnapshots);
+  const loadUsageSettings = useUsageSettingsStore((s) => s.loadSettings);
 
   useEffect(() => {
     fetchRepos();
     void loadEditorSettings();
     void loadTerminalSettings();
+    void loadUsageSettings();
+    void fetchUsageSnapshots();
     void initNotifications();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));
-  }, [fetchRepos, loadEditorSettings, loadTerminalSettings]);
+  }, [fetchRepos, loadEditorSettings, loadTerminalSettings, loadUsageSettings, fetchUsageSnapshots]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void refreshUsageData();
+      void fetchUsageSnapshots();
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [fetchUsageSnapshots]);
+
+  // Auto-refresh when background ingest completes
+  useEffect(() => {
+    const unlisten = listen("usage-ingest-complete", () => {
+      void fetchUsageSnapshots();
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, [fetchUsageSnapshots]);
 
   const handleSelectRepo = useCallback(
     async (repoPath: string) => {
@@ -168,6 +191,8 @@ export default function AppShell() {
         const isFirstVisit = !useCommandStore.getState().hasProject(repoPath);
 
         const config = await openRepo(repoPath);
+        restoreAttemptedRef.current = true;
+        window.localStorage.setItem(LAST_REPO_STORAGE_KEY, repoPath);
         useTerminalStore.getState().switchProject(repoPath);
         useCommandStore.getState().switchProject(repoPath);
 
@@ -198,6 +223,8 @@ export default function AppShell() {
         const config = await addRepo(repoPath);
         // addRepo sets activeRepoPath in the repo store, get the canonical path
         const canonicalPath = useRepoStore.getState().activeRepoPath!;
+        restoreAttemptedRef.current = true;
+        window.localStorage.setItem(LAST_REPO_STORAGE_KEY, canonicalPath);
         useTerminalStore.getState().switchProject(canonicalPath);
         useCommandStore.getState().switchProject(canonicalPath);
         useCommandStore.getState().loadCommands(canonicalPath, config.commands);
@@ -260,6 +287,7 @@ export default function AppShell() {
     useUIStore.getState().deactivateGitPanel();
     useUIStore.getState().deactivateCommandsPanel();
     useUIStore.getState().deactivateLauncher();
+    useUIStore.getState().deactivateUsagePanel();
     setActiveTab(tabId);
     const tab = tabs.find((t) => t.id === tabId);
     if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
@@ -283,6 +311,11 @@ export default function AppShell() {
   );
 
   const handleNewShell = useCallback(() => {
+    useUIStore.getState().deactivateSettings();
+    useUIStore.getState().deactivateLauncher();
+    useUIStore.getState().deactivateGitPanel();
+    useUIStore.getState().deactivateCommandsPanel();
+    useUIStore.getState().deactivateUsagePanel();
     const { cols, rows } = getTerminalDimensions();
     spawnBlankShell(cols, rows);
   }, [spawnBlankShell, getTerminalDimensions]);
@@ -370,13 +403,6 @@ export default function AppShell() {
   }, [pushNotice]);
 
   useEffect(() => {
-    if (activeRepoPath) {
-      restoreAttemptedRef.current = true;
-      window.localStorage.setItem(LAST_REPO_STORAGE_KEY, activeRepoPath);
-    }
-  }, [activeRepoPath]);
-
-  useEffect(() => {
     if (restoreAttemptedRef.current || activeRepoPath || repos.length === 0) return;
 
     restoreAttemptedRef.current = true;
@@ -413,7 +439,7 @@ export default function AppShell() {
     return () => { unlisten.then((f) => f()); };
   }, []);
 
-  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive;
+  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive;
 
   return (
     <div className="app-shell">
@@ -430,9 +456,8 @@ export default function AppShell() {
             }
           }
         }}
-      >
-        <span className="drag-region__logo"><ShepLogo size={18} /></span>
-      </div>
+      />
+
       <div className="app-shell__frame">
         <Sidebar
           repos={repos}
@@ -454,6 +479,7 @@ export default function AppShell() {
           <TabBar
             onClose={closeTab}
             onNewShell={handleNewShell}
+            onNewAssistant={handleNewAssistant}
           />
 
           <div ref={terminalContainerRef} className="terminal-stage">
@@ -472,6 +498,7 @@ export default function AppShell() {
               />
             )}
             {launcherActive && <SessionLauncher onStartSession={handleStartSession} />}
+            {usagePanelActive && <UsagePanel />}
 
             {!showOverlay && tabs.length === 0 && (
               <div className="terminal-empty">

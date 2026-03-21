@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use super::config::{
     CommandConfig, EditorSettings, GlobalConfig, KeybindingSettings, RegisteredRepo, RepoEntry,
-    RepoInfo, TerminalSettings, WorkspaceConfig,
+    RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
 };
 
 // ── Paths ───────────────────────────────────────────────────────────
@@ -79,6 +79,16 @@ pub fn load_terminal_settings() -> Result<TerminalSettings, String> {
 pub fn save_terminal_settings(settings: &TerminalSettings) -> Result<(), String> {
     let mut config = load_global_config()?;
     config.terminal = settings.clone();
+    save_global_config(&config)
+}
+
+pub fn load_usage_settings() -> Result<UsageSettings, String> {
+    Ok(load_global_config()?.usage)
+}
+
+pub fn save_usage_settings(settings: &UsageSettings) -> Result<(), String> {
+    let mut config = load_global_config()?;
+    config.usage = settings.clone();
     save_global_config(&config)
 }
 

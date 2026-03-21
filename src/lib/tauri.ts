@@ -11,6 +11,10 @@ import type {
   KeybindingSettings,
   TerminalSettings,
   PreferredEditor,
+  ProviderUsageSnapshot,
+  LocalUsageDetails,
+  UsageSettings,
+  UsageOverview,
 } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -193,4 +197,32 @@ export function getComputerName(): Promise<string> {
 
 export function checkCommandExists(command: string): Promise<boolean> {
   return invoke("check_command_exists", { command });
+}
+
+export function getUsageSettings(): Promise<UsageSettings> {
+  return invoke("get_usage_settings");
+}
+
+export function saveUsageSettings(settings: UsageSettings): Promise<void> {
+  return invoke("save_usage_settings", { settings });
+}
+
+export function getAllUsageSnapshots(): Promise<ProviderUsageSnapshot[]> {
+  return invoke("get_all_usage_snapshots");
+}
+
+export function getUsageSnapshot(provider: string): Promise<ProviderUsageSnapshot> {
+  return invoke("get_usage_snapshot", { provider });
+}
+
+export function getUsageDetails(provider: string, window: string): Promise<LocalUsageDetails> {
+  return invoke("get_usage_details", { provider, window });
+}
+
+export function getUsageOverview(window: string): Promise<UsageOverview> {
+  return invoke("get_usage_overview", { window });
+}
+
+export function refreshUsageData(): Promise<void> {
+  return invoke("refresh_usage_data");
 }
