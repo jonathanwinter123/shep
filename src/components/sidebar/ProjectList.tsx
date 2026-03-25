@@ -42,14 +42,28 @@ export default function ProjectList({
   onCloseTab,
   onNewShell,
 }: ProjectListProps) {
-  const [expandedPath, setExpandedPath] = useState<string | null>(activeRepoPath);
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
+    () => new Set(activeRepoPath ? [activeRepoPath] : []),
+  );
 
-  // Derive: always expand the active project if the stored expandedPath doesn't match
-  const effectiveExpandedPath = expandedPath === activeRepoPath ? expandedPath : activeRepoPath;
+  // Auto-expand a newly selected project
+  const prevActiveRef = useState({ path: activeRepoPath })[0];
+  if (activeRepoPath && activeRepoPath !== prevActiveRef.path) {
+    prevActiveRef.path = activeRepoPath;
+    if (!expandedPaths.has(activeRepoPath)) {
+      setExpandedPaths((prev) => new Set(prev).add(activeRepoPath));
+    }
+  }
 
   const handleProjectClick = (repoPath: string) => {
     if (repoPath === activeRepoPath) {
-      setExpandedPath(effectiveExpandedPath === repoPath ? null : repoPath);
+      // Toggle collapse/expand for the active project
+      setExpandedPaths((prev) => {
+        const next = new Set(prev);
+        if (next.has(repoPath)) next.delete(repoPath);
+        else next.add(repoPath);
+        return next;
+      });
     } else {
       onSelectRepo(repoPath);
     }
@@ -82,7 +96,7 @@ export default function ProjectList({
     <div className="flex flex-col gap-0.5 px-2 pb-2">
       {[...repos].sort((a, b) => a.name.localeCompare(b.name)).map((repo) => {
         const isActive = repo.path === activeRepoPath;
-        const isExpanded = isActive && effectiveExpandedPath === repo.path;
+        const isExpanded = isActive && expandedPaths.has(repo.path);
         return (
           <div key={repo.path}>
             <ProjectItem

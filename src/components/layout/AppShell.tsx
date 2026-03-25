@@ -302,7 +302,17 @@ export default function AppShell() {
       const { cols, rows } = getTerminalDimensions();
       const ptyId = await launchAssistant(assistantId, cols, rows, mode, worktreePath);
       if (ptyId) {
-        useUIStore.getState().closeLauncher();
+        // Close the launcher tab and deactivate all overlays so the new
+        // terminal tab is immediately visible. closeLauncher() alone would
+        // call activateNextOpen() which can re-activate another panel
+        // (e.g. commands), hiding the tab we just created.
+        const ui = useUIStore.getState();
+        ui.deactivateSettings();
+        ui.deactivateLauncher();
+        ui.deactivateGitPanel();
+        ui.deactivateCommandsPanel();
+        ui.deactivateUsagePanel();
+        useUIStore.setState({ launcherOpen: false });
         return true;
       }
       return false;
