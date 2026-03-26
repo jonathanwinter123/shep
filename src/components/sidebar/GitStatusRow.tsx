@@ -9,7 +9,7 @@ interface GitStatusRowProps {
 export default function GitStatusRow({ repoPath }: GitStatusRowProps) {
   const status = useGitStore((s) => s.projectGitStatus[repoPath]);
   const gitPanelActive = useUIStore((s) => s.gitPanelActive);
-  const toggleGitPanel = useUIStore((s) => s.toggleGitPanel);
+  const { toggleGitPanel } = useUIStore.getState();
 
   if (!status?.is_git_repo) return null;
 

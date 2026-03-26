@@ -22,14 +22,19 @@ const pendingOutput = new Map<number, string[]>();
 const writeBatch = new Map<number, string[]>();
 const writeBatchScheduled = new Set<number>();
 
-// Debounce timers for activity detection — clears "active" after 3s of silence
+// Debounce timers for activity detection — clears "active" after 3s of silence.
+// Activity state is tracked here (not in the store) on every data event to avoid
+// high-frequency store updates during AI streaming. The store is only updated
+// on transitions: idle→active and active→idle.
 const activityTimers = new Map<number, ReturnType<typeof setTimeout>>();
+const activityActive = new Set<number>();
 const ACTIVITY_TIMEOUT = 3000;
 const stoppingPtys = new Set<number>();
 
 function cleanupActivityState(ptyId: number) {
   const timer = activityTimers.get(ptyId);
   if (timer) { clearTimeout(timer); activityTimers.delete(ptyId); }
+  activityActive.delete(ptyId);
 }
 
 export function registerTerminal(ptyId: number, term: Terminal) {
@@ -104,9 +109,9 @@ export function usePty() {
     setCommandPtyId,
     setCommandStatusForProject,
     setCommandPtyIdForProject,
-  } = useCommandStore();
-  const { addTab, removeTab, findTabByCommand, setActiveTab, initActivity, setTabActive, setTabExited, updateLastActivity, removeActivity } =
-    useTerminalStore();
+  } = useCommandStore.getState();
+  const { addTab, removeTab, findTabByCommand, setActiveTab, initActivity, setTabActive, setTabExited, removeActivity } =
+    useTerminalStore.getState();
 
   const handlePtyMessage = useCallback(
     (
@@ -117,13 +122,18 @@ export function usePty() {
     ) => {
       if (msg.event === "data") {
         writeToPty(ptyId, msg.data);
-        updateLastActivity(ptyId);
-        setTabActive(ptyId, true);
+
+        // Only update the store on the idle→active transition, not on every chunk.
+        if (!activityActive.has(ptyId)) {
+          activityActive.add(ptyId);
+          setTabActive(ptyId, true);
+        }
 
         // Reset the idle timer — after 3s of no output, mark as inactive
         const existing = activityTimers.get(ptyId);
         if (existing) clearTimeout(existing);
         activityTimers.set(ptyId, setTimeout(() => {
+          activityActive.delete(ptyId);
           setTabActive(ptyId, false);
           activityTimers.delete(ptyId);
         }, ACTIVITY_TIMEOUT));
@@ -142,7 +152,7 @@ export function usePty() {
         }
       }
     },
-    [setCommandStatusForProject, setCommandPtyIdForProject, updateLastActivity, setTabActive, setTabExited],
+    [setCommandStatusForProject, setCommandPtyIdForProject, setTabActive, setTabExited],
   );
 
   const spawnSession = useCallback(

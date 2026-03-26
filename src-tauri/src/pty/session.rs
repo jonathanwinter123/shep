@@ -189,6 +189,10 @@ impl PtySession {
         })
     }
 
+    pub fn pid(&self) -> Option<u32> {
+        self.child_pid
+    }
+
     pub fn write(&mut self, data: &[u8]) -> Result<(), String> {
         self.writer
             .write_all(data)

@@ -226,3 +226,12 @@ export function getUsageOverview(window: string): Promise<UsageOverview> {
 export function refreshUsageData(): Promise<void> {
   return invoke("refresh_usage_data");
 }
+
+export interface MemoryStats {
+  app_rss: number;
+  children_rss: number;
+}
+
+export function getMemoryStats(): Promise<MemoryStats> {
+  return invoke("get_memory_stats");
+}

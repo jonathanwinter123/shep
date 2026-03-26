@@ -3,10 +3,12 @@ import { createPortal } from "react-dom";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { useGitStore } from "../../stores/useGitStore";
+import { useShallow } from "zustand/shallow";
 import { GitBranch, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined } from "lucide-react";
 import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
+import DevMemory from "./DevMemory";
 
 function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () => void; onNewShell: () => void }) {
   const [open, setOpen] = useState(false);
@@ -90,9 +92,7 @@ export default function TabBar({
   );
   const tabs = projectTerminals?.tabs ?? [];
   const activeTabId = projectTerminals?.activeTabId ?? null;
-  const setActiveTab = useTerminalStore((s) => s.setActiveTab);
-  const reorderTab = useTerminalStore((s) => s.reorderTab);
-  const updateTab = useTerminalStore((s) => s.updateTab);
+  const { setActiveTab, reorderTab, updateTab } = useTerminalStore.getState();
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [dragTabId, setDragTabId] = useState<string | null>(null);
@@ -153,37 +153,41 @@ export default function TabBar({
     window.addEventListener("pointercancel", onCancel);
   }, [computeDropIndex, reorderTab]);
 
-  const settingsTabOpen = useUIStore((s) => s.settingsTabOpen);
-  const settingsActive = useUIStore((s) => s.settingsActive);
-  const activateSettings = useUIStore((s) => s.activateSettings);
-  const closeSettingsTab = useUIStore((s) => s.closeSettingsTab);
+  // Single shallow subscription for all UI panel booleans (1 subscription, not 25)
+  const {
+    settingsTabOpen, settingsActive,
+    gitPanelOpen, gitPanelActive,
+    launcherOpen, launcherActive,
+    commandsPanelOpen, commandsPanelActive,
+    usageTabOpen, usagePanelActive,
+  } = useUIStore(useShallow((s) => ({
+    settingsTabOpen: s.settingsTabOpen,
+    settingsActive: s.settingsActive,
+    gitPanelOpen: s.gitPanelOpen,
+    gitPanelActive: s.gitPanelActive,
+    launcherOpen: s.launcherOpen,
+    launcherActive: s.launcherActive,
+    commandsPanelOpen: s.commandsPanelOpen,
+    commandsPanelActive: s.commandsPanelActive,
+    usageTabOpen: s.usageTabOpen,
+    usagePanelActive: s.usagePanelActive,
+  })));
 
-  const gitPanelOpen = useUIStore((s) => s.gitPanelOpen);
-  const gitPanelActive = useUIStore((s) => s.gitPanelActive);
-  const activateGitPanel = useUIStore((s) => s.activateGitPanel);
-  const closeGitPanel = useUIStore((s) => s.closeGitPanel);
-  const openGitPanel = useUIStore((s) => s.openGitPanel);
+  // Actions are stable — grab via getState() to avoid subscribing
+  const {
+    activateSettings, closeSettingsTab,
+    activateGitPanel, closeGitPanel, openGitPanel,
+    activateLauncher, closeLauncher,
+    activateCommandsPanel, closeCommandsPanel,
+    activateUsagePanel, closeUsageTab,
+  } = useUIStore.getState();
 
-  const launcherOpen = useUIStore((s) => s.launcherOpen);
-  const launcherActive = useUIStore((s) => s.launcherActive);
-  const activateLauncher = useUIStore((s) => s.activateLauncher);
-  const closeLauncher = useUIStore((s) => s.closeLauncher);
-
-  const commandsPanelOpen = useUIStore((s) => s.commandsPanelOpen);
-  const commandsPanelActive = useUIStore((s) => s.commandsPanelActive);
-  const activateCommandsPanel = useUIStore((s) => s.activateCommandsPanel);
-  const closeCommandsPanel = useUIStore((s) => s.closeCommandsPanel);
-
-  const usageTabOpen = useUIStore((s) => s.usageTabOpen);
-  const usagePanelActive = useUIStore((s) => s.usagePanelActive);
-  const activateUsagePanel = useUIStore((s) => s.activateUsagePanel);
-  const closeUsageTab = useUIStore((s) => s.closeUsageTab);
-
-  // Git status for the active tab
+  // Git status — only subscribe to the active tab's repo, not all repos
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
   const activeTabCwd = activeTab?.worktreePath ?? activeTab?.repoPath ?? null;
-  const projectGitStatus = useGitStore((s) => s.projectGitStatus);
-  const gitStatus = activeTabCwd ? projectGitStatus[activeTabCwd] : null;
+  const gitStatus = useGitStore((s) =>
+    activeTabCwd ? s.projectGitStatus[activeTabCwd] ?? null : null,
+  );
 
   const anyOverlay = settingsActive || launcherActive || gitPanelActive || commandsPanelActive || usagePanelActive;
 
@@ -410,6 +414,8 @@ export default function TabBar({
 
         <NewSessionButton onNewAssistant={onNewAssistant} onNewShell={onNewShell} />
       </div>
+
+      {import.meta.env.DEV && <DevMemory />}
 
       {gitStatus?.is_git_repo && (
         <div

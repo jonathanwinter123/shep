@@ -4,7 +4,7 @@ import { useGitStore } from "../stores/useGitStore";
 const POLL_INTERVAL = 5_000;
 
 export function useGitPolling(repoPaths: string[]) {
-  const refreshAll = useGitStore((s) => s.refreshAll);
+  const { refreshAll } = useGitStore.getState();
   const pathsRef = useRef(repoPaths);
   pathsRef.current = repoPaths;
 

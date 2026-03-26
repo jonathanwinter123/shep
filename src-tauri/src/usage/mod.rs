@@ -9,6 +9,7 @@ pub use db::UsageDb;
 pub use types::{LocalUsageDetails, ProviderUsageSnapshot, UsageOverview};
 
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use types::UsageWindowSnapshot;
 use helpers::{now_epoch_seconds, now_iso_string};
 
@@ -32,9 +33,11 @@ static PROVIDER_CACHE: Mutex<ProviderCache> = Mutex::new(ProviderCache {
 
 /// Fetch snapshots for all providers from whatever is currently in the DB.
 /// Does NOT trigger ingestion — that runs in the background.
+/// Provider API refresh happens in a background thread so this never blocks
+/// on network I/O.
 pub fn get_all_usage_snapshots(db: &UsageDb) -> Vec<ProviderUsageSnapshot> {
-    // Refresh provider API data if cooldown has elapsed
-    refresh_provider_cache();
+    // Kick off provider API refresh in the background (non-blocking)
+    spawn_provider_refresh();
 
     let conn = db.conn.lock().unwrap();
     vec![
@@ -46,7 +49,7 @@ pub fn get_all_usage_snapshots(db: &UsageDb) -> Vec<ProviderUsageSnapshot> {
 
 /// Fetch snapshot for a single provider.
 pub fn get_usage_snapshot(db: &UsageDb, provider: &str) -> Result<ProviderUsageSnapshot, String> {
-    refresh_provider_cache();
+    spawn_provider_refresh();
 
     let conn = db.conn.lock().unwrap();
     match provider {
@@ -71,7 +74,8 @@ pub fn get_usage_overview(db: &UsageDb, window: &str) -> Result<UsageOverview, S
 }
 
 /// Run background ingestion in a loop until fully caught up.
-/// Yields between cycles so we don't monopolize the DB lock.
+/// Processes a small batch per cycle and releases the DB lock between cycles
+/// so UI queries (usage snapshots, etc.) aren't starved.
 pub fn run_background_ingest(db: &UsageDb) {
     loop {
         let done = {
@@ -81,37 +85,82 @@ pub fn run_background_ingest(db: &UsageDb) {
         if done {
             break;
         }
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        // Yield for long enough that any queued UI query can grab the lock
+        std::thread::sleep(std::time::Duration::from_millis(200));
     }
 }
 
-/// Refresh provider API cache if cooldown has elapsed.
-fn refresh_provider_cache() {
-    let now = now_epoch_seconds();
-    let mut cache = PROVIDER_CACHE.lock().unwrap();
+/// Whether a provider refresh is already in flight (prevents piling up threads).
+static PROVIDER_REFRESH_RUNNING: AtomicBool = AtomicBool::new(false);
 
-    if now - cache.claude_fetched_at >= PROVIDER_API_COOLDOWN_SECS {
-        match providers::claude_provider_windows() {
-            Ok(data) => {
-                cache.claude = Some(data);
-                cache.claude_fetched_at = now;
-            }
-            Err(e) => {
-                eprintln!("Claude provider API error (using cache): {e}");
-                cache.claude_fetched_at = now;
+/// Spawn a background thread to refresh provider API data if cooldown has
+/// elapsed. Returns immediately — never blocks the calling thread on network I/O.
+fn spawn_provider_refresh() {
+    let now = now_epoch_seconds();
+    {
+        let cache = PROVIDER_CACHE.lock().unwrap();
+        let claude_stale = now - cache.claude_fetched_at >= PROVIDER_API_COOLDOWN_SECS;
+        let codex_stale = now - cache.codex_fetched_at >= PROVIDER_API_COOLDOWN_SECS;
+        if !claude_stale && !codex_stale {
+            return; // Cache is fresh, nothing to do
+        }
+    }
+
+    // Only allow one refresh thread at a time
+    if PROVIDER_REFRESH_RUNNING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    std::thread::spawn(move || {
+        refresh_provider_cache_sync();
+        PROVIDER_REFRESH_RUNNING.store(false, Ordering::SeqCst);
+    });
+}
+
+/// Actual (blocking) provider refresh — only called from background thread.
+fn refresh_provider_cache_sync() {
+    let now = now_epoch_seconds();
+
+    // Check + fetch Claude
+    {
+        let needs_refresh = {
+            let cache = PROVIDER_CACHE.lock().unwrap();
+            now - cache.claude_fetched_at >= PROVIDER_API_COOLDOWN_SECS
+        };
+        if needs_refresh {
+            match providers::claude_provider_windows() {
+                Ok(data) => {
+                    let mut cache = PROVIDER_CACHE.lock().unwrap();
+                    cache.claude = Some(data);
+                    cache.claude_fetched_at = now;
+                }
+                Err(e) => {
+                    eprintln!("Claude provider API error (using cache): {e}");
+                    let mut cache = PROVIDER_CACHE.lock().unwrap();
+                    cache.claude_fetched_at = now;
+                }
             }
         }
     }
 
-    if now - cache.codex_fetched_at >= PROVIDER_API_COOLDOWN_SECS {
-        match providers::codex_provider_windows() {
-            Ok(data) => {
-                cache.codex = Some(data);
-                cache.codex_fetched_at = now;
-            }
-            Err(e) => {
-                eprintln!("Codex provider API error (using cache): {e}");
-                cache.codex_fetched_at = now;
+    // Check + fetch Codex
+    {
+        let needs_refresh = {
+            let cache = PROVIDER_CACHE.lock().unwrap();
+            now - cache.codex_fetched_at >= PROVIDER_API_COOLDOWN_SECS
+        };
+        if needs_refresh {
+            match providers::codex_provider_windows() {
+                Ok(data) => {
+                    let mut cache = PROVIDER_CACHE.lock().unwrap();
+                    cache.codex = Some(data);
+                    cache.codex_fetched_at = now;
+                }
+                Err(e) => {
+                    eprintln!("Codex provider API error (using cache): {e}");
+                    let mut cache = PROVIDER_CACHE.lock().unwrap();
+                    cache.codex_fetched_at = now;
+                }
             }
         }
     }

@@ -41,9 +41,21 @@ export default function Sidebar({
   const projectState = useTerminalStore((s) => s.projectState);
   const projectCommands = useCommandStore((s) => s.projectCommands);
 
-  const tabActivity = useTerminalStore((s) => s.tabActivity);
+  // Only subscribe to the fields that affect the sidebar badges (bell, crash).
+  // Returns a stable string so the selector doesn't trigger re-renders when
+  // unrelated tabActivity fields change (e.g. active toggling during streaming).
+  const activityKey = useTerminalStore((s) => {
+    const parts: string[] = [];
+    for (const [ptyId, a] of Object.entries(s.tabActivity)) {
+      if (a.bell || (!a.alive && a.exitCode !== 0)) {
+        parts.push(`${ptyId}:${a.bell ? "b" : ""}${!a.alive ? `x${a.exitCode}` : ""}`);
+      }
+    }
+    return parts.join(",");
+  });
 
   const projectActivity = useMemo(() => {
+    const tabActivity = useTerminalStore.getState().tabActivity;
     const activity: Record<string, { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean }> = {};
     for (const repo of repos) {
       const repoTabs = projectState[repo.path]?.tabs ?? [];
@@ -65,7 +77,7 @@ export default function Sidebar({
       };
     }
     return activity;
-  }, [repos, projectState, projectCommands, tabActivity]);
+  }, [repos, projectState, projectCommands, activityKey]);
 
   return (
     <div className="w-72 shrink-0 flex flex-col h-full pr-4 mr-4 border-r border-white/8" onContextMenu={(e) => e.preventDefault()}>

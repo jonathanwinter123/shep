@@ -7,8 +7,9 @@ use std::time::UNIX_EPOCH;
 
 use super::helpers::{as_u64, home_join, now_epoch_seconds, walk_files};
 
-/// Maximum files to process per ingest cycle to keep startup snappy.
-const MAX_FILES_PER_CYCLE: usize = 50;
+/// Maximum files to process per ingest cycle. Keep small so the DB lock is
+/// released frequently and UI queries aren't starved during heavy ingestion.
+const MAX_FILES_PER_CYCLE: usize = 10;
 
 /// Run incremental ingestion for all providers.
 /// Returns true if all providers are fully caught up (no remaining work).
