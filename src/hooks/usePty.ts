@@ -78,7 +78,13 @@ function writeToPty(ptyId: number, data: string) {
         writeBatchScheduled.delete(ptyId);
         const chunks = writeBatch.get(ptyId);
         if (chunks && chunks.length > 0) {
-          term.write(chunks.join(""));
+          term.write(chunks.join(""), () => {
+            // After xterm finishes processing the write, ensure the viewport
+            // is at the bottom so new output is always visible. This is a
+            // no-op in alternate screen (TUI apps), but critical for normal
+            // buffer mode where user scrollback can leave the viewport stale.
+            term.scrollToBottom();
+          });
           chunks.length = 0;
         }
       });

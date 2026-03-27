@@ -184,8 +184,7 @@ export default function TerminalView({
       term.options.theme = createTerminalTheme(useThemeStore.getState().theme);
 
       // Refresh the viewport so rendering is restored after visibility
-      // changes (e.g. closing settings overlay). Only done here, not on
-      // every resize, to avoid resetting scroll position.
+      // changes (e.g. closing settings overlay).
       term.refresh(0, term.rows - 1);
 
       await fitAndResize();
