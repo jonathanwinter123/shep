@@ -28,17 +28,26 @@ export const useGitStore = create<GitStore>((set) => ({
       repoPaths.map((p) => gitStatus(p)),
     );
 
-    const updated: Record<string, GitStatus> = {};
-    for (let i = 0; i < repoPaths.length; i++) {
-      const result = results[i];
-      if (result.status === "fulfilled") {
-        updated[repoPaths[i]] = result.value;
-      }
-    }
+    set((state) => {
+      const prev = state.projectGitStatus;
+      let changed = false;
+      const next = { ...prev };
 
-    set((state) => ({
-      projectGitStatus: { ...state.projectGitStatus, ...updated },
-    }));
+      for (let i = 0; i < repoPaths.length; i++) {
+        const result = results[i];
+        if (result.status !== "fulfilled") continue;
+        const path = repoPaths[i];
+        const status = result.value;
+        const old = prev[path];
+        // Only update if the status actually changed
+        if (!old || old.branch !== status.branch || old.dirty !== status.dirty || old.is_git_repo !== status.is_git_repo) {
+          next[path] = status;
+          changed = true;
+        }
+      }
+
+      return changed ? { projectGitStatus: next } : state;
+    });
   },
 
   removeProject: (repoPath: string) => {

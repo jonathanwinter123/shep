@@ -76,6 +76,10 @@ impl PtyManager {
         }
     }
 
+    pub fn child_pids(&self) -> Vec<u32> {
+        self.sessions.lock().unwrap().values().filter_map(|s| s.pid()).collect()
+    }
+
     pub fn kill_all(&self) {
         let mut sessions = self.sessions.lock().unwrap();
         for (_, mut session) in sessions.drain() {

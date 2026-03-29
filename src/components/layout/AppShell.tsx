@@ -15,6 +15,7 @@ import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
 import { useUIStore } from "../../stores/useUIStore";
+import { useShallow } from "zustand/shallow";
 import { usePty } from "../../hooks/usePty";
 import { useThemeApplicator } from "../../hooks/useThemeApplicator";
 import { useGitPolling } from "../../hooks/useGitPolling";
@@ -115,7 +116,7 @@ export default function AppShell() {
     (s) => (s.activeProjectPath ? s.projectCommands[s.activeProjectPath] ?? EMPTY_COMMANDS : EMPTY_COMMANDS),
   );
 
-  const setActiveTab = useTerminalStore((s) => s.setActiveTab);
+  const { setActiveTab } = useTerminalStore.getState();
 
   const persistWorkspaceCommands = useCallback(
     async (nextCommands: CommandConfig[]) => {
@@ -146,15 +147,19 @@ export default function AppShell() {
     [activeConfig, activeRepoPath, pushNotice, setActiveConfig],
   );
 
-  const settingsActive = useUIStore((s) => s.settingsActive);
-  const gitPanelActive = useUIStore((s) => s.gitPanelActive);
-  const commandsPanelActive = useUIStore((s) => s.commandsPanelActive);
-  const launcherActive = useUIStore((s) => s.launcherActive);
-  const usagePanelActive = useUIStore((s) => s.usagePanelActive);
-  const loadEditorSettings = useEditorStore((s) => s.loadSettings);
-  const loadTerminalSettings = useTerminalSettingsStore((s) => s.loadSettings);
-  const fetchUsageSnapshots = useUsageStore((s) => s.fetchSnapshots);
-  const loadUsageSettings = useUsageSettingsStore((s) => s.loadSettings);
+  const {
+    settingsActive, gitPanelActive, commandsPanelActive, launcherActive, usagePanelActive,
+  } = useUIStore(useShallow((s) => ({
+    settingsActive: s.settingsActive,
+    gitPanelActive: s.gitPanelActive,
+    commandsPanelActive: s.commandsPanelActive,
+    launcherActive: s.launcherActive,
+    usagePanelActive: s.usagePanelActive,
+  })));
+  const { loadSettings: loadEditorSettings } = useEditorStore.getState();
+  const { loadSettings: loadTerminalSettings } = useTerminalSettingsStore.getState();
+  const { fetchSnapshots: fetchUsageSnapshots } = useUsageStore.getState();
+  const { loadSettings: loadUsageSettings } = useUsageSettingsStore.getState();
 
   useEffect(() => {
     fetchRepos();
@@ -302,7 +307,17 @@ export default function AppShell() {
       const { cols, rows } = getTerminalDimensions();
       const ptyId = await launchAssistant(assistantId, cols, rows, mode, worktreePath);
       if (ptyId) {
-        useUIStore.getState().closeLauncher();
+        // Close the launcher tab and deactivate all overlays so the new
+        // terminal tab is immediately visible. closeLauncher() alone would
+        // call activateNextOpen() which can re-activate another panel
+        // (e.g. commands), hiding the tab we just created.
+        const ui = useUIStore.getState();
+        ui.deactivateSettings();
+        ui.deactivateLauncher();
+        ui.deactivateGitPanel();
+        ui.deactivateCommandsPanel();
+        ui.deactivateUsagePanel();
+        useUIStore.setState({ launcherOpen: false });
         return true;
       }
       return false;

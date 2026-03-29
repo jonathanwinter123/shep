@@ -2,9 +2,11 @@ use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, Pt
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 use tauri::ipc::Channel;
 
 #[derive(Clone, Serialize)]
@@ -67,6 +69,29 @@ fn decode_utf8_chunks(pending: &mut Vec<u8>, incoming: &[u8]) -> Vec<String> {
 
     pending.clear();
     output
+}
+
+/// Find all descendant PIDs of the given root PID by walking the process tree.
+/// Uses `pgrep -P <pid>` to find direct children, then recurses.
+fn get_all_descendants(root_pid: i32) -> Vec<i32> {
+    let mut descendants = Vec::new();
+    let mut queue = vec![root_pid];
+
+    while let Some(parent) = queue.pop() {
+        if let Ok(output) = Command::new("pgrep").arg("-P").arg(parent.to_string()).output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if let Ok(pid) = line.trim().parse::<i32>() {
+                    if !descendants.contains(&pid) {
+                        descendants.push(pid);
+                        queue.push(pid);
+                    }
+                }
+            }
+        }
+    }
+
+    descendants
 }
 
 impl PtySession {
@@ -164,6 +189,10 @@ impl PtySession {
         })
     }
 
+    pub fn pid(&self) -> Option<u32> {
+        self.child_pid
+    }
+
     pub fn write(&mut self, data: &[u8]) -> Result<(), String> {
         self.writer
             .write_all(data)
@@ -184,15 +213,40 @@ impl PtySession {
     pub fn kill(&mut self) -> Result<(), String> {
         self.alive.store(false, Ordering::SeqCst);
 
-        // Kill the entire process group so child processes (e.g. dev servers)
-        // don't become orphans. Only signal if the process is still ours
-        // (kill(pid, 0) checks existence without sending a signal).
         if let Some(pid) = self.child_pid {
             let pid = pid as i32;
+
+            // Collect all descendant PIDs before killing anything, since
+            // dying parents cause reparenting which scrambles the tree.
+            let descendants = get_all_descendants(pid);
+
             unsafe {
+                // Signal the process group (covers children that stayed in group)
                 if libc::kill(pid, 0) == 0 {
                     libc::killpg(pid, libc::SIGHUP);
                     libc::killpg(pid, libc::SIGTERM);
+                }
+
+                // Also signal descendants that escaped to their own process
+                // group or session (e.g. opencode, which calls setsid).
+                for &child in &descendants {
+                    if libc::kill(child, 0) == 0 {
+                        libc::kill(child, libc::SIGTERM);
+                    }
+                }
+            }
+
+            // Give processes a moment to exit gracefully, then SIGKILL survivors.
+            thread::sleep(Duration::from_millis(100));
+
+            unsafe {
+                for &child in &descendants {
+                    if libc::kill(child, 0) == 0 {
+                        libc::kill(child, libc::SIGKILL);
+                    }
+                }
+                if libc::kill(pid, 0) == 0 {
+                    libc::kill(pid, libc::SIGKILL);
                 }
             }
         }

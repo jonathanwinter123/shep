@@ -23,7 +23,6 @@ interface TerminalStore {
   setTabActive: (ptyId: number, active: boolean) => void;
   setTabExited: (ptyId: number, exitCode: number) => void;
   setTabBell: (ptyId: number) => void;
-  updateLastActivity: (ptyId: number) => void;
   clearTabBell: (ptyId: number) => void;
   removeActivity: (ptyId: number) => void;
 }
@@ -187,7 +186,7 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     set((state) => ({
       tabActivity: {
         ...state.tabActivity,
-        [ptyId]: { alive: true, active: true, exitCode: null, bell: false, lastActivityAt: Date.now() },
+        [ptyId]: { alive: true, active: true, exitCode: null, bell: false },
       },
     }));
   },
@@ -213,14 +212,6 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
       const prev = state.tabActivity[ptyId];
       if (!prev) return state;
       return { tabActivity: { ...state.tabActivity, [ptyId]: { ...prev, bell: true } } };
-    });
-  },
-
-  updateLastActivity: (ptyId: number) => {
-    set((state) => {
-      const prev = state.tabActivity[ptyId];
-      if (!prev) return state;
-      return { tabActivity: { ...state.tabActivity, [ptyId]: { ...prev, lastActivityAt: Date.now() } } };
     });
   },
 

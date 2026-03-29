@@ -80,7 +80,6 @@ export interface TabActivity {
   active: boolean;
   exitCode: number | null;
   bell: boolean;
-  lastActivityAt: number;
 }
 
 // ── Coding assistants ───────────────────────────────────────────────

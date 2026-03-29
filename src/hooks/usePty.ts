@@ -15,14 +15,26 @@ const terminalInstances = new Map<number, Terminal>();
 // Buffer for PTY output that arrives before terminal is registered
 const pendingOutput = new Map<number, string[]>();
 
-// Debounce timers for activity detection — clears "active" after 3s of silence
+// Batch buffer for coalescing rapid PTY writes into single animation frames.
+// Prevents screen tearing when TUI apps (Claude Code, opencode) send screen
+// redraws larger than the 4KB PTY read buffer — without batching, xterm
+// renders intermediate states where only the top of the screen is drawn.
+const writeBatch = new Map<number, string[]>();
+const writeBatchScheduled = new Set<number>();
+
+// Debounce timers for activity detection — clears "active" after 3s of silence.
+// Activity state is tracked here (not in the store) on every data event to avoid
+// high-frequency store updates during AI streaming. The store is only updated
+// on transitions: idle→active and active→idle.
 const activityTimers = new Map<number, ReturnType<typeof setTimeout>>();
+const activityActive = new Set<number>();
 const ACTIVITY_TIMEOUT = 3000;
 const stoppingPtys = new Set<number>();
 
 function cleanupActivityState(ptyId: number) {
   const timer = activityTimers.get(ptyId);
   if (timer) { clearTimeout(timer); activityTimers.delete(ptyId); }
+  activityActive.delete(ptyId);
 }
 
 export function registerTerminal(ptyId: number, term: Terminal) {
@@ -36,9 +48,7 @@ export function flushPendingOutput(ptyId: number) {
   // Flush any buffered output
   const buffered = pendingOutput.get(ptyId);
   if (buffered) {
-    for (const data of buffered) {
-      term.write(data);
-    }
+    term.write(buffered.join(""));
     pendingOutput.delete(ptyId);
   }
 }
@@ -46,12 +56,33 @@ export function flushPendingOutput(ptyId: number) {
 export function unregisterTerminal(ptyId: number) {
   terminalInstances.delete(ptyId);
   pendingOutput.delete(ptyId);
+  writeBatch.delete(ptyId);
+  writeBatchScheduled.delete(ptyId);
 }
 
 function writeToPty(ptyId: number, data: string) {
   const term = terminalInstances.get(ptyId);
   if (term) {
-    term.write(data);
+    // Accumulate data and flush once per animation frame so xterm processes
+    // a complete (or near-complete) screen update before the renderer paints.
+    let batch = writeBatch.get(ptyId);
+    if (!batch) {
+      batch = [];
+      writeBatch.set(ptyId, batch);
+    }
+    batch.push(data);
+
+    if (!writeBatchScheduled.has(ptyId)) {
+      writeBatchScheduled.add(ptyId);
+      requestAnimationFrame(() => {
+        writeBatchScheduled.delete(ptyId);
+        const chunks = writeBatch.get(ptyId);
+        if (chunks && chunks.length > 0) {
+          term.write(chunks.join(""));
+          chunks.length = 0;
+        }
+      });
+    }
   } else {
     // Terminal not mounted yet — buffer the output
     let buf = pendingOutput.get(ptyId);
@@ -78,9 +109,9 @@ export function usePty() {
     setCommandPtyId,
     setCommandStatusForProject,
     setCommandPtyIdForProject,
-  } = useCommandStore();
-  const { addTab, removeTab, findTabByCommand, setActiveTab, initActivity, setTabActive, setTabExited, updateLastActivity, removeActivity } =
-    useTerminalStore();
+  } = useCommandStore.getState();
+  const { addTab, removeTab, findTabByCommand, setActiveTab, initActivity, setTabActive, setTabExited, removeActivity } =
+    useTerminalStore.getState();
 
   const handlePtyMessage = useCallback(
     (
@@ -91,13 +122,18 @@ export function usePty() {
     ) => {
       if (msg.event === "data") {
         writeToPty(ptyId, msg.data);
-        updateLastActivity(ptyId);
-        setTabActive(ptyId, true);
+
+        // Only update the store on the idle→active transition, not on every chunk.
+        if (!activityActive.has(ptyId)) {
+          activityActive.add(ptyId);
+          setTabActive(ptyId, true);
+        }
 
         // Reset the idle timer — after 3s of no output, mark as inactive
         const existing = activityTimers.get(ptyId);
         if (existing) clearTimeout(existing);
         activityTimers.set(ptyId, setTimeout(() => {
+          activityActive.delete(ptyId);
           setTabActive(ptyId, false);
           activityTimers.delete(ptyId);
         }, ACTIVITY_TIMEOUT));
@@ -116,7 +152,7 @@ export function usePty() {
         }
       }
     },
-    [setCommandStatusForProject, setCommandPtyIdForProject, updateLastActivity, setTabActive, setTabExited],
+    [setCommandStatusForProject, setCommandPtyIdForProject, setTabActive, setTabExited],
   );
 
   const spawnSession = useCallback(

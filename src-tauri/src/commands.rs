@@ -320,6 +320,54 @@ pub fn refresh_usage_data(db: State<'_, UsageDb>, app: tauri::AppHandle) {
     });
 }
 
+// ── Memory diagnostics (dev only) ──────────────────────────────────
+
+#[derive(serde::Serialize)]
+pub struct MemoryStats {
+    /// Shep (Rust backend) resident memory in bytes
+    pub app_rss: u64,
+    /// Total resident memory of all child processes (CLI tools) in bytes
+    pub children_rss: u64,
+}
+
+#[tauri::command]
+pub fn get_memory_stats(pty_manager: State<'_, PtyManager>) -> MemoryStats {
+    let app_pid = std::process::id() as i32;
+    let app_rss = rss_for_pid(app_pid);
+
+    // Sum RSS of all child process trees
+    let child_pids = pty_manager.child_pids();
+    let mut children_rss: u64 = 0;
+    for pid in child_pids {
+        let pid = pid as i32;
+        // The direct child + its descendants
+        children_rss += rss_for_pid(pid);
+        if let Ok(output) = Command::new("pgrep").arg("-P").arg(pid.to_string()).output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if let Ok(child) = line.trim().parse::<i32>() {
+                    children_rss += rss_for_pid(child);
+                }
+            }
+        }
+    }
+
+    MemoryStats { app_rss, children_rss }
+}
+
+/// Get resident set size (RSS) for a single PID using `ps`.
+fn rss_for_pid(pid: i32) -> u64 {
+    // ps -o rss= returns RSS in kilobytes
+    Command::new("ps")
+        .args(["-o", "rss=", "-p", &pid.to_string()])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|s| s.trim().parse::<u64>().ok())
+        .map(|kb| kb * 1024)
+        .unwrap_or(0)
+}
+
 fn open_path_in_editor(repo_path: &str, editor_id: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {

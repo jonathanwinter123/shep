@@ -7,7 +7,7 @@ interface CommandsRowProps {
 
 export default function CommandsRow({ badge }: CommandsRowProps) {
   const commandsPanelActive = useUIStore((s) => s.commandsPanelActive);
-  const toggleCommandsPanel = useUIStore((s) => s.toggleCommandsPanel);
+  const { toggleCommandsPanel } = useUIStore.getState();
 
   return (
     <button

@@ -439,6 +439,55 @@ const clear: ShepTheme = {
   termBrightWhite: "#d8e0f0",
 };
 
+/* ── GitHub Dark ───────────────────────────────────────── */
+const githubDark: ShepTheme = {
+  id: "github-dark",
+  name: "GitHub Dark",
+  isTransparent: false,
+
+  bgRadial1: "rgba(88, 166, 255, 0.06)",
+  bgRadial2: "rgba(188, 140, 255, 0.04)",
+  bgRadial3: "rgba(63, 185, 80, 0.04)",
+
+  bgLinearFrom: "#010409",
+  bgLinearMid: "#0d1117",
+  bgLinearTo: "#010409",
+
+  frameTint: "#0d1117",
+  panelTint: "rgba(13, 17, 23, 0.60)",
+  glassBorder: "rgba(48, 54, 61, 0.40)",
+  glassPanelStrong: "rgba(13, 17, 23, 0.78)",
+  glassBorderStrong: "rgba(48, 54, 61, 0.55)",
+
+  statusRunning: "#58a6ff",
+  statusStopped: "#484f58",
+  statusCrashed: "#ff7b72",
+  statusAttention: "#d29922",
+
+  appBg: "#010409",
+  appFg: "#e6edf3",
+
+  termForeground: "#e6edf3",
+  termCursor: "#e6edf3",
+  termSelection: "#264f78",
+  termBlack: "#484f58",
+  termRed: "#ff7b72",
+  termGreen: "#3fb950",
+  termYellow: "#d29922",
+  termBlue: "#58a6ff",
+  termMagenta: "#bc8cff",
+  termCyan: "#39c5cf",
+  termWhite: "#b1bac4",
+  termBrightBlack: "#6e7681",
+  termBrightRed: "#ffa198",
+  termBrightGreen: "#56d364",
+  termBrightYellow: "#e3b341",
+  termBrightBlue: "#79c0ff",
+  termBrightMagenta: "#d2a8ff",
+  termBrightCyan: "#56d4dd",
+  termBrightWhite: "#ffffff",
+};
+
 export const THEMES: Record<string, ShepTheme> = {
   dracula,
   "tokyo-night": tokyoNight,
@@ -447,12 +496,13 @@ export const THEMES: Record<string, ShepTheme> = {
   catppuccin,
   kanagawa,
   "night-owl": nightOwl,
+  "github-dark": githubDark,
   clear,
 };
 
 export const THEME_LIST: ShepTheme[] = Object.values(THEMES);
 
-export const DEFAULT_THEME_ID = "dracula";
+export const DEFAULT_THEME_ID = "catppuccin";
 
 export function getThemeById(id: string): ShepTheme {
   return THEMES[id] ?? THEMES[DEFAULT_THEME_ID];

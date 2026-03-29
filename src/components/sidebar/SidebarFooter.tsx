@@ -12,9 +12,8 @@ export default function SidebarFooter({
   onOpenInEditor,
 }: SidebarFooterProps) {
   const settingsTabOpen = useUIStore((s) => s.settingsTabOpen);
-  const toggleSettings = useUIStore((s) => s.toggleSettings);
   const usageTabOpen = useUIStore((s) => s.usageTabOpen);
-  const toggleUsagePanel = useUIStore((s) => s.toggleUsagePanel);
+  const { toggleSettings, toggleUsagePanel } = useUIStore.getState();
   const editorDisabled = !activeRepoPath;
   const footerButtonClass = "tab !flex-1 !shrink !justify-center !gap-0.5 !px-2 !py-1.5 flex-col min-w-0";
 

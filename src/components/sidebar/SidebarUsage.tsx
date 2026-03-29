@@ -40,9 +40,9 @@ function barTone(pace: ReturnType<typeof computePace>, pct: number | null | unde
 export default function SidebarUsage() {
   const snapshots = useUsageStore((s) => s.snapshots);
   const window = useUsageStore((s) => s.window);
-  const setWindow = useUsageStore((s) => s.setWindow);
   const usageSettings = useUsageSettingsStore((s) => s.settings);
-  const toggleUsagePanel = useUIStore((s) => s.toggleUsagePanel);
+  const { setWindow } = useUsageStore.getState();
+  const { toggleUsagePanel } = useUIStore.getState();
 
   const providers = useMemo(() => ALL_PROVIDERS.filter((p) => {
     if (p === "claude") return usageSettings.showClaude;
