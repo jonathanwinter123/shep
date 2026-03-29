@@ -4,9 +4,9 @@
 
 Shep gives each repo a dedicated workspace for terminals, AI coding agents, commands, and git-aware workflows. Instead of managing a pile of Terminal tabs, iTerm windows, and half-remembered shell commands, you open one app and work from a single place.
 
-## Screenshot
-
-![Shep screenshot](docs/images/shep-screenshot.png)
+<p align="center">
+  <img src="assets/shep_v4.png" alt="Shep" width="200" />
+</p>
 
 ## Why Shep
 
@@ -23,6 +23,7 @@ Shep gives each repo a dedicated workspace for terminals, AI coding agents, comm
 - **Git-aware sessions** with worktree-backed agent launches
 - **Autostart tasks** for dev servers, watchers, and recurring commands
 - **Status indicators** so crashed or noisy sessions are easy to spot
+- **Usage tracking** for AI coding assistant costs across providers
 - **In-app notices** for common failures instead of silent errors or browser alerts
 - **Native macOS packaging** via Tauri
 
