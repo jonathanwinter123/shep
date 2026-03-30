@@ -5,7 +5,7 @@
 Shep gives each repo a dedicated workspace for terminals, AI coding agents, commands, and git-aware workflows. Instead of managing a pile of Terminal tabs, iTerm windows, and half-remembered shell commands, you open one app and work from a single place.
 
 <p align="center">
-  <img src="assets/shep_v4.png" alt="Shep" width="200" />
+  <img src="assets/shep.png" alt="Shep" width="200" />
 </p>
 
 ## Why Shep
