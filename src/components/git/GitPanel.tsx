@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { GitBranch, GitFork, X } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
-import { gitChangedFiles, gitFileDiff, gitStageFile, gitUnstageFile, gitListWorktrees } from "../../lib/tauri";
+import { gitChangedFiles, gitFileDiff, gitStageFile, gitUnstageFile, gitListWorktrees, watchRepo, unwatchRepo } from "../../lib/tauri";
 import type { ChangedFile, WorktreeEntry } from "../../lib/types";
 import FileList from "./FileList";
 import DiffViewer from "./DiffViewer";
@@ -94,12 +95,22 @@ export default function GitPanel() {
     setDiffContent("");
   }, []);
 
-  // Poll git status for the viewed worktree (not covered by AppShell polling)
+  // Watch the viewed worktree for file changes (not covered by AppShell watcher)
   useEffect(() => {
     if (!validViewingPath) return;
+    void watchRepo(validViewingPath);
     refreshStatus(validViewingPath);
-    const id = setInterval(() => refreshStatus(validViewingPath), 5_000);
-    return () => clearInterval(id);
+
+    const unlisten = listen<{ paths: string[] }>("git-fs-changed", (event) => {
+      if (event.payload.paths.includes(validViewingPath)) {
+        refreshStatus(validViewingPath);
+      }
+    });
+
+    return () => {
+      void unwatchRepo(validViewingPath);
+      unlisten.then((f) => f());
+    };
   }, [validViewingPath, refreshStatus]);
 
   const fetchFiles = useCallback(async () => {

@@ -2,12 +2,14 @@ mod commands;
 mod git;
 mod pty;
 mod usage;
+mod watcher;
 mod workspace;
 
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
 use pty::manager::PtyManager;
 use usage::UsageDb;
+use watcher::GitWatcher;
 use workspace::manager::WorkspaceManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -25,6 +27,9 @@ pub fn run() {
             if let Err(e) = workspace.migrate() {
                 eprintln!("Migration warning: {e}");
             }
+
+            // Start file system watcher for git status updates
+            app.manage(GitWatcher::new(app.handle().clone()));
 
             // Kick off background usage ingestion so it doesn't block startup
             let db = app.state::<UsageDb>().inner().clone();
@@ -102,6 +107,8 @@ pub fn run() {
             commands::get_usage_overview,
             commands::refresh_usage_data,
             commands::get_memory_stats,
+            commands::watch_repo,
+            commands::unwatch_repo,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
@@ -117,6 +124,7 @@ pub fn run() {
                 api.prevent_exit();
                 let _ = app_handle.emit("quit-requested", count);
             } else {
+                app_handle.state::<GitWatcher>().shutdown();
                 pty.kill_all();
             }
         }
