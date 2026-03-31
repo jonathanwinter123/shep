@@ -9,6 +9,7 @@ use crate::git::{ChangedFile, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::PtyOutput;
 use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
+use crate::watcher::GitWatcher;
 use crate::workspace::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig};
 use crate::workspace::manager::WorkspaceManager;
 
@@ -165,88 +166,101 @@ pub fn get_pty_session_count(pty_manager: State<'_, PtyManager>) -> usize {
 }
 
 #[tauri::command]
-pub fn shutdown_and_quit(app: tauri::AppHandle, pty_manager: State<'_, PtyManager>) {
+pub fn shutdown_and_quit(app: tauri::AppHandle, pty_manager: State<'_, PtyManager>, watcher: State<'_, GitWatcher>) {
     if !pty_manager.begin_shutdown() {
         return;
     }
+    watcher.shutdown();
     pty_manager.kill_all();
     app.exit(0);
 }
 
-// ── Git commands ──────────────────────────────────────────────────
+// ── File watcher commands ─────────────────────────────────────────
 
 #[tauri::command]
-pub fn is_git_repo(path: &str) -> bool {
-    git::is_git_repo(path)
+pub fn watch_repo(path: &str, watcher: State<'_, GitWatcher>) -> Result<(), String> {
+    watcher.watch(path)
 }
 
 #[tauri::command]
-pub fn git_init(path: &str) -> Result<(), String> {
-    git::init_repo(path)
+pub fn unwatch_repo(path: &str, watcher: State<'_, GitWatcher>) -> Result<(), String> {
+    watcher.unwatch(path)
+}
+
+// ── Git commands (async — runs on Tauri thread pool, not main thread) ──
+
+#[tauri::command]
+pub async fn is_git_repo(path: String) -> bool {
+    git::is_git_repo(&path)
 }
 
 #[tauri::command]
-pub fn git_current_branch(path: &str) -> Result<String, String> {
-    git::current_branch(path)
+pub async fn git_init(path: String) -> Result<(), String> {
+    git::init_repo(&path)
 }
 
 #[tauri::command]
-pub fn git_list_branches(path: &str) -> Result<Vec<String>, String> {
-    git::list_branches(path)
+pub async fn git_current_branch(path: String) -> Result<String, String> {
+    git::current_branch(&path)
 }
 
 #[tauri::command]
-pub fn git_create_worktree(
-    repo_path: &str,
-    worktree_path: &str,
-    branch_name: &str,
+pub async fn git_list_branches(path: String) -> Result<Vec<String>, String> {
+    git::list_branches(&path)
+}
+
+#[tauri::command]
+pub async fn git_create_worktree(
+    repo_path: String,
+    worktree_path: String,
+    branch_name: String,
 ) -> Result<(), String> {
-    git::create_worktree(repo_path, worktree_path, branch_name)
+    git::create_worktree(&repo_path, &worktree_path, &branch_name)
 }
 
 #[tauri::command]
-pub fn git_remove_worktree(repo_path: &str, worktree_path: &str) -> Result<(), String> {
-    git::remove_worktree(repo_path, worktree_path)
+pub async fn git_remove_worktree(repo_path: String, worktree_path: String) -> Result<(), String> {
+    git::remove_worktree(&repo_path, &worktree_path)
 }
 
 #[tauri::command]
-pub fn git_list_worktrees(path: &str) -> Result<Vec<WorktreeEntry>, String> {
-    git::list_worktrees(path)
+pub async fn git_list_worktrees(path: String) -> Result<Vec<WorktreeEntry>, String> {
+    git::list_worktrees(&path)
 }
 
 #[tauri::command]
-pub fn git_status(path: &str) -> GitStatus {
-    git::status(path)
+pub async fn git_status(path: String) -> GitStatus {
+    git::status(&path)
 }
 
 #[tauri::command]
-pub fn git_changed_files(path: &str) -> Result<Vec<ChangedFile>, String> {
-    git::changed_files(path)
+pub async fn git_changed_files(path: String) -> Result<Vec<ChangedFile>, String> {
+    git::changed_files(&path)
 }
 
 #[tauri::command]
-pub fn git_file_diff(path: &str, file_path: &str, staged: bool) -> Result<String, String> {
-    git::file_diff(path, file_path, staged)
+pub async fn git_file_diff(path: String, file_path: String, staged: bool) -> Result<String, String> {
+    git::file_diff(&path, &file_path, staged)
 }
 
 #[tauri::command]
-pub fn git_stage_file(path: &str, file_path: &str) -> Result<(), String> {
-    git::stage_file(path, file_path)
+pub async fn git_stage_file(path: String, file_path: String) -> Result<(), String> {
+    git::stage_file(&path, &file_path)
 }
 
 #[tauri::command]
-pub fn git_unstage_file(path: &str, file_path: &str) -> Result<(), String> {
-    git::unstage_file(path, file_path)
+pub async fn git_unstage_file(path: String, file_path: String) -> Result<(), String> {
+    git::unstage_file(&path, &file_path)
 }
 
 #[tauri::command]
-pub fn git_switch_branch(path: &str, branch_name: &str) -> Result<(), String> {
-    git::switch_branch(path, branch_name)
+pub async fn git_switch_branch(path: String, branch_name: String) -> Result<(), String> {
+    git::switch_branch(&path, &branch_name)
 }
 
 #[tauri::command]
-pub fn git_create_branch(path: &str, branch_name: &str) -> Result<(), String> {
-    git::create_branch(path, branch_name)
+pub async fn git_create_branch(path: String, branch_name: String) -> Result<(), String> {
+    git::create_branch(&path, &branch_name)
 }
 
 // ── System commands ────────────────────────────────────────────────
@@ -277,13 +291,13 @@ pub fn check_command_exists(command: &str) -> bool {
 }
 
 #[tauri::command]
-pub fn get_all_usage_snapshots(db: State<'_, UsageDb>) -> Vec<ProviderUsageSnapshot> {
-    crate::usage::get_all_usage_snapshots(&db)
+pub async fn get_all_usage_snapshots(db: State<'_, UsageDb>) -> Result<Vec<ProviderUsageSnapshot>, String> {
+    Ok(crate::usage::get_all_usage_snapshots(&db))
 }
 
 #[tauri::command]
-pub fn get_usage_snapshot(db: State<'_, UsageDb>, provider: &str) -> Result<ProviderUsageSnapshot, String> {
-    crate::usage::get_usage_snapshot(&db, provider)
+pub async fn get_usage_snapshot(db: State<'_, UsageDb>, provider: String) -> Result<ProviderUsageSnapshot, String> {
+    crate::usage::get_usage_snapshot(&db, &provider)
 }
 
 #[tauri::command]
@@ -302,13 +316,13 @@ pub fn save_usage_settings(
 }
 
 #[tauri::command]
-pub fn get_usage_details(db: State<'_, UsageDb>, provider: &str, window: &str) -> Result<LocalUsageDetails, String> {
-    crate::usage::get_windowed_details(&db, provider, window)
+pub async fn get_usage_details(db: State<'_, UsageDb>, provider: String, window: String) -> Result<LocalUsageDetails, String> {
+    crate::usage::get_windowed_details(&db, &provider, &window)
 }
 
 #[tauri::command]
-pub fn get_usage_overview(db: State<'_, UsageDb>, window: &str) -> Result<UsageOverview, String> {
-    crate::usage::get_usage_overview(&db, window)
+pub async fn get_usage_overview(db: State<'_, UsageDb>, window: String) -> Result<UsageOverview, String> {
+    crate::usage::get_usage_overview(&db, &window)
 }
 
 #[tauri::command]
@@ -331,7 +345,7 @@ pub struct MemoryStats {
 }
 
 #[tauri::command]
-pub fn get_memory_stats(pty_manager: State<'_, PtyManager>) -> MemoryStats {
+pub async fn get_memory_stats(pty_manager: State<'_, PtyManager>) -> Result<MemoryStats, String> {
     let app_pid = std::process::id() as i32;
     let app_rss = rss_for_pid(app_pid);
 
@@ -352,7 +366,7 @@ pub fn get_memory_stats(pty_manager: State<'_, PtyManager>) -> MemoryStats {
         }
     }
 
-    MemoryStats { app_rss, children_rss }
+    Ok(MemoryStats { app_rss, children_rss })
 }
 
 /// Get resident set size (RSS) for a single PID using `ps`.

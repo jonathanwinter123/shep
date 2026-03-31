@@ -18,7 +18,7 @@ import { useUIStore } from "../../stores/useUIStore";
 import { useShallow } from "zustand/shallow";
 import { usePty } from "../../hooks/usePty";
 import { useThemeApplicator } from "../../hooks/useThemeApplicator";
-import { useGitPolling } from "../../hooks/useGitPolling";
+import { useGitWatcher } from "../../hooks/useGitWatcher";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
 import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
@@ -99,7 +99,7 @@ export default function AppShell() {
     }
     return paths;
   }, [repos, projectState]);
-  useGitPolling(gitPollPaths);
+  useGitWatcher(gitPollPaths);
   const allTabs = useMemo(() => {
     const all: TerminalTab[] = [];
     for (const project of Object.values(projectState)) {

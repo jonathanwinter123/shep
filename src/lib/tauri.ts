@@ -120,6 +120,16 @@ export function shutdownAndQuit(): Promise<void> {
   return invoke("shutdown_and_quit");
 }
 
+// ── File watcher commands ─────────────────────────────────────────
+
+export function watchRepo(path: string): Promise<void> {
+  return invoke("watch_repo", { path });
+}
+
+export function unwatchRepo(path: string): Promise<void> {
+  return invoke("unwatch_repo", { path });
+}
+
 // ── Git commands ──────────────────────────────────────────────────
 
 export function isGitRepo(path: string): Promise<boolean> {
