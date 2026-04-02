@@ -11,6 +11,7 @@ interface UIStore {
   launcherActive: boolean;    // launcher panel is the active view
   usageTabOpen: boolean;      // usage tab visible in tab bar
   usagePanelActive: boolean;  // usage panel is the active view
+  sidebarVisible: boolean;    // sidebar visibility
   username: string | null;
   computerName: string | null;
   openSettings: () => void;
@@ -37,6 +38,7 @@ interface UIStore {
   activateUsagePanel: () => void;
   deactivateUsagePanel: () => void;
   toggleUsagePanel: () => void;
+  toggleSidebar: () => void;
   setUsername: (name: string) => void;
   setComputerName: (name: string) => void;
 }
@@ -82,6 +84,7 @@ export const useUIStore = create<UIStore>((set) => ({
   launcherActive: false,
   usageTabOpen: false,
   usagePanelActive: false,
+  sidebarVisible: true,
   username: null,
   computerName: null,
   openSettings: () => set({
@@ -204,6 +207,7 @@ export const useUIStore = create<UIStore>((set) => ({
       }
       return { usageTabOpen: true, ...deactivateAll, usagePanelActive: true };
     }),
+  toggleSidebar: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })),
   setUsername: (name: string) => set({ username: name }),
   setComputerName: (name: string) => set({ computerName: name }),
 }));

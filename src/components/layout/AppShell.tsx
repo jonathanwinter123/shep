@@ -10,6 +10,7 @@ import CommandsPanel from "../commands/CommandsPanel";
 import SessionLauncher from "../session/SessionLauncher";
 import NoticeCenter from "../shared/NoticeCenter";
 import UsagePanel from "../usage/UsagePanel";
+import { PanelLeft, PanelLeftOpen } from "lucide-react";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -148,13 +149,14 @@ export default function AppShell() {
   );
 
   const {
-    settingsActive, gitPanelActive, commandsPanelActive, launcherActive, usagePanelActive,
+    settingsActive, gitPanelActive, commandsPanelActive, launcherActive, usagePanelActive, sidebarVisible,
   } = useUIStore(useShallow((s) => ({
     settingsActive: s.settingsActive,
     gitPanelActive: s.gitPanelActive,
     commandsPanelActive: s.commandsPanelActive,
     launcherActive: s.launcherActive,
     usagePanelActive: s.usagePanelActive,
+    sidebarVisible: s.sidebarVisible,
   })));
   const { loadSettings: loadEditorSettings } = useEditorStore.getState();
   const { loadSettings: loadTerminalSettings } = useTerminalSettingsStore.getState();
@@ -454,6 +456,29 @@ export default function AppShell() {
     return () => { unlisten.then((f) => f()); };
   }, []);
 
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+T — new terminal tab
+      if (e.metaKey && e.key === "t" && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        handleNewShell();
+      }
+      // Cmd+Shift+T — new agent session
+      if (e.metaKey && e.key === "T" && e.shiftKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        handleNewAssistant();
+      }
+      // Cmd+B — toggle sidebar
+      if (e.metaKey && e.key === "b" && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        useUIStore.getState().toggleSidebar();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleNewShell, handleNewAssistant]);
+
   const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive;
 
   return (
@@ -471,24 +496,40 @@ export default function AppShell() {
             }
           }
         }}
-      />
+      >
+        <button
+          onClick={(e) => { e.stopPropagation(); useUIStore.getState().toggleSidebar(); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute right-6 top-1/2 -translate-y-1/2 p-1 rounded opacity-30 hover:opacity-70 transition-opacity z-20"
+          title={sidebarVisible ? "Hide sidebar (Cmd+B)" : "Show sidebar (Cmd+B)"}
+          aria-label={sidebarVisible ? "Hide sidebar" : "Show sidebar"}
+        >
+          {sidebarVisible ? (
+            <PanelLeft size={20} />
+          ) : (
+            <PanelLeftOpen size={20} />
+          )}
+        </button>
+      </div>
 
       <div className="app-shell__frame">
-        <Sidebar
-          repos={repos}
-          activeRepoPath={activeRepoPath}
-          tabs={tabs}
-          activeTabId={showOverlay ? null : activeTabId}
-          commands={commands}
-          onSelectRepo={handleSelectRepo}
-          onAddProject={handleAddProject}
-          onRemoveProject={handleRemoveProject}
-          onNewAssistant={handleNewAssistant}
-          onOpenInEditor={handleOpenInEditor}
-          onSelectTab={handleSelectSidebarTab}
-          onCloseTab={closeTab}
-          onNewShell={handleNewShell}
-        />
+        {sidebarVisible && (
+          <Sidebar
+            repos={repos}
+            activeRepoPath={activeRepoPath}
+            tabs={tabs}
+            activeTabId={showOverlay ? null : activeTabId}
+            commands={commands}
+            onSelectRepo={handleSelectRepo}
+            onAddProject={handleAddProject}
+            onRemoveProject={handleRemoveProject}
+            onNewAssistant={handleNewAssistant}
+            onOpenInEditor={handleOpenInEditor}
+            onSelectTab={handleSelectSidebarTab}
+            onCloseTab={closeTab}
+            onNewShell={handleNewShell}
+          />
+        )}
 
         <div className="workspace-panel">
           <TabBar
