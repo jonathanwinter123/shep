@@ -74,6 +74,10 @@ pub struct TerminalSettings {
     pub cursor_blink: bool,
     #[serde(default = "default_scrollback")]
     pub scrollback: u32,
+    #[serde(default = "default_font_family", rename = "fontFamily")]
+    pub font_family: String,
+    #[serde(default = "default_font_size", rename = "fontSize")]
+    pub font_size: u32,
 }
 
 fn default_cursor_style() -> String {
@@ -84,12 +88,22 @@ fn default_scrollback() -> u32 {
     10000
 }
 
+fn default_font_family() -> String {
+    "'MesloLGS NF', 'Menlo', 'Monaco', 'Courier New', monospace".to_string()
+}
+
+fn default_font_size() -> u32 {
+    14
+}
+
 impl Default for TerminalSettings {
     fn default() -> Self {
         TerminalSettings {
             cursor_style: default_cursor_style(),
             cursor_blink: true,
             scrollback: default_scrollback(),
+            font_family: default_font_family(),
+            font_size: default_font_size(),
         }
     }
 }

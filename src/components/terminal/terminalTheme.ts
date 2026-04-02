@@ -59,5 +59,7 @@ export function applyTerminalSettings(settings: TerminalSettings): void {
     entry.term.options.cursorStyle = settings.cursorStyle;
     entry.term.options.cursorBlink = settings.cursorBlink;
     entry.term.options.scrollback = settings.scrollback;
+    entry.term.options.fontFamily = settings.fontFamily;
+    entry.term.options.fontSize = settings.fontSize;
   }
 }

@@ -9,6 +9,7 @@ import { useKeybindingStore } from "../../stores/useKeybindingStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { FONT_OPTIONS, FONT_SIZE_OPTIONS } from "../../lib/terminalConfig";
 import type { CursorStyle, UsageProvider } from "../../lib/types";
 import { getErrorMessage } from "../../lib/errors";
 
@@ -220,6 +221,47 @@ export default function SettingsPanel() {
         >
           {termSettings.cursorBlink ? "On" : "Off"}
         </button>
+      </div>
+
+      <div className="settings-row">
+        <span className="settings-row__label">Font</span>
+        <div className="flex flex-wrap gap-2">
+          {FONT_OPTIONS.map((font) => (
+            <button
+              key={font.id}
+              onClick={() => void updateTermSettings({ fontFamily: font.id })}
+              className={`option-card option-card--compact ${termSettings.fontFamily === font.id ? "selected" : ""}`}
+            >
+              <span>{font.label}</span>
+            </button>
+          ))}
+          <input
+            type="text"
+            placeholder="Custom font name..."
+            className="option-card option-card--compact w-48 bg-transparent text-sm"
+            value={FONT_OPTIONS.some((f) => f.id === termSettings.fontFamily) ? "" : termSettings.fontFamily}
+            onChange={(e) => {
+              if (e.target.value) {
+                void updateTermSettings({ fontFamily: e.target.value });
+              }
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="settings-row">
+        <span className="settings-row__label">Font Size</span>
+        <div className="flex flex-wrap gap-2">
+          {FONT_SIZE_OPTIONS.map((size) => (
+            <button
+              key={size}
+              onClick={() => void updateTermSettings({ fontSize: size })}
+              className={`option-card option-card--compact ${termSettings.fontSize === size ? "selected" : ""}`}
+            >
+              {size}px
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="settings-row">

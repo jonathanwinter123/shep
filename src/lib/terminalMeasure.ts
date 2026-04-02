@@ -1,10 +1,7 @@
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import {
-  TERMINAL_FONT_FAMILY,
-  TERMINAL_FONT_SIZE,
-  TERMINAL_LINE_HEIGHT,
-} from "./terminalConfig";
+import { TERMINAL_LINE_HEIGHT } from "./terminalConfig";
+import { useTerminalSettingsStore } from "../stores/useTerminalSettingsStore";
 
 /**
  * Compute terminal cols/rows from a container's pixel dimensions.
@@ -19,6 +16,8 @@ export function computeTerminalSize(
     return { cols: 80, rows: 24 };
   }
 
+  const { fontFamily, fontSize } = useTerminalSettingsStore.getState().settings;
+
   const container = document.createElement("div");
   container.style.position = "fixed";
   container.style.left = "-9999px";
@@ -29,8 +28,8 @@ export function computeTerminalSize(
   document.body.appendChild(container);
 
   const term = new Terminal({
-    fontSize: TERMINAL_FONT_SIZE,
-    fontFamily: TERMINAL_FONT_FAMILY,
+    fontSize,
+    fontFamily,
     lineHeight: TERMINAL_LINE_HEIGHT,
     scrollback: 10000,
     allowProposedApi: true,
