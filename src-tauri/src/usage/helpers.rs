@@ -2,23 +2,45 @@ use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+const COMMAND_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub fn run_command(program: &str, args: &[&str]) -> Result<String, String> {
-    let output = Command::new(program)
+    let mut child = Command::new(program)
         .args(args)
-        .output()
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
         .map_err(|e| format!("Failed to run {program}: {e}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "{program} exited with status {:?}: {}",
-            output.status.code(),
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+
+    let start = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let output = child.wait_with_output()
+                    .map_err(|e| format!("Failed to read output from {program}: {e}"))?;
+                if !status.success() {
+                    return Err(format!(
+                        "{program} exited with status {:?}: {}",
+                        status.code(),
+                        String::from_utf8_lossy(&output.stderr).trim()
+                    ));
+                }
+                return String::from_utf8(output.stdout)
+                    .map(|s| s.trim().to_string())
+                    .map_err(|e| format!("Invalid UTF-8 from {program}: {e}"));
+            }
+            Ok(None) => {
+                if start.elapsed() > COMMAND_TIMEOUT {
+                    let _ = child.kill();
+                    return Err(format!("{program} timed out after {}s", COMMAND_TIMEOUT.as_secs()));
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(e) => return Err(format!("Error waiting for {program}: {e}")),
+        }
     }
-    String::from_utf8(output.stdout)
-        .map(|s| s.trim().to_string())
-        .map_err(|e| format!("Invalid UTF-8 from {program}: {e}"))
 }
 
 pub fn home_join(suffix: &str) -> Result<PathBuf, String> {

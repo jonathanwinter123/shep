@@ -22,6 +22,7 @@ pub fn codex_provider_windows() -> Result<Vec<UsageWindowSnapshot>, String> {
         "curl",
         &[
             "-sS",
+            "--max-time", "10",
             "-H",
             &format!("Authorization: Bearer {token}"),
             "https://chatgpt.com/backend-api/wham/usage",
@@ -60,6 +61,7 @@ pub fn claude_provider_windows() -> Result<(Vec<UsageWindowSnapshot>, Vec<UsageW
         "curl",
         &[
             "-sS",
+            "--max-time", "10",
             "-H",
             &format!("Authorization: Bearer {token}"),
             "-H",
