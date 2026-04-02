@@ -271,6 +271,11 @@ pub fn get_username() -> String {
 }
 
 #[tauri::command]
+pub fn get_default_shell() -> String {
+    std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string())
+}
+
+#[tauri::command]
 pub fn get_computer_name() -> String {
     Command::new("scutil")
         .args(["--get", "ComputerName"])

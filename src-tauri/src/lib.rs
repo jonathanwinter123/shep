@@ -83,6 +83,7 @@ pub fn run() {
             commands::get_pty_session_count,
             commands::shutdown_and_quit,
             commands::get_username,
+            commands::get_default_shell,
             commands::get_computer_name,
             commands::is_git_repo,
             commands::git_init,
