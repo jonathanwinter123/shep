@@ -28,6 +28,7 @@ import { useEditorStore } from "../../stores/useEditorStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { useUsageStore } from "../../stores/useUsageStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
+import { useUpdateStore } from "../../stores/useUpdateStore";
 import { initNotifications } from "../../lib/notifications";
 import { getErrorMessage } from "../../lib/errors";
 import { useNoticeStore } from "../../stores/useNoticeStore";
@@ -172,7 +173,20 @@ export default function AppShell() {
     void initNotifications();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));
-  }, [fetchRepos, loadEditorSettings, loadTerminalSettings, loadUsageSettings, fetchUsageSnapshots]);
+
+    // Check for updates after startup settles
+    const updateTimer = window.setTimeout(async () => {
+      await useUpdateStore.getState().checkForUpdate();
+      const { status, availableVersion } = useUpdateStore.getState();
+      if (status === "available" && availableVersion) {
+        pushNotice(
+          { tone: "info", title: "Update available", message: `Version ${availableVersion} is ready to download` },
+          { durationMs: 8000 },
+        );
+      }
+    }, 3000);
+    return () => window.clearTimeout(updateTimer);
+  }, [fetchRepos, loadEditorSettings, loadTerminalSettings, loadUsageSettings, fetchUsageSnapshots, pushNotice]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {

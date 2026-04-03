@@ -8,6 +8,7 @@ import { useThemeStore } from "../../stores/useThemeStore";
 import { useKeybindingStore } from "../../stores/useKeybindingStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
+import { useUpdateStore } from "../../stores/useUpdateStore";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { FONT_OPTIONS, FONT_SIZE_OPTIONS } from "../../lib/terminalConfig";
 import type { CursorStyle, UsageProvider } from "../../lib/types";
@@ -66,6 +67,16 @@ export default function SettingsPanel() {
   const usageError = useUsageSettingsStore((s) => s.error);
   const loadUsageSettings = useUsageSettingsStore((s) => s.loadSettings);
   const setProviderEnabled = useUsageSettingsStore((s) => s.setProviderEnabled);
+
+  const updateStatus = useUpdateStore((s) => s.status);
+  const availableVersion = useUpdateStore((s) => s.availableVersion);
+  const releaseNotesUrl = useUpdateStore((s) => s.releaseNotesUrl);
+  const downloadProgress = useUpdateStore((s) => s.downloadProgress);
+  const updateError = useUpdateStore((s) => s.error);
+  const hasChecked = useUpdateStore((s) => s.hasChecked);
+  const checkForUpdate = useUpdateStore((s) => s.checkForUpdate);
+  const downloadAndInstall = useUpdateStore((s) => s.downloadAndInstall);
+  const restartApp = useUpdateStore((s) => s.restartApp);
 
   useEffect(() => {
     if (!hasLoaded) void loadSettings();
@@ -315,6 +326,73 @@ export default function SettingsPanel() {
       <p className="text-xs text-white/30 mt-6">
         Settings are saved to ~/.shep/config.yml
       </p>
+
+      <hr className="settings-divider" />
+
+      {/* ── Updates ─────────────────────────────────────────── */}
+      <h2 className="section-label !p-0 mb-4">Updates</h2>
+
+      {updateStatus === "available" && (
+        <div className="settings-meta-grid mb-4" style={{ border: "1px solid rgba(122,162,247,0.3)", borderRadius: 8, padding: 12 }}>
+          <div className="settings-meta-row">
+            <span className="settings-meta-row__label">New version</span>
+            <span>{availableVersion}</span>
+          </div>
+          {releaseNotesUrl && (
+            <div className="settings-meta-row">
+              <span className="settings-meta-row__label">Release notes</span>
+              <button
+                className="text-sm underline text-white/60 hover:text-white/80 bg-transparent border-0 cursor-pointer p-0"
+                onClick={() => import("@tauri-apps/plugin-shell").then((mod) => mod.open(releaseNotesUrl))}
+              >
+                View on GitHub
+              </button>
+            </div>
+          )}
+          <button
+            className="btn-primary mt-2"
+            onClick={() => void downloadAndInstall()}
+          >
+            Download &amp; Install
+          </button>
+        </div>
+      )}
+
+      {updateStatus === "downloading" && (
+        <div className="mb-4">
+          <div className="update-progress-track mb-2">
+            <div className="update-progress-fill" style={{ width: `${downloadProgress}%` }} />
+          </div>
+          <div className="text-xs text-white/40">Downloading... {downloadProgress}%</div>
+        </div>
+      )}
+
+      {updateStatus === "ready" && (
+        <div className="mb-4">
+          <div className="text-sm text-white/60 mb-2">Update downloaded and ready to install.</div>
+          <button className="btn-primary" onClick={() => void restartApp()}>
+            Restart Now
+          </button>
+        </div>
+      )}
+
+      {updateStatus === "error" && updateError && (
+        <div className="text-sm text-red-300 mb-4">{updateError}</div>
+      )}
+
+      {updateStatus !== "downloading" && updateStatus !== "ready" && (
+        <button
+          className="btn-primary"
+          disabled={updateStatus === "checking"}
+          onClick={() => void checkForUpdate()}
+        >
+          {updateStatus === "checking" ? "Checking..." : "Check for Updates"}
+        </button>
+      )}
+
+      {updateStatus === "idle" && hasChecked && (
+        <div className="text-xs text-white/40 mt-2">You're on the latest version.</div>
+      )}
 
       <hr className="settings-divider" />
 

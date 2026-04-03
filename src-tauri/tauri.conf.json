@@ -30,7 +30,7 @@
     "security": {
       "csp": {
         "default-src": "'self' customprotocol: asset:",
-        "connect-src": "ipc: http://ipc.localhost",
+        "connect-src": "ipc: http://ipc.localhost https://github.com https://objects.githubusercontent.com",
         "img-src": "'self' asset: http://asset.localhost data: blob:",
         "style-src": "'unsafe-inline' 'self'",
         "font-src": "'self' data:",
@@ -40,7 +40,7 @@
       },
       "devCsp": {
         "default-src": "'self' customprotocol: asset: http://localhost:5173",
-        "connect-src": "ipc: http://ipc.localhost http://localhost:5173 ws://localhost:5173",
+        "connect-src": "ipc: http://ipc.localhost http://localhost:5173 ws://localhost:5173 https://github.com https://objects.githubusercontent.com",
         "img-src": "'self' asset: http://asset.localhost data: blob: http://localhost:5173",
         "style-src": "'unsafe-inline' 'self' http://localhost:5173",
         "font-src": "'self' data: http://localhost:5173",
@@ -60,5 +60,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/stumptowndoug/shep/releases/latest/download/latest.json"
+      ],
+      "pubkey": "REPLACE_WITH_PUBLIC_KEY"
+    }
   }
 }
