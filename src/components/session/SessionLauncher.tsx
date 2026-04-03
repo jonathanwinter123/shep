@@ -10,6 +10,9 @@ import {
   gitCreateBranch,
   gitCreateWorktree,
   checkCommandExists,
+  copyPath,
+  createSymlink,
+  runShellCommand,
 } from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { ChevronDown, GitBranch, GitFork, HandMetal, Play } from "lucide-react";
@@ -67,6 +70,7 @@ function modeBranchSlug(mode: SessionMode): string {
 
 export default function SessionLauncher({ onStartSession }: SessionLauncherProps) {
   const activeRepoPath = useRepoStore((s) => s.activeRepoPath);
+  const activeConfig = useRepoStore((s) => s.activeConfig);
   const pushNotice = useNoticeStore((s) => s.pushNotice);
 
   const [selectedAssistant, setSelectedAssistant] = useState<CodingAssistant | null>(null);
@@ -184,6 +188,31 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         const folderName = finalBranch.replace(/\//g, "-") + "-wt";
         worktreePath = `${activeRepoPath}/../.shep-worktrees/${folderName}`;
         await gitCreateWorktree(activeRepoPath, worktreePath, finalBranch);
+
+        // Execute environment blueprint: copy files, create symlinks, run post-create commands
+        const blueprint = activeConfig?.worktree;
+        if (blueprint && worktreePath) {
+          for (const entry of blueprint.copy) {
+            await copyPath(`${activeRepoPath}/${entry}`, `${worktreePath}/${entry}`).catch((err) => {
+              if (import.meta.env.DEV) console.warn(`Blueprint copy failed for ${entry}:`, err);
+            });
+          }
+          for (const entry of blueprint.symlink) {
+            await createSymlink(`${activeRepoPath}/${entry}`, `${worktreePath}/${entry}`).catch((err) => {
+              if (import.meta.env.DEV) console.warn(`Blueprint symlink failed for ${entry}:`, err);
+            });
+          }
+          for (const cmd of blueprint.post_create) {
+            const exitCode = await runShellCommand(cmd, worktreePath).catch(() => -1);
+            if (exitCode !== 0) {
+              pushNotice({
+                tone: "error",
+                title: "Worktree setup warning",
+                message: `"${cmd}" exited with code ${exitCode}`,
+              });
+            }
+          }
+        }
       } else if (isGit && !usesWorktree && !repoWasInitialized) {
         // Branch mode: switch to selected base branch if needed
         if (selectedBranch !== currentBranch) {

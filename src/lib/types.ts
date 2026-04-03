@@ -14,10 +14,17 @@ export interface CommandConfig {
   cwd: string | null;
 }
 
+export interface WorktreeConfig {
+  copy: string[];
+  symlink: string[];
+  post_create: string[];
+}
+
 export interface WorkspaceConfig {
   name: string;
   commands: CommandConfig[];
   assistants: AssistantConfig[];
+  worktree: WorktreeConfig;
 }
 
 export interface RegisteredRepo {

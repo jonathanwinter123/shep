@@ -542,6 +542,92 @@ select {
   color: var(--text-primary);
 }
 
+/* ── Worktree close dialog ─────────────────────────────────────────── */
+
+.worktree-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.worktree-dialog {
+  width: min(340px, calc(100vw - 48px));
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--surface-raised), transparent 4%);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.worktree-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.worktree-dialog__title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.worktree-dialog__branch {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.worktree-dialog__warning {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(247, 118, 142, 0.9);
+}
+
+.worktree-dialog__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.worktree-dialog__btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.worktree-dialog__btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-primary);
+}
+
+.worktree-dialog__btn--discard:hover {
+  border-color: rgba(247, 118, 142, 0.34);
+  color: rgba(247, 118, 142, 0.9);
+}
+
 .notice-card__copy span {
   color: var(--text-secondary);
   overflow-wrap: anywhere;
@@ -623,6 +709,16 @@ select {
 .tab.drop-after::after {
   right: -2px;
 }
+.tab-branch-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tab-rename-input {
   background: transparent;
   border: none;

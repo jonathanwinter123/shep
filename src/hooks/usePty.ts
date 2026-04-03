@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { spawnPty, killPty, gitRemoveWorktree, gitCurrentBranch, getDefaultShell } from "../lib/tauri";
+import { spawnPty, killPty, gitRemoveWorktree, gitPushBranch, gitStatus, gitCurrentBranch, getDefaultShell } from "../lib/tauri";
 import type { PtyOutput, CommandConfig, SessionMode } from "../lib/types";
 import { useCommandStore } from "../stores/useCommandStore";
 import { useTerminalStore, nextTabId } from "../stores/useTerminalStore";
@@ -8,6 +8,7 @@ import { useNoticeStore } from "../stores/useNoticeStore";
 import { CODING_ASSISTANTS } from "../components/sidebar/constants";
 import type { Terminal } from "@xterm/xterm";
 import { getErrorMessage } from "../lib/errors";
+import { useWorktreeDialogStore } from "../stores/useWorktreeDialogStore";
 
 // Map ptyId -> xterm instance for writing output
 const terminalInstances = new Map<number, Terminal>();
@@ -193,6 +194,14 @@ export function usePty() {
       if (!activeRepoPath) return;
       const commandName = command.name;
 
+      // Use the active tab's worktree path as base if available
+      const termState = useTerminalStore.getState();
+      const ps = termState.projectState[activeRepoPath];
+      const activeTab = ps?.activeTabId
+        ? ps.tabs.find((t) => t.id === ps.activeTabId)
+        : null;
+      const basePath = activeTab?.worktreePath ?? activeRepoPath;
+
       try {
         const ptyId = await spawnSession(
           command.command,
@@ -200,7 +209,7 @@ export function usePty() {
           cols,
           rows,
           commandName,
-          resolveCommandCwd(activeRepoPath, command.cwd ?? null),
+          resolveCommandCwd(basePath, command.cwd ?? null),
         );
         if (!ptyId) return;
 
@@ -409,6 +418,48 @@ export function usePty() {
       const tab = tabs.find((t) => t.id === tabId);
       if (!tab) return;
 
+      // For worktree sessions, ask the user what to do before closing
+      if (tab.worktreePath) {
+        const status = await gitStatus(tab.worktreePath).catch(() => null);
+        const dirty = status?.dirty ?? false;
+
+        const choice = await useWorktreeDialogStore.getState().open({
+          tabId,
+          branch: tab.branch,
+          worktreePath: tab.worktreePath,
+          repoPath: tab.repoPath,
+          dirty,
+        });
+
+        if (!choice) return; // User cancelled
+
+        if (choice === "push") {
+          if (tab.branch) {
+            try {
+              await gitPushBranch(tab.worktreePath, tab.branch);
+              pushNotice({ tone: "success", title: `Pushed ${tab.branch} to remote` });
+            } catch (error) {
+              pushNotice({
+                tone: "error",
+                title: "Push failed",
+                message: getErrorMessage(error),
+              });
+              return; // Don't close if push failed
+            }
+          }
+          await gitRemoveWorktree(tab.repoPath, tab.worktreePath).catch((error) => {
+            if (import.meta.env.DEV) console.warn("Failed to remove worktree:", error);
+            pushNotice({ tone: "error", title: "Worktree cleanup failed", message: getErrorMessage(error) });
+          });
+        } else if (choice === "discard") {
+          await gitRemoveWorktree(tab.repoPath, tab.worktreePath).catch((error) => {
+            if (import.meta.env.DEV) console.warn("Failed to remove worktree:", error);
+            pushNotice({ tone: "error", title: "Worktree cleanup failed", message: getErrorMessage(error) });
+          });
+        }
+        // "keep" — leave worktree on disk, just close the tab
+      }
+
       cleanupActivityState(tab.ptyId);
       stoppingPtys.add(tab.ptyId);
       await killPty(tab.ptyId).catch(() => {
@@ -422,20 +473,6 @@ export function usePty() {
         setCommandPtyId(tab.commandName, null);
       }
 
-      // Clean up worktree for YOLO sessions
-      if (tab.worktreePath) {
-        await gitRemoveWorktree(tab.repoPath, tab.worktreePath).catch((error) => {
-          if (import.meta.env.DEV) {
-            console.warn("Failed to remove worktree:", error);
-          }
-          pushNotice({
-            tone: "error",
-            title: "Worktree cleanup failed",
-            message: getErrorMessage(error),
-          });
-        });
-      }
-
       removeTab(tabId);
     },
     [setCommandStatus, setCommandPtyId, removeTab, removeActivity, pushNotice],
@@ -444,6 +481,37 @@ export function usePty() {
   const killProjectPtys = useCallback(async (repoPath: string) => {
     const state = useTerminalStore.getState();
     const tabs = state.projectState[repoPath]?.tabs ?? [];
+
+    // Collect worktree tabs that need user decision
+    const worktreeTabs = tabs.filter((t) => t.worktreePath);
+    for (const tab of worktreeTabs) {
+      const status = await gitStatus(tab.worktreePath!).catch(() => null);
+      const dirty = status?.dirty ?? false;
+
+      const choice = await useWorktreeDialogStore.getState().open({
+        tabId: tab.id,
+        branch: tab.branch,
+        worktreePath: tab.worktreePath!,
+        repoPath: tab.repoPath,
+        dirty,
+      });
+
+      if (!choice) return; // User cancelled — abort the whole operation
+
+      if (choice === "push" && tab.branch) {
+        try {
+          await gitPushBranch(tab.worktreePath!, tab.branch);
+          pushNotice({ tone: "success", title: `Pushed ${tab.branch} to remote` });
+        } catch (error) {
+          pushNotice({ tone: "error", title: "Push failed", message: getErrorMessage(error) });
+          return;
+        }
+        await gitRemoveWorktree(tab.repoPath, tab.worktreePath!).catch(() => {});
+      } else if (choice === "discard") {
+        await gitRemoveWorktree(tab.repoPath, tab.worktreePath!).catch(() => {});
+      }
+    }
+
     for (const tab of tabs) {
       cleanupActivityState(tab.ptyId);
       stoppingPtys.add(tab.ptyId);
@@ -452,19 +520,6 @@ export function usePty() {
       });
       unregisterTerminal(tab.ptyId);
       removeActivity(tab.ptyId);
-
-      if (tab.worktreePath) {
-        await gitRemoveWorktree(tab.repoPath, tab.worktreePath).catch((error) => {
-          if (import.meta.env.DEV) {
-            console.warn("Failed to remove worktree:", error);
-          }
-          pushNotice({
-            tone: "error",
-            title: "Worktree cleanup failed",
-            message: getErrorMessage(error),
-          });
-        });
-      }
     }
   }, [removeActivity, pushNotice]);
 

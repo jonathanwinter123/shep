@@ -1,5 +1,5 @@
 import type { TerminalTab, TabActivity } from "../../lib/types";
-import { Terminal } from "lucide-react";
+import { Terminal, GitFork } from "lucide-react";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { handleActionKey } from "../../lib/a11y";
 
@@ -35,7 +35,11 @@ export default function TerminalItem({
       aria-pressed={isActive}
       aria-label={`Open terminal tab ${tab.label}`}
     >
-      <Terminal size={14} className="shrink-0" />
+      {tab.worktreePath ? (
+        <GitFork size={14} className="shrink-0" style={{ opacity: 0.6 }} />
+      ) : (
+        <Terminal size={14} className="shrink-0" />
+      )}
       <span className="min-w-0 truncate text-left">{tab.label}</span>
       <span className={`sidebar-status-dot ${dotClass(activity)}`} />
       <button

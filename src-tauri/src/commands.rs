@@ -219,6 +219,11 @@ pub async fn git_create_worktree(
 }
 
 #[tauri::command]
+pub async fn git_push_branch(path: String, branch: String) -> Result<(), String> {
+    git::push_branch(&path, &branch)
+}
+
+#[tauri::command]
 pub async fn git_remove_worktree(repo_path: String, worktree_path: String) -> Result<(), String> {
     git::remove_worktree(&repo_path, &worktree_path)
 }
@@ -226,6 +231,68 @@ pub async fn git_remove_worktree(repo_path: String, worktree_path: String) -> Re
 #[tauri::command]
 pub async fn git_list_worktrees(path: String) -> Result<Vec<WorktreeEntry>, String> {
     git::list_worktrees(&path)
+}
+
+#[tauri::command]
+pub async fn copy_path(src: String, dest: String) -> Result<(), String> {
+    let src_path = Path::new(&src);
+    if !src_path.exists() {
+        return Ok(()); // Skip silently if source doesn't exist
+    }
+    if src_path.is_dir() {
+        copy_dir_recursive(src_path, Path::new(&dest))
+    } else {
+        std::fs::copy(&src, &dest)
+            .map(|_| ())
+            .map_err(|e| format!("Failed to copy {src}: {e}"))
+    }
+}
+
+fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(dest).map_err(|e| format!("Failed to create dir {}: {e}", dest.display()))?;
+    for entry in std::fs::read_dir(src).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let dest_child = dest.join(entry.file_name());
+        if entry.file_type().map_err(|e| e.to_string())?.is_dir() {
+            copy_dir_recursive(&entry.path(), &dest_child)?;
+        } else {
+            std::fs::copy(entry.path(), &dest_child).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn create_symlink(target: String, link_path: String) -> Result<(), String> {
+    let target_path = Path::new(&target);
+    if !target_path.exists() {
+        return Ok(()); // Skip silently if target doesn't exist
+    }
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(&target, &link_path)
+            .map_err(|e| format!("Failed to symlink {target} -> {link_path}: {e}"))
+    }
+    #[cfg(windows)]
+    {
+        if target_path.is_dir() {
+            std::os::windows::fs::symlink_dir(&target, &link_path)
+                .map_err(|e| format!("Failed to symlink {target} -> {link_path}: {e}"))
+        } else {
+            std::os::windows::fs::symlink_file(&target, &link_path)
+                .map_err(|e| format!("Failed to symlink {target} -> {link_path}: {e}"))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn run_shell_command(command: String, cwd: String) -> Result<i32, String> {
+    let output = Command::new("sh")
+        .args(["-c", &command])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to run command: {e}"))?;
+    Ok(output.status.code().unwrap_or(-1))
 }
 
 #[tauri::command]

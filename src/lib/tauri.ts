@@ -156,6 +156,22 @@ export function gitCreateWorktree(
   return invoke("git_create_worktree", { repoPath, worktreePath, branchName });
 }
 
+export function gitPushBranch(path: string, branch: string): Promise<void> {
+  return invoke("git_push_branch", { path, branch });
+}
+
+export function copyPath(src: string, dest: string): Promise<void> {
+  return invoke("copy_path", { src, dest });
+}
+
+export function createSymlink(target: string, linkPath: string): Promise<void> {
+  return invoke("create_symlink", { target, linkPath });
+}
+
+export function runShellCommand(command: string, cwd: string): Promise<number> {
+  return invoke("run_shell_command", { command, cwd });
+}
+
 export function gitRemoveWorktree(
   repoPath: string,
   worktreePath: string,

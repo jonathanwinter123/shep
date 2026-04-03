@@ -13,12 +13,24 @@ import { getErrorMessage } from "../../lib/errors";
 
 export default function GitPanel() {
   const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
+  const activeTab = useTerminalStore((s) => {
+    const path = s.activeProjectPath;
+    if (!path) return null;
+    const ps = s.projectState[path];
+    if (!ps?.activeTabId) return null;
+    return ps.tabs.find((t) => t.id === ps.activeTabId) ?? null;
+  });
   const projectGitStatus = useGitStore((s) => s.projectGitStatus);
   const refreshStatus = useGitStore((s) => s.refreshStatus);
   const pushNotice = useNoticeStore((s) => s.pushNotice);
 
   // Worktree viewing state: null = main repo, string = worktree path
+  // Auto-sync to the active tab's worktree when switching tabs
   const [viewingPath, setViewingPath] = useState<string | null>(null);
+  const activeTabWorktree = activeTab?.worktreePath ?? null;
+  useEffect(() => {
+    setViewingPath(activeTabWorktree);
+  }, [activeTabWorktree]);
 
   // Worktrees fetched from git
   const [worktreeEntries, setWorktreeEntries] = useState<WorktreeEntry[]>([]);

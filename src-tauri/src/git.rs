@@ -180,6 +180,19 @@ pub fn create_worktree(
     Ok(())
 }
 
+pub fn push_branch(path: &str, branch: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["-C", path, "push", "-u", "origin", branch])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(())
+}
+
 pub fn remove_worktree(repo_path: &str, worktree_path: &str) -> Result<(), String> {
     let output = Command::new("git")
         .args(["-C", repo_path, "worktree", "remove", worktree_path])

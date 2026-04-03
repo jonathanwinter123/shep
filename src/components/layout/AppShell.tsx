@@ -9,6 +9,7 @@ import GitPanel from "../git/GitPanel";
 import CommandsPanel from "../commands/CommandsPanel";
 import SessionLauncher from "../session/SessionLauncher";
 import NoticeCenter from "../shared/NoticeCenter";
+import WorktreeCloseDialog from "../shared/WorktreeCloseDialog";
 import UsagePanel from "../usage/UsagePanel";
 import { PanelLeft, PanelLeftOpen } from "lucide-react";
 import { useRepoStore } from "../../stores/useRepoStore";
@@ -23,7 +24,7 @@ import { useGitWatcher } from "../../hooks/useGitWatcher";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
 import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit, refreshUsageData } from "../../lib/tauri";
+import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit, refreshUsageData, gitListWorktrees } from "../../lib/tauri";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { useUsageStore } from "../../stores/useUsageStore";
@@ -128,6 +129,7 @@ export default function AppShell() {
         name: activeConfig?.name ?? fallbackWorkspaceName(activeRepoPath),
         assistants: activeConfig?.assistants ?? [],
         commands: nextCommands,
+        worktree: activeConfig?.worktree ?? { copy: [], symlink: [], post_create: [] },
       };
 
       try {
@@ -203,6 +205,46 @@ export default function AppShell() {
     });
     return () => { unlisten.then((f) => f()); };
   }, [fetchUsageSnapshots]);
+
+  // Check for orphaned worktrees on startup
+  const orphanCheckDone = useRef(false);
+  useEffect(() => {
+    if (orphanCheckDone.current || repos.length === 0) return;
+    orphanCheckDone.current = true;
+
+    (async () => {
+      for (const repo of repos) {
+        if (!repo.valid) continue;
+        try {
+          const worktrees = await gitListWorktrees(repo.path);
+          const shepWorktrees = worktrees.filter(
+            (w) => !w.is_main && w.path.includes(".shep-worktrees"),
+          );
+          if (shepWorktrees.length === 0) continue;
+
+          // Check if any tab references these worktrees
+          const termState = useTerminalStore.getState();
+          const allTabs = Object.values(termState.projectState).flatMap((ps) => ps.tabs);
+          const activePaths = new Set(allTabs.map((t) => t.worktreePath).filter(Boolean));
+
+          const orphans = shepWorktrees.filter((w) => !activePaths.has(w.path));
+          if (orphans.length > 0) {
+            const branchNames = orphans.map((o) => o.branch ?? "unknown").join(", ");
+            pushNotice(
+              {
+                tone: "info",
+                title: `${orphans.length} orphaned worktree${orphans.length > 1 ? "s" : ""} found`,
+                message: `Branches: ${branchNames}. Use git worktree remove to clean up.`,
+              },
+              { durationMs: 10000 },
+            );
+          }
+        } catch {
+          // Skip repos where worktree listing fails
+        }
+      }
+    })();
+  }, [repos, pushNotice]);
 
   const handleSelectRepo = useCallback(
     async (repoPath: string) => {
@@ -498,6 +540,7 @@ export default function AppShell() {
   return (
     <div className="app-shell">
       <NoticeCenter />
+      <WorktreeCloseDialog />
       <div
         className="drag-region"
         aria-hidden="true"
