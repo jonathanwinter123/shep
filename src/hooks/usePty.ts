@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { spawnPty, killPty, gitRemoveWorktree, gitCurrentBranch } from "../lib/tauri";
+import { spawnPty, killPty, gitRemoveWorktree, gitCurrentBranch, getDefaultShell } from "../lib/tauri";
 import type { PtyOutput, CommandConfig, SessionMode } from "../lib/types";
 import { useCommandStore } from "../stores/useCommandStore";
 import { useTerminalStore, nextTabId } from "../stores/useTerminalStore";
@@ -289,8 +289,9 @@ export function usePty() {
       if (!activeRepoPath) return;
 
       try {
+        const shell = await getDefaultShell();
         const ptyId = await spawnSession(
-          "/bin/zsh -l",
+          `${shell} -l`,
           {},
           cols,
           rows,

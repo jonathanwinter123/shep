@@ -113,7 +113,8 @@ impl PtySession {
             })
             .map_err(|e| format!("Failed to open PTY: {e}"))?;
 
-        let mut cmd = CommandBuilder::new("/bin/zsh");
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+        let mut cmd = CommandBuilder::new(&shell);
         cmd.arg("-l");
         cmd.arg("-c");
         cmd.arg(command);

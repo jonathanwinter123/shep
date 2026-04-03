@@ -12,11 +12,7 @@ import {
   registerTerminal,
   unregisterTerminal,
 } from "../../hooks/usePty";
-import {
-  TERMINAL_FONT_FAMILY,
-  TERMINAL_FONT_SIZE,
-  TERMINAL_LINE_HEIGHT,
-} from "../../lib/terminalConfig";
+import { TERMINAL_LINE_HEIGHT } from "../../lib/terminalConfig";
 import { createTerminalTheme } from "./terminalTheme";
 import { useThemeStore } from "../../stores/useThemeStore";
 import { notifyAgent } from "../../lib/notifications";
@@ -52,8 +48,8 @@ export default function TerminalView({
     const term = new Terminal({
       cursorBlink: termSettings.cursorBlink,
       cursorStyle: termSettings.cursorStyle,
-      fontSize: TERMINAL_FONT_SIZE,
-      fontFamily: TERMINAL_FONT_FAMILY,
+      fontSize: termSettings.fontSize,
+      fontFamily: termSettings.fontFamily,
       lineHeight: TERMINAL_LINE_HEIGHT,
       theme: createTerminalTheme(useThemeStore.getState().theme),
       scrollback: termSettings.scrollback,

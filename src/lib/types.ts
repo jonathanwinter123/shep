@@ -43,6 +43,8 @@ export interface TerminalSettings {
   cursorStyle: CursorStyle;
   cursorBlink: boolean;
   scrollback: number;
+  fontFamily: string;
+  fontSize: number;
 }
 
 // ── Runtime state types ─────────────────────────────────────────────

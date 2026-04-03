@@ -201,6 +201,10 @@ export function getUsername(): Promise<string> {
   return invoke("get_username");
 }
 
+export function getDefaultShell(): Promise<string> {
+  return invoke("get_default_shell");
+}
+
 export function getComputerName(): Promise<string> {
   return invoke("get_computer_name");
 }

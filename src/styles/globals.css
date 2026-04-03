@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "MesloLGS NF";
+  src: url("../assets/fonts/MesloLGS-NF-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "MesloLGS NF";
+  src: url("../assets/fonts/MesloLGS-NF-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "MesloLGS NF";
+  src: url("../assets/fonts/MesloLGS-NF-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "MesloLGS NF";
+  src: url("../assets/fonts/MesloLGS-NF-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+}
+
 html,
 body,
 #root {
@@ -339,6 +367,22 @@ select {
 
 .settings-meta-row span:last-child {
   overflow-wrap: anywhere;
+}
+
+/* Update progress bar */
+.update-progress-track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  max-width: 320px;
+  overflow: hidden;
+}
+
+.update-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: rgba(122, 162, 247, 0.75);
+  transition: width 200ms ease;
 }
 
 /* Keybinding card */

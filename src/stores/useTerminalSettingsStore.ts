@@ -3,10 +3,14 @@ import type { TerminalSettings } from "../lib/types";
 import { getTerminalSettings, saveTerminalSettings } from "../lib/tauri";
 import { applyTerminalSettings } from "../components/terminal/terminalTheme";
 
+import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from "../lib/terminalConfig";
+
 const DEFAULT_SETTINGS: TerminalSettings = {
   cursorStyle: "block",
   cursorBlink: true,
   scrollback: 10000,
+  fontFamily: TERMINAL_FONT_FAMILY,
+  fontSize: TERMINAL_FONT_SIZE,
 };
 
 interface TerminalSettingsStore {

@@ -18,6 +18,8 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(PtyManager::new())
         .manage(WorkspaceManager::new())
         .manage(UsageDb::open().expect("Failed to initialize usage database"))
@@ -83,6 +85,7 @@ pub fn run() {
             commands::get_pty_session_count,
             commands::shutdown_and_quit,
             commands::get_username,
+            commands::get_default_shell,
             commands::get_computer_name,
             commands::is_git_repo,
             commands::git_init,
