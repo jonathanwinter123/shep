@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "shep",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "identifier": "com.shep.terminal",
   "build": {
     "frontendDist": "../dist",
@@ -53,6 +53,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -66,7 +67,7 @@
       "endpoints": [
         "https://github.com/stumptowndoug/shep/releases/latest/download/latest.json"
       ],
-      "pubkey": "REPLACE_WITH_PUBLIC_KEY"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFENUI5MjhFQ0I1QThGM0IKUldRN2oxckxqcEpiSGZocmVQUDBpSFN4dDFZempVSWgrMDNzZmFCWHphTkpSR2xvaDZvMzAyNVUK"
     }
   }
 }
