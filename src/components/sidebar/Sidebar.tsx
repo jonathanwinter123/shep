@@ -21,6 +21,7 @@ interface SidebarProps {
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
+  onSwitchWorkspace: (repoPath: string, workspaceId: string) => void;
 }
 
 export default function Sidebar({
@@ -37,6 +38,7 @@ export default function Sidebar({
   onSelectTab,
   onCloseTab,
   onNewShell,
+  onSwitchWorkspace,
 }: SidebarProps) {
   const projectState = useTerminalStore((s) => s.projectState);
   const projectCommands = useCommandStore((s) => s.projectCommands);
@@ -58,7 +60,10 @@ export default function Sidebar({
     const tabActivity = useTerminalStore.getState().tabActivity;
     const activity: Record<string, { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean }> = {};
     for (const repo of repos) {
-      const repoTabs = projectState[repo.path]?.tabs ?? [];
+      const ps = projectState[repo.path];
+      const repoTabs = ps
+        ? Object.values(ps.workspaces).flatMap((ws) => ws.tabs)
+        : [];
       const cmds = projectCommands[repo.path] ?? [];
       let hasAttention = false;
       let hasCrash = false;
@@ -98,6 +103,7 @@ export default function Sidebar({
           onSelectTab={onSelectTab}
           onCloseTab={onCloseTab}
           onNewShell={onNewShell}
+          onSwitchWorkspace={onSwitchWorkspace}
         />
       </div>
       <SidebarUsage />

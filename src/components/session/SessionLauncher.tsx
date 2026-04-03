@@ -15,6 +15,7 @@ import {
   runShellCommand,
 } from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
+import { useTerminalStore } from "../../stores/useTerminalStore";
 import { ChevronDown, GitBranch, GitFork, HandMetal, Play } from "lucide-react";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { ASSISTANT_INSTALL_URLS } from "../sidebar/constants";
@@ -213,6 +214,11 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
             }
           }
         }
+
+        // Register as a workspace and switch to it
+        const store = useTerminalStore.getState();
+        store.addWorkspace(activeRepoPath, finalBranch, finalBranch, worktreePath);
+        store.switchWorkspace(activeRepoPath, finalBranch);
       } else if (isGit && !usesWorktree && !repoWasInitialized) {
         // Branch mode: switch to selected base branch if needed
         if (selectedBranch !== currentBranch) {

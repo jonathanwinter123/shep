@@ -6,8 +6,8 @@ import ProjectItem from "./ProjectItem";
 import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
-import GitStatusRow from "./GitStatusRow";
 import CommandsRow from "./CommandsRow";
+import WorkspacePicker from "./WorkspacePicker";
 
 interface ProjectListProps {
   repos: RepoInfo[];
@@ -24,6 +24,7 @@ interface ProjectListProps {
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
+  onSwitchWorkspace: (repoPath: string, workspaceId: string) => void;
 }
 
 export default function ProjectList({
@@ -41,6 +42,7 @@ export default function ProjectList({
   onSelectTab,
   onCloseTab,
   onNewShell,
+  onSwitchWorkspace,
 }: ProjectListProps) {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
     () => new Set(activeRepoPath ? [activeRepoPath] : []),
@@ -110,6 +112,11 @@ export default function ProjectList({
             />
             {isExpanded && (
               <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
+                <WorkspacePicker
+                  repoPath={repo.path}
+                  onSwitch={(wsId) => onSwitchWorkspace(repo.path, wsId)}
+                />
+
                 <CollapsibleSection
                   label="AI Assistants"
                   icon={<Sparkles size={14} />}
@@ -141,7 +148,6 @@ export default function ProjectList({
                 </CollapsibleSection>
 
                 <CommandsRow badge={commandsBadge} />
-                <GitStatusRow repoPath={repo.path} />
               </div>
             )}
           </div>

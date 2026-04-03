@@ -2,13 +2,13 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useUIStore } from "../../stores/useUIStore";
-import { useGitStore } from "../../stores/useGitStore";
 import { useShallow } from "zustand/shallow";
 import { GitBranch, GitFork, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined } from "lucide-react";
 import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
 import DevMemory from "./DevMemory";
+import BranchSwitcher from "../shared/BranchSwitcher";
 
 function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () => void; onNewShell: () => void }) {
   const [open, setOpen] = useState(false);
@@ -87,6 +87,7 @@ export default function TabBar({
   onNewShell,
   onNewAssistant,
 }: TabBarProps) {
+  const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
   const projectTerminals = useTerminalStore(
     (s) => (s.activeProjectPath ? s.projectState[s.activeProjectPath] : null),
   );
@@ -176,18 +177,11 @@ export default function TabBar({
   // Actions are stable — grab via getState() to avoid subscribing
   const {
     activateSettings, closeSettingsTab,
-    activateGitPanel, closeGitPanel, openGitPanel,
+    activateGitPanel, closeGitPanel,
     activateLauncher, closeLauncher,
     activateCommandsPanel, closeCommandsPanel,
     activateUsagePanel, closeUsageTab,
   } = useUIStore.getState();
-
-  // Git status — only subscribe to the active tab's repo, not all repos
-  const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
-  const activeTabCwd = activeTab?.worktreePath ?? activeTab?.repoPath ?? null;
-  const gitStatus = useGitStore((s) =>
-    activeTabCwd ? s.projectGitStatus[activeTabCwd] ?? null : null,
-  );
 
   const anyOverlay = settingsActive || launcherActive || gitPanelActive || commandsPanelActive || usagePanelActive;
 
@@ -425,25 +419,11 @@ export default function TabBar({
 
       {import.meta.env.DEV && <DevMemory />}
 
-      {gitStatus?.is_git_repo && (
-        <div
-          className="flex items-center gap-1.5 shrink-0 text-xs pl-3 border-l border-white/8 cursor-pointer hover:opacity-80 transition-opacity"
-          onClick={openGitPanel}
-          onKeyDown={(event) => handleActionKey(event, openGitPanel)}
-          title="Open Git panel"
-          role="button"
-          tabIndex={0}
-          aria-label={`Open Git panel for branch ${gitStatus.branch}`}
-        >
-          <GitBranch size={12} />
-          <span className="truncate max-w-32">{gitStatus.branch}</span>
-          <span
-            className="w-1.5 h-1.5 rounded-full shrink-0"
-            style={{
-              backgroundColor: gitStatus.dirty
-                ? "rgb(251, 191, 36)"
-                : "rgb(74, 222, 128)",
-            }}
+      {activeProjectPath && (
+        <div className="shrink-0 pl-3 border-l border-white/8">
+          <BranchSwitcher
+            repoPath={activeProjectPath}
+            onOpenGitPanel={activateGitPanel}
           />
         </div>
       )}

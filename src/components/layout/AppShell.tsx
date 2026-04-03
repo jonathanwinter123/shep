@@ -85,6 +85,32 @@ export default function AppShell() {
   );
   const tabs = activeProjectTerminals?.tabs ?? EMPTY_TABS;
   const activeTabId = activeProjectTerminals?.activeTabId ?? null;
+  // Discover git worktrees and register them as workspaces
+  const discoverWorkspaces = useCallback(
+    async (repoPath: string) => {
+      try {
+        const worktrees = await gitListWorktrees(repoPath);
+        const store = useTerminalStore.getState();
+        for (const wt of worktrees) {
+          if (wt.is_main || !wt.branch) continue;
+          store.addWorkspace(repoPath, wt.branch, wt.branch, wt.path);
+        }
+        // Remove workspaces for worktrees that no longer exist on disk
+        const ps = store.projectState[repoPath];
+        if (ps) {
+          const wtPaths = new Set(worktrees.map((w) => w.path));
+          for (const [wsId, ws] of Object.entries(ps.workspaces)) {
+            if (wsId !== "main" && !wtPaths.has(ws.path)) {
+              store.removeWorkspace(repoPath, wsId);
+            }
+          }
+        }
+      } catch {
+        // Skip if worktree listing fails (not a git repo, etc.)
+      }
+    },
+    [],
+  );
 
   // Derive allTabs via useMemo instead of a selector that returns a new array
   // every call — zustand v5 + useSyncExternalStore would infinite-loop otherwise.
@@ -93,10 +119,12 @@ export default function AppShell() {
   // Git status polling: project roots + all active worktree paths
   const gitPollPaths = useMemo(() => {
     const paths = repos.filter((r) => r.valid).map((r) => r.path);
-    for (const state of Object.values(projectState)) {
-      for (const tab of state.tabs) {
-        if (tab.worktreePath && !paths.includes(tab.worktreePath)) {
-          paths.push(tab.worktreePath);
+    for (const ps of Object.values(projectState)) {
+      for (const ws of Object.values(ps.workspaces)) {
+        for (const tab of ws.tabs) {
+          if (tab.worktreePath && !paths.includes(tab.worktreePath)) {
+            paths.push(tab.worktreePath);
+          }
         }
       }
     }
@@ -105,8 +133,10 @@ export default function AppShell() {
   useGitWatcher(gitPollPaths);
   const allTabs = useMemo(() => {
     const all: TerminalTab[] = [];
-    for (const project of Object.values(projectState)) {
-      all.push(...project.tabs);
+    for (const ps of Object.values(projectState)) {
+      for (const ws of Object.values(ps.workspaces)) {
+        all.push(...ws.tabs);
+      }
     }
 
     // Keep terminal DOM order stable even when the visible tab order changes.
@@ -206,45 +236,14 @@ export default function AppShell() {
     return () => { unlisten.then((f) => f()); };
   }, [fetchUsageSnapshots]);
 
-  // Check for orphaned worktrees on startup
-  const orphanCheckDone = useRef(false);
+  // Re-discover workspaces when git changes (worktrees created/removed)
   useEffect(() => {
-    if (orphanCheckDone.current || repos.length === 0) return;
-    orphanCheckDone.current = true;
-
-    (async () => {
-      for (const repo of repos) {
-        if (!repo.valid) continue;
-        try {
-          const worktrees = await gitListWorktrees(repo.path);
-          const shepWorktrees = worktrees.filter(
-            (w) => !w.is_main && w.path.includes(".shep-worktrees"),
-          );
-          if (shepWorktrees.length === 0) continue;
-
-          // Check if any tab references these worktrees
-          const termState = useTerminalStore.getState();
-          const allTabs = Object.values(termState.projectState).flatMap((ps) => ps.tabs);
-          const activePaths = new Set(allTabs.map((t) => t.worktreePath).filter(Boolean));
-
-          const orphans = shepWorktrees.filter((w) => !activePaths.has(w.path));
-          if (orphans.length > 0) {
-            const branchNames = orphans.map((o) => o.branch ?? "unknown").join(", ");
-            pushNotice(
-              {
-                tone: "info",
-                title: `${orphans.length} orphaned worktree${orphans.length > 1 ? "s" : ""} found`,
-                message: `Branches: ${branchNames}. Use git worktree remove to clean up.`,
-              },
-              { durationMs: 10000 },
-            );
-          }
-        } catch {
-          // Skip repos where worktree listing fails
-        }
-      }
-    })();
-  }, [repos, pushNotice]);
+    const unlisten = listen<{ paths: string[] }>("git-fs-changed", () => {
+      const repoPath = useRepoStore.getState().activeRepoPath;
+      if (repoPath) void discoverWorkspaces(repoPath);
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, [discoverWorkspaces]);
 
   const handleSelectRepo = useCallback(
     async (repoPath: string) => {
@@ -258,6 +257,7 @@ export default function AppShell() {
         window.localStorage.setItem(LAST_REPO_STORAGE_KEY, repoPath);
         useTerminalStore.getState().switchProject(repoPath);
         useCommandStore.getState().switchProject(repoPath);
+        await discoverWorkspaces(repoPath);
 
         if (isFirstVisit) {
           useCommandStore.getState().loadCommands(repoPath, config.commands);
@@ -277,7 +277,7 @@ export default function AppShell() {
         });
       }
     },
-    [activeRepoPath, openRepo, startCommand, getTerminalDimensions, pushNotice],
+    [activeRepoPath, openRepo, startCommand, getTerminalDimensions, pushNotice, discoverWorkspaces],
   );
 
   const handleAddProject = useCallback(
@@ -355,6 +355,40 @@ export default function AppShell() {
     const tab = tabs.find((t) => t.id === tabId);
     if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
   }, [setActiveTab, tabs]);
+
+  const handleSwitchWorkspace = useCallback(
+    async (repoPath: string, workspaceId: string) => {
+      const store = useTerminalStore.getState();
+      const ps = store.projectState[repoPath];
+      if (!ps || ps.activeWorkspaceId === workspaceId) return;
+
+      store.switchWorkspace(repoPath, workspaceId);
+
+      // Prompt to restart running commands in the new workspace
+      const cmds = useCommandStore.getState().projectCommands[repoPath] ?? [];
+      const runningCmds = cmds.filter((c) => c.status === "running");
+      if (runningCmds.length > 0) {
+        const ws = ps.workspaces[workspaceId];
+        const wsLabel = ws?.label ?? workspaceId;
+        for (const cmd of runningCmds) {
+          const confirmed = await ask(
+            `Restart "${cmd.name}" in ${wsLabel}?`,
+            { title: "Restart command", kind: "info", okLabel: "Restart", cancelLabel: "Skip" },
+          );
+          if (confirmed) {
+            await stopCommand(cmd.name);
+            const { cols, rows } = getTerminalDimensions();
+            await startCommand(
+              { name: cmd.name, command: cmd.command, autostart: cmd.autostart, env: cmd.env, cwd: cmd.cwd },
+              cols,
+              rows,
+            );
+          }
+        }
+      }
+    },
+    [stopCommand, startCommand, getTerminalDimensions],
+  );
 
   const handleNewAssistant = useCallback(() => {
     useUIStore.getState().openLauncher();
@@ -585,6 +619,7 @@ export default function AppShell() {
             onSelectTab={handleSelectSidebarTab}
             onCloseTab={closeTab}
             onNewShell={handleNewShell}
+            onSwitchWorkspace={handleSwitchWorkspace}
           />
         )}
 

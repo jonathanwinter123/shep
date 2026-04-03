@@ -194,13 +194,8 @@ export function usePty() {
       if (!activeRepoPath) return;
       const commandName = command.name;
 
-      // Use the active tab's worktree path as base if available
-      const termState = useTerminalStore.getState();
-      const ps = termState.projectState[activeRepoPath];
-      const activeTab = ps?.activeTabId
-        ? ps.tabs.find((t) => t.id === ps.activeTabId)
-        : null;
-      const basePath = activeTab?.worktreePath ?? activeRepoPath;
+      // Use the active workspace path as base
+      const basePath = useTerminalStore.getState().getActiveWorkspacePath() ?? activeRepoPath;
 
       try {
         const ptyId = await spawnSession(
@@ -266,7 +261,7 @@ export function usePty() {
       const state = useTerminalStore.getState();
       const commands = useCommandStore.getState().projectCommands[path] ?? [];
       const command = commands.find((c) => c.name === commandName);
-      const tab = state.projectState[path]?.tabs.find((t) => t.commandName === commandName);
+      const tab = state.getAllProjectTabs(path).find((t) => t.commandName === commandName);
       if (command?.ptyId) {
         cleanupActivityState(command.ptyId);
         stoppingPtys.add(command.ptyId);
@@ -298,6 +293,7 @@ export function usePty() {
       if (!activeRepoPath) return;
 
       try {
+        const workspacePath = useTerminalStore.getState().getActiveWorkspacePath() ?? activeRepoPath;
         const shell = await getDefaultShell();
         const ptyId = await spawnSession(
           `${shell} -l`,
@@ -305,7 +301,7 @@ export function usePty() {
           cols,
           rows,
           null,
-          activeRepoPath,
+          workspacePath,
         );
         if (!ptyId) return;
 
@@ -451,11 +447,13 @@ export function usePty() {
             if (import.meta.env.DEV) console.warn("Failed to remove worktree:", error);
             pushNotice({ tone: "error", title: "Worktree cleanup failed", message: getErrorMessage(error) });
           });
+          if (tab.branch) useTerminalStore.getState().removeWorkspace(tab.repoPath, tab.branch);
         } else if (choice === "discard") {
           await gitRemoveWorktree(tab.repoPath, tab.worktreePath).catch((error) => {
             if (import.meta.env.DEV) console.warn("Failed to remove worktree:", error);
             pushNotice({ tone: "error", title: "Worktree cleanup failed", message: getErrorMessage(error) });
           });
+          if (tab.branch) useTerminalStore.getState().removeWorkspace(tab.repoPath, tab.branch);
         }
         // "keep" — leave worktree on disk, just close the tab
       }
@@ -480,7 +478,7 @@ export function usePty() {
 
   const killProjectPtys = useCallback(async (repoPath: string) => {
     const state = useTerminalStore.getState();
-    const tabs = state.projectState[repoPath]?.tabs ?? [];
+    const tabs = state.getAllProjectTabs(repoPath);
 
     // Collect worktree tabs that need user decision
     const worktreeTabs = tabs.filter((t) => t.worktreePath);
@@ -507,8 +505,10 @@ export function usePty() {
           return;
         }
         await gitRemoveWorktree(tab.repoPath, tab.worktreePath!).catch(() => {});
+        if (tab.branch) useTerminalStore.getState().removeWorkspace(tab.repoPath, tab.branch);
       } else if (choice === "discard") {
         await gitRemoveWorktree(tab.repoPath, tab.worktreePath!).catch(() => {});
+        if (tab.branch) useTerminalStore.getState().removeWorkspace(tab.repoPath, tab.branch);
       }
     }
 

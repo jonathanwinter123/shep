@@ -22,7 +22,7 @@ export default function GitStatusRow({ repoPath }: GitStatusRowProps) {
       className={`section-toggle ${gitPanelActive ? "!text-[var(--text-primary)] !bg-white/6" : ""}`}
     >
       <GitBranch size={14} className="shrink-0" />
-      <span className="truncate">{status.branch || "HEAD"}</span>
+      <span className="truncate">Git</span>
       {status.dirty && (
         <span className="badge">{changeCount}</span>
       )}
