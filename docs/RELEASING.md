@@ -31,22 +31,29 @@ Before tagging a release:
 
 ## Build
 
-Set the signing env vars (see [macOS Signing and Notarization](#macos-signing-and-notarization)
-below for first-time setup):
+All signing env vars are stored in `.env` (not committed). Source them with
+`set -a` so they're exported to child processes:
 
 ```bash
-export APPLE_SIGNING_IDENTITY="Developer ID Application: Doug Dement (Y49DF9C9JJ)"
-export APPLE_ID="dougdmail@gmail.com"
-export APPLE_PASSWORD="<app-specific-password>"
-export APPLE_TEAM_ID="Y49DF9C9JJ"
+set -a && source .env && set +a
 ```
 
-Set the updater signing key (see [Updater Signing](#updater-signing) below for
-first-time setup):
+The `.env` file should contain:
 
 ```bash
-export TAURI_SIGNING_PRIVATE_KEY=$(cat ~/.tauri/shep.key)
-export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="<password-if-set>"
+APPLE_SIGNING_IDENTITY="Developer ID Application: Doug Dement (Y49DF9C9JJ)"
+APPLE_ID="dougdmail@gmail.com"
+APPLE_PASSWORD="<app-specific-password>"
+APPLE_TEAM_ID="Y49DF9C9JJ"
+TAURI_SIGNING_PRIVATE_KEY_PATH=/Users/dougdement/.tauri/shep.key
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD="<updater-key-password>"
+```
+
+Then export the updater private key contents (the build reads the key value,
+not the path):
+
+```bash
+export TAURI_SIGNING_PRIVATE_KEY="$(cat "$TAURI_SIGNING_PRIVATE_KEY_PATH")"
 ```
 
 Build, sign, and notarize:
