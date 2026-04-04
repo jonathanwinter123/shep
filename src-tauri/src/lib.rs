@@ -102,6 +102,8 @@ pub fn run() {
             commands::git_changed_files,
             commands::git_file_diff,
             commands::git_stage_file,
+            commands::git_stage_all,
+            commands::git_commit,
             commands::git_unstage_file,
             commands::git_switch_branch,
             commands::git_create_branch,

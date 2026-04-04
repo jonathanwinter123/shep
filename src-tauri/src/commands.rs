@@ -329,6 +329,16 @@ pub async fn git_stage_file(path: String, file_path: String) -> Result<(), Strin
 }
 
 #[tauri::command]
+pub async fn git_stage_all(path: String) -> Result<(), String> {
+    git::stage_all(&path)
+}
+
+#[tauri::command]
+pub async fn git_commit(path: String, message: String) -> Result<(), String> {
+    git::commit(&path, &message)
+}
+
+#[tauri::command]
 pub async fn git_unstage_file(path: String, file_path: String) -> Result<(), String> {
     git::unstage_file(&path, &file_path)
 }

@@ -439,6 +439,32 @@ pub fn stage_file(path: &str, file_path: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn stage_all(path: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["-C", path, "add", "-A"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(())
+}
+
+pub fn commit(path: &str, message: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["-C", path, "commit", "-m", message])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+
+    Ok(())
+}
+
 pub fn unstage_file(path: &str, file_path: &str) -> Result<(), String> {
     let output = Command::new("git")
         .args(["-C", path, "restore", "--staged", "--", file_path])

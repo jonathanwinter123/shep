@@ -199,6 +199,14 @@ export function gitStageFile(path: string, filePath: string): Promise<void> {
   return invoke("git_stage_file", { path, filePath });
 }
 
+export function gitStageAll(path: string): Promise<void> {
+  return invoke("git_stage_all", { path });
+}
+
+export function gitCommit(path: string, message: string): Promise<void> {
+  return invoke("git_commit", { path, message });
+}
+
 export function gitUnstageFile(path: string, filePath: string): Promise<void> {
   return invoke("git_unstage_file", { path, filePath });
 }

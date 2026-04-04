@@ -1996,12 +1996,56 @@ select {
   min-height: 0;
 }
 
-.git-panel__file-list {
+.git-panel__sidebar {
   width: 280px;
   flex-shrink: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   border-right: 1px solid var(--glass-border);
+}
+
+.git-panel__file-list {
+  flex: 1;
+  overflow-y: auto;
   scrollbar-color: rgba(185, 208, 255, 0.24) transparent;
+}
+
+.git-panel__commit {
+  flex-shrink: 0;
+  padding: 8px;
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.git-panel__commit-input {
+  width: 100%;
+  resize: none;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 6px 8px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.git-panel__commit-input:focus {
+  border-color: rgba(122, 162, 247, 0.5);
+}
+
+.git-panel__commit-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.git-panel__commit-btn {
+  font-size: 12px;
+  padding: 5px 12px;
 }
 
 .git-panel__diff {
