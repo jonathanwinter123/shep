@@ -120,19 +120,12 @@ export default function AppShell() {
   // every call — zustand v5 + useSyncExternalStore would infinite-loop otherwise.
   const projectState = useTerminalStore((s) => s.projectState);
 
-  // Git status polling: project roots + all worktree workspace paths
-  const gitPollPaths = useMemo(() => {
-    const paths = repos.filter((r) => r.valid).map((r) => r.path);
-    for (const ps of Object.values(projectState)) {
-      for (const [id, ws] of Object.entries(ps.workspaces)) {
-        if (id !== "main" && ws.path && !paths.includes(ws.path)) {
-          paths.push(ws.path);
-        }
-      }
-    }
-    return paths;
-  }, [repos, projectState]);
-  useGitWatcher(gitPollPaths);
+  // Git watching: main repo paths only — worktree paths are discovered automatically
+  const gitRepoPaths = useMemo(
+    () => repos.filter((r) => r.valid).map((r) => r.path),
+    [repos],
+  );
+  useGitWatcher(gitRepoPaths);
   const allTabs = useMemo(() => {
     const all: TerminalTab[] = [];
     for (const ps of Object.values(projectState)) {

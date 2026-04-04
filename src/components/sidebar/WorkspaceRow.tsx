@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { GitBranch, GitFork } from "lucide-react";
+import { GitBranch, FolderTree } from "lucide-react";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import type { TabActivity } from "../../lib/types";
 
@@ -73,7 +73,7 @@ export default function WorkspaceRow({
                 className="shrink-0 w-[14px] flex items-center justify-center"
                 style={{ color: "var(--text-muted)" }}
               >
-                {isMain ? <GitBranch size={14} /> : <GitFork size={14} />}
+                {isMain ? <GitBranch size={14} /> : <FolderTree size={14} />}
               </span>
               <span className="truncate" style={{ opacity: isMain ? 0.78 : 1 }}>
                 {label}

@@ -110,8 +110,14 @@ export default function ProjectList({
     [activeTabs],
   );
 
-  // Effective git path: worktree path when in one, otherwise main repo
-  const effectiveGitPath = activeWorkspace?.path ?? activeRepoPath;
+  // Effective git path: resolve worktree path from git store by branch name
+  const worktreeBranch = activeWorkspaceId !== "main" ? activeWorkspaceId : null;
+  const effectiveGitPath = useGitStore((s) => {
+    if (!worktreeBranch || !activeRepoPath) return activeRepoPath;
+    const entries = s.worktreesByRepo[activeRepoPath];
+    if (!entries) return activeRepoPath;
+    return entries.find((e) => e.branch === worktreeBranch)?.path ?? activeRepoPath;
+  });
 
   const commandsBadge = String(commands.length);
 
@@ -172,8 +178,8 @@ export default function ProjectList({
                         />
                       </CollapsibleSection>
 
-                      {effectiveGitPath && <GitStatusRow repoPath={effectiveGitPath} />}
                       <CommandsRow badge={commandsBadge} />
+                      {effectiveGitPath && <GitStatusRow repoPath={effectiveGitPath} />}
                     </>
                   }
                 />
