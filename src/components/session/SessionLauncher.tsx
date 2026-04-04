@@ -1,12 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import type { CodingAssistant, SessionMode } from "../../lib/types";
 import { CODING_ASSISTANTS } from "../sidebar/constants";
 import {
   isGitRepo,
   gitCurrentBranch,
-  gitInit,
   gitListBranches,
-  gitSwitchBranch,
   gitCreateBranch,
   gitCreateWorktree,
   checkCommandExists,
@@ -16,7 +14,7 @@ import {
 } from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
-import { ChevronDown, GitBranch, GitFork, HandMetal } from "lucide-react";
+import { GitBranch, GitFork, HandMetal } from "lucide-react";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { ASSISTANT_INSTALL_URLS } from "../sidebar/constants";
 import { getErrorMessage } from "../../lib/errors";
@@ -51,7 +49,7 @@ function dateTimeStamp(): string {
 
 /** Mode labels for display */
 const MODE_LABELS: Record<SessionMode, string> = {
-  standard: "Branch",
+  standard: "Standard",
   worktree: "Worktree",
   yolo: "YOLO",
 };
@@ -62,13 +60,6 @@ const MODE_ICONS: Record<SessionMode, React.ReactNode> = {
   worktree: <GitFork size={14} style={{ opacity: 0.5 }} />,
   yolo: <HandMetal size={14} style={{ opacity: 0.5 }} />,
 };
-
-/** Branch prefix per mode */
-function modeBranchPrefix(mode: SessionMode): string {
-  if (mode === "yolo") return "yolo/";
-  if (mode === "worktree") return "wt/";
-  return "";
-}
 
 export default function SessionLauncher({ onStartSession }: SessionLauncherProps) {
   const activeRepoPath = useRepoStore((s) => s.activeRepoPath);
@@ -88,13 +79,11 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   const [isGit, setIsGit] = useState(false);
   const [currentBranch, setCurrentBranch] = useState<string>("");
   const [branches, setBranches] = useState<string[]>([]);
-  const [selectedBranch, setSelectedBranch] = useState<string>("");
-  const [branchPickerOpen, setBranchPickerOpen] = useState(false);
   const [branchName, setBranchName] = useState("");
-  const [useCurrentBranch, setUseCurrentBranch] = useState(false);
-  const [initializeGitOnLaunch, setInitializeGitOnLaunch] = useState(false);
+  const [createBranch, setCreateBranch] = useState(false);
   const [launching, setLaunching] = useState(false);
-  const branchPickerRef = useRef<HTMLDivElement>(null);
+
+  const usesWorktree = mode === "worktree" || mode === "yolo";
 
   // Check which assistants are installed
   useEffect(() => {
@@ -113,13 +102,11 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
 
   useEffect(() => {
     if (!activeRepoPath) return;
-
     let cancelled = false;
     (async () => {
       const git = await isGitRepo(activeRepoPath);
       if (cancelled) return;
       setIsGit(git);
-
       if (git) {
         const [branch, branchList] = await Promise.all([
           gitCurrentBranch(activeRepoPath),
@@ -128,10 +115,8 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         if (cancelled) return;
         setCurrentBranch(branch);
         setBranches(branchList);
-        setSelectedBranch(branch);
       }
     })();
-
     return () => { cancelled = true; };
   }, [activeRepoPath]);
 
@@ -139,7 +124,6 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   useEffect(() => {
     if (!installPopover) return;
     const handleClick = () => setInstallPopover(null);
-    // Delay to avoid closing immediately from the same click
     const timer = setTimeout(() => document.addEventListener("mousedown", handleClick), 0);
     return () => {
       clearTimeout(timer);
@@ -147,38 +131,23 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
     };
   }, [installPopover]);
 
+  // Auto-generate branch name for worktree/yolo modes
   useEffect(() => {
-    if (!branchPickerOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (branchPickerRef.current && !branchPickerRef.current.contains(e.target as Node)) {
-        setBranchPickerOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [branchPickerOpen]);
-
-  const usesWorktree = mode === "worktree" || mode === "yolo";
-
-  // Auto-generate branch name when mode or assistant changes
-  useEffect(() => {
-    if (!selectedAssistant || !isGit || useCurrentBranch) {
+    if (!selectedAssistant || !isGit) {
       setBranchName("");
       return;
     }
     if (usesWorktree) {
-      const base = `${modeBranchPrefix(mode)}${dateTimeStamp()}`;
-      setBranchName(uniqueBranchName(base, branches));
+      const prefix = mode === "yolo" ? "yolo/" : "wt/";
+      setBranchName(uniqueBranchName(`${prefix}${dateTimeStamp()}`, branches));
     } else {
       setBranchName("");
     }
-  }, [mode, selectedAssistant, isGit, useCurrentBranch, branches]);
+  }, [mode, selectedAssistant, isGit, branches]);
 
   const handleModeChange = (m: SessionMode) => {
     setMode(m);
-    const nextUsesWorktree = m === "worktree" || m === "yolo";
-    if (nextUsesWorktree) setUseCurrentBranch(false);
-    if (isGit || m !== "standard") setInitializeGitOnLaunch(false);
+    if (m !== "standard") setCreateBranch(false);
   };
 
   const handleStart = async () => {
@@ -187,23 +156,17 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
 
     try {
       let worktreePath: string | null = null;
-      let repoWasInitialized = false;
-
-      if (!isGit && mode === "standard" && initializeGitOnLaunch) {
-        await gitInit(activeRepoPath);
-        repoWasInitialized = true;
-      }
 
       if (usesWorktree && isGit) {
-        // Worktree/YOLO: create worktree + branch
-        const finalBranch = branchName.trim() || `${modeBranchPrefix(mode)}${dateTimeStamp()}`;
+        const prefix = mode === "yolo" ? "yolo/" : "wt/";
+        const finalBranch = branchName.trim() || `${prefix}${dateTimeStamp()}`;
         const parentDir = activeRepoPath.substring(0, activeRepoPath.lastIndexOf("/"));
         const repoName = activeRepoPath.substring(activeRepoPath.lastIndexOf("/") + 1);
         const folderName = finalBranch.replace(/\//g, "-");
         worktreePath = `${parentDir}/.shep-worktrees/${repoName}/${folderName}`;
         await gitCreateWorktree(activeRepoPath, worktreePath, finalBranch);
 
-        // Execute environment blueprint: copy files, create symlinks, run post-create commands
+        // Execute environment blueprint
         const blueprint = activeConfig?.worktree;
         if (blueprint && worktreePath) {
           for (const entry of blueprint.copy) {
@@ -228,24 +191,17 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
           }
         }
 
-        // Register as a workspace and switch to it
         const store = useTerminalStore.getState();
         store.addWorkspace(activeRepoPath, finalBranch, finalBranch, worktreePath);
         store.switchWorkspace(activeRepoPath, finalBranch);
-      } else if (isGit && !usesWorktree && !repoWasInitialized) {
-        // Branch mode: switch to selected base branch if needed
-        if (selectedBranch !== currentBranch) {
-          await gitSwitchBranch(activeRepoPath, selectedBranch);
-        }
-        // Create new branch unless "use current branch" is checked
-        if (!useCurrentBranch) {
-          const finalBranch = branchName.trim() || `feature/${dateTimeStamp()}`;
-          await gitCreateBranch(activeRepoPath, finalBranch);
-        }
+      }
+      if (!usesWorktree && createBranch && isGit) {
+        const finalBranch = branchName.trim() || `feature/${dateTimeStamp()}`;
+        await gitCreateBranch(activeRepoPath, finalBranch);
       }
 
       // If we're in a worktree workspace and didn't create a new one,
-      // use the current workspace's path so the session runs there
+      // use the current workspace's path
       if (!worktreePath && inWorktree) {
         worktreePath = useTerminalStore.getState().getActiveWorkspacePath();
       }
@@ -255,12 +211,10 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         setLaunching(false);
       }
     } catch (e) {
-      if (import.meta.env.DEV) {
-        console.error("Failed to start session:", e);
-      }
+      if (import.meta.env.DEV) console.error("Failed to start session:", e);
       pushNotice({
         tone: "error",
-        title: "Couldn’t start session",
+        title: "Couldn't start session",
         message: getErrorMessage(e),
       });
       setLaunching(false);
@@ -330,11 +284,11 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
       </div>
 
       {/* Mode Toggle */}
-      {selectedAssistant && (
+      {selectedAssistant && isGit && !inWorktree && (
         <div className="mb-6">
           <label className="section-label !p-0 mb-3 block text-xs opacity-50">Mode</label>
           <div className="flex gap-2">
-            {(["standard", ...(isGit ? ["worktree"] : []), "yolo"] as SessionMode[]).map((m) => (
+            {(["standard", "worktree", "yolo"] as SessionMode[]).map((m) => (
               <button
                 key={m}
                 className={`option-card ${mode === m ? "selected" : ""}`}
@@ -353,153 +307,70 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         </div>
       )}
 
-      {selectedAssistant && !isGit && mode === "standard" && (
+      {/* Worktree/YOLO: branch info + new branch name */}
+      {selectedAssistant && isGit && usesWorktree && !inWorktree && (
         <div className="mb-6">
-          <label className="flex items-center gap-2 cursor-pointer text-xs">
-            <input
-              type="checkbox"
-              checked={initializeGitOnLaunch}
-              onChange={(e) => setInitializeGitOnLaunch(e.target.checked)}
-              style={{ accentColor: "var(--text-muted)" }}
-            />
-            <span style={{ color: "var(--text-muted)" }}>
-              Initialize Git repository before launch
-            </span>
-          </label>
-          <p className="text-xs opacity-40 mt-2 max-w-md">
-            Creates a local Git repo in this project before launching the assistant.
-            Worktrees still need an initial commit before they can be used.
+          <p className="text-xs opacity-50 mb-3">
+            On branch{" "}
+            <code
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                padding: "1px 6px",
+                borderRadius: 4,
+                fontSize: 11,
+              }}
+            >
+              {currentBranch}
+            </code>
           </p>
+
+          <label className="section-label !p-0 mb-2 block text-xs opacity-50">New Branch Name</label>
+          <input
+            className="branch-dropdown__input w-full max-w-md"
+            type="text"
+            value={branchName}
+            onChange={(e) => setBranchName(e.target.value)}
+            placeholder={`${mode === "yolo" ? "yolo" : "wt"}/my-feature`}
+          />
         </div>
       )}
 
-      {/* Branch Section — hidden in worktree for standard mode (already on a branch),
-           but shown for worktree/yolo modes (creating a new worktree from base) */}
-      {selectedAssistant && isGit && !(inWorktree && !usesWorktree) && (
+      {/* Standard mode: branch info + optional new branch */}
+      {selectedAssistant && isGit && mode === "standard" && !inWorktree && (
         <div className="mb-6">
-          {usesWorktree ? (
-            /* Worktree/YOLO: base branch picker + branch name */
-            <>
-              <label className="section-label !p-0 mb-3 block text-xs opacity-50">Base Branch</label>
-              <div className="relative max-w-md" ref={branchPickerRef}>
-                <button
-                  className="option-card w-full"
-                  onClick={() => setBranchPickerOpen(!branchPickerOpen)}
-                >
-                  <GitBranch size={14} className="shrink-0 opacity-50" />
-                  <span className="flex-1 text-left text-sm">{selectedBranch}</span>
-                  <ChevronDown
-                    size={14}
-                    className="shrink-0 opacity-50 transition-transform duration-150"
-                    style={{ transform: branchPickerOpen ? "rotate(180deg)" : undefined }}
-                  />
-                </button>
-                {branchPickerOpen && (
-                  <div
-                    className="absolute left-0 right-0 top-full mt-1 z-50 max-h-52 overflow-y-auto rounded-lg py-1"
-                    style={{
-                      background: "var(--glass-panel-strong)",
-                      border: "1px solid var(--glass-border-strong)",
-                      backdropFilter: "blur(24px) saturate(155%)",
-                      WebkitBackdropFilter: "blur(24px) saturate(155%)",
-                      boxShadow: "0 14px 36px rgba(0, 0, 0, 0.28)",
-                    }}
-                  >
-                    {branches.map((b) => (
-                      <button
-                        key={b}
-                        className={`list-item w-full ${b === selectedBranch ? "active" : ""}`}
-                        style={{ padding: "6px 12px", borderRadius: 0 }}
-                        onClick={() => {
-                          setSelectedBranch(b);
-                          setBranchPickerOpen(false);
-                        }}
-                      >
-                        <span className="text-sm">{b}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+          <p className="text-xs opacity-50 mb-3">
+            On branch{" "}
+            <code
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                padding: "1px 6px",
+                borderRadius: 4,
+                fontSize: 11,
+              }}
+            >
+              {currentBranch}
+            </code>
+          </p>
 
-              <label className="section-label !p-0 mt-4 mb-2 block text-xs opacity-50">New Branch Name</label>
-              <input
-                className="branch-dropdown__input w-full max-w-md"
-                type="text"
-                value={branchName}
-                onChange={(e) => setBranchName(e.target.value)}
-                placeholder={`${modeBranchPrefix(mode)}my-feature`}
-              />
-              <p className="text-xs opacity-40 mt-2">
-                Creates an isolated worktree branching from {selectedBranch}.
-              </p>
-            </>
-          ) : (
-            /* Branch mode: base branch picker + new branch name, with opt-out */
-            <>
-              <label className="section-label !p-0 mb-3 block text-xs opacity-50">Base Branch</label>
-              <div className="relative max-w-md" ref={branchPickerRef}>
-                <button
-                  className={`option-card w-full${useCurrentBranch ? " opacity-40 pointer-events-none" : ""}`}
-                  onClick={() => setBranchPickerOpen(!branchPickerOpen)}
-                  disabled={useCurrentBranch}
-                >
-                  <GitBranch size={14} className="shrink-0 opacity-50" />
-                  <span className="flex-1 text-left text-sm">{selectedBranch}</span>
-                  <ChevronDown
-                    size={14}
-                    className="shrink-0 opacity-50 transition-transform duration-150"
-                    style={{ transform: branchPickerOpen ? "rotate(180deg)" : undefined }}
-                  />
-                </button>
-                {branchPickerOpen && !useCurrentBranch && (
-                  <div
-                    className="absolute left-0 right-0 top-full mt-1 z-50 max-h-52 overflow-y-auto rounded-lg py-1"
-                    style={{
-                      background: "var(--glass-panel-strong)",
-                      border: "1px solid var(--glass-border-strong)",
-                      backdropFilter: "blur(24px) saturate(155%)",
-                      WebkitBackdropFilter: "blur(24px) saturate(155%)",
-                      boxShadow: "0 14px 36px rgba(0, 0, 0, 0.28)",
-                    }}
-                  >
-                    {branches.map((b) => (
-                      <button
-                        key={b}
-                        className={`list-item w-full ${b === selectedBranch ? "active" : ""}`}
-                        style={{ padding: "6px 12px", borderRadius: 0 }}
-                        onClick={() => {
-                          setSelectedBranch(b);
-                          setBranchPickerOpen(false);
-                        }}
-                      >
-                        <span className="text-sm">{b}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+          <label className="flex items-center gap-2 cursor-pointer text-xs">
+            <input
+              type="checkbox"
+              checked={createBranch}
+              onChange={(e) => setCreateBranch(e.target.checked)}
+              style={{ accentColor: "var(--text-muted)" }}
+            />
+            <span style={{ color: "var(--text-muted)" }}>Create new branch</span>
+          </label>
 
-              <label className="section-label !p-0 mt-4 mb-2 block text-xs opacity-50">New Branch Name</label>
-              <input
-                className={`branch-dropdown__input w-full max-w-md${useCurrentBranch ? " opacity-40 pointer-events-none" : ""}`}
-                type="text"
-                value={useCurrentBranch ? selectedBranch : branchName}
-                onChange={(e) => setBranchName(e.target.value)}
-                disabled={useCurrentBranch}
-                placeholder="feature/my-feature"
-              />
-
-              <label className="flex items-center gap-2 cursor-pointer text-xs mt-3">
-                <input
-                  type="checkbox"
-                  checked={useCurrentBranch}
-                  onChange={(e) => setUseCurrentBranch(e.target.checked)}
-                  style={{ accentColor: "var(--text-muted)" }}
-                />
-                <span style={{ color: "var(--text-muted)" }}>Use current branch ({selectedBranch})</span>
-              </label>
-            </>
+          {createBranch && (
+            <input
+              className="branch-dropdown__input w-full max-w-md mt-3"
+              type="text"
+              value={branchName}
+              onChange={(e) => setBranchName(e.target.value)}
+              placeholder="feature/my-feature"
+              autoFocus
+            />
           )}
         </div>
       )}

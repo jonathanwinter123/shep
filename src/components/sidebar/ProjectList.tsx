@@ -1,9 +1,13 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { RepoInfo, CommandState } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Sparkles, SquareTerminal } from "lucide-react";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
+import { useWorktreeDialogStore } from "../../stores/useWorktreeDialogStore";
+import { useNoticeStore } from "../../stores/useNoticeStore";
+import { gitStatus, gitPushBranch, gitRemoveWorktree } from "../../lib/tauri";
+import { getErrorMessage } from "../../lib/errors";
 import ProjectItem from "./ProjectItem";
 import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
@@ -119,6 +123,55 @@ export default function ProjectList({
     return entries.find((e) => e.branch === worktreeBranch)?.path ?? activeRepoPath;
   });
 
+  const pushNotice = useNoticeStore((s) => s.pushNotice);
+
+  const handleRemoveWorktree = useCallback(async (workspaceId: string) => {
+    if (!activeRepoPath) return;
+    const ws = projectState?.workspaces?.[workspaceId];
+    if (!ws) return;
+
+    // Resolve worktree path from git store
+    const wtPath = useGitStore.getState().getWorktreePath(activeRepoPath, workspaceId);
+    if (!wtPath) return;
+
+    // Check dirty status
+    const st = await gitStatus(wtPath).catch(() => null);
+    const dirty = st?.dirty ?? false;
+
+    const choice = await useWorktreeDialogStore.getState().open({
+      tabId: "",
+      branch: workspaceId,
+      worktreePath: wtPath,
+      repoPath: activeRepoPath,
+      dirty,
+    });
+
+    if (!choice) return;
+
+    if (choice === "push") {
+      try {
+        await gitPushBranch(wtPath, workspaceId);
+        pushNotice({ tone: "success", title: `Pushed ${workspaceId} to remote` });
+      } catch (error) {
+        pushNotice({ tone: "error", title: "Push failed", message: getErrorMessage(error) });
+        return;
+      }
+      await gitRemoveWorktree(activeRepoPath, wtPath).catch((error) => {
+        pushNotice({ tone: "error", title: "Worktree cleanup failed", message: getErrorMessage(error) });
+      });
+      useTerminalStore.getState().removeWorkspace(activeRepoPath, workspaceId);
+    } else if (choice === "discard") {
+      await gitRemoveWorktree(activeRepoPath, wtPath).catch((error) => {
+        pushNotice({ tone: "error", title: "Worktree cleanup failed", message: getErrorMessage(error) });
+      });
+      useTerminalStore.getState().removeWorkspace(activeRepoPath, workspaceId);
+    }
+    // "keep" — leave worktree on disk, just remove from sidebar
+    if (choice === "keep") {
+      useTerminalStore.getState().removeWorkspace(activeRepoPath, workspaceId);
+    }
+  }, [activeRepoPath, projectState, pushNotice]);
+
   const commandsBadge = String(commands.length);
 
   return (
@@ -146,6 +199,7 @@ export default function ProjectList({
                   activeWorkspaceId={activeWorkspaceId}
                   currentBranch={currentBranch}
                   onSwitchWorkspace={(wsId) => onSwitchWorkspace(repo.path, wsId)}
+                  onRemoveWorktree={handleRemoveWorktree}
                   activeContent={
                     <>
                       <CollapsibleSection

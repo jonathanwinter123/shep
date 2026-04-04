@@ -1,7 +1,9 @@
-import type { ReactNode } from "react";
-import { GitBranch, FolderTree } from "lucide-react";
+import { useState, useCallback, type ReactNode } from "react";
+import { GitBranch, FolderTree, Trash2 } from "lucide-react";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import type { TabActivity } from "../../lib/types";
+import ContextMenu from "../shared/ContextMenu";
+import type { ContextMenuItem } from "../shared/ContextMenu";
 
 interface WorktreeInfo {
   id: string;
@@ -14,6 +16,7 @@ interface WorkspaceRowProps {
   activeWorkspaceId: string;
   currentBranch: string;
   onSwitchWorkspace: (workspaceId: string) => void;
+  onRemoveWorktree?: (workspaceId: string) => void;
   activeContent?: ReactNode;
 }
 
@@ -42,9 +45,18 @@ export default function WorkspaceRow({
   activeWorkspaceId,
   currentBranch,
   onSwitchWorkspace,
+  onRemoveWorktree,
   activeContent,
 }: WorkspaceRowProps) {
   const tabActivity = useTerminalStore((s) => s.tabActivity);
+  const [menu, setMenu] = useState<{ x: number; y: number; wsId: string } | null>(null);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, wsId: string) => {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, wsId });
+  }, []);
+
+  const handleCloseMenu = useCallback(() => setMenu(null), []);
 
   if (worktrees.length === 0) return null;
 
@@ -52,6 +64,17 @@ export default function WorkspaceRow({
   if (worktrees.length === 1 && worktrees[0].id === "main") {
     return <>{activeContent}</>;
   }
+
+  const menuItems: ContextMenuItem[] = menu && menu.wsId !== "main" && onRemoveWorktree
+    ? [
+        {
+          label: "Remove worktree",
+          icon: <Trash2 size={14} />,
+          danger: true,
+          onClick: () => onRemoveWorktree(menu.wsId),
+        },
+      ]
+    : [];
 
   return (
     <div className="tree-branch mt-0.5">
@@ -66,6 +89,7 @@ export default function WorkspaceRow({
             <button
               className={`list-item ${isActive ? "active" : ""}`}
               onClick={() => onSwitchWorkspace(wt.id)}
+              onContextMenu={!isMain ? (e) => handleContextMenu(e, wt.id) : undefined}
               aria-pressed={isActive}
               title={isMain ? `Current branch: ${label}` : `Worktree: ${label}`}
             >
@@ -92,6 +116,9 @@ export default function WorkspaceRow({
           </div>
         );
       })}
+      {menu && menuItems.length > 0 && (
+        <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={handleCloseMenu} />
+      )}
     </div>
   );
 }
