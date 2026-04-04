@@ -197,9 +197,10 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
       if (usesWorktree && isGit) {
         // Worktree/YOLO: create worktree + branch
         const finalBranch = branchName.trim() || `${modeBranchPrefix(mode)}${dateTimeStamp()}`;
-        const repoName = activeRepoPath.split("/").pop()!;
+        const parentDir = activeRepoPath.substring(0, activeRepoPath.lastIndexOf("/"));
+        const repoName = activeRepoPath.substring(activeRepoPath.lastIndexOf("/") + 1);
         const folderName = finalBranch.replace(/\//g, "-");
-        worktreePath = `${activeRepoPath}/../.shep-worktrees/${repoName}/${folderName}`;
+        worktreePath = `${parentDir}/.shep-worktrees/${repoName}/${folderName}`;
         await gitCreateWorktree(activeRepoPath, worktreePath, finalBranch);
 
         // Execute environment blueprint: copy files, create symlinks, run post-create commands

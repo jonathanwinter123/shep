@@ -9,6 +9,7 @@ import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
 import CommandsRow from "./CommandsRow";
+import GitStatusRow from "./GitStatusRow";
 import WorkspaceRow from "./WorkspaceRow";
 
 interface ProjectListProps {
@@ -109,6 +110,9 @@ export default function ProjectList({
     [activeTabs],
   );
 
+  // Effective git path: worktree path when in one, otherwise main repo
+  const effectiveGitPath = activeWorkspace?.path ?? activeRepoPath;
+
   const commandsBadge = String(commands.length);
 
   return (
@@ -168,6 +172,7 @@ export default function ProjectList({
                         />
                       </CollapsibleSection>
 
+                      {effectiveGitPath && <GitStatusRow repoPath={effectiveGitPath} />}
                       <CommandsRow badge={commandsBadge} />
                     </>
                   }

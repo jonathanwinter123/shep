@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { GitBranch, GitFork, X } from "lucide-react";
-import { listen } from "@tauri-apps/api/event";
+import { GitBranch, GitFork } from "lucide-react";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
-import { gitChangedFiles, gitFileDiff, gitStageFile, gitUnstageFile, gitListWorktrees, watchRepo, unwatchRepo } from "../../lib/tauri";
+import { gitChangedFiles, gitFileDiff, gitStageFile, gitUnstageFile, gitListWorktrees } from "../../lib/tauri";
 import type { ChangedFile, WorktreeEntry } from "../../lib/types";
 import FileList from "./FileList";
 import DiffViewer from "./DiffViewer";
@@ -13,24 +12,21 @@ import { getErrorMessage } from "../../lib/errors";
 
 export default function GitPanel() {
   const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
-  const activeTab = useTerminalStore((s) => {
-    const path = s.activeProjectPath;
-    if (!path) return null;
-    const ps = s.projectState[path];
-    if (!ps?.activeTabId) return null;
-    return ps.tabs.find((t) => t.id === ps.activeTabId) ?? null;
-  });
   const projectGitStatus = useGitStore((s) => s.projectGitStatus);
   const refreshStatus = useGitStore((s) => s.refreshStatus);
   const pushNotice = useNoticeStore((s) => s.pushNotice);
 
-  // Worktree viewing state: null = main repo, string = worktree path
-  // Auto-sync to the active tab's worktree when switching tabs
-  const [viewingPath, setViewingPath] = useState<string | null>(null);
-  const activeTabWorktree = activeTab?.worktreePath ?? null;
-  useEffect(() => {
-    setViewingPath(activeTabWorktree);
-  }, [activeTabWorktree]);
+  // Worktree viewing: derived from the active workspace, not individual tabs
+  // Return a primitive (string|null) to avoid Zustand v5 infinite re-render from new object refs
+  const viewingPath = useTerminalStore((s) => {
+    const path = s.activeProjectPath;
+    if (!path) return null;
+    const ps = s.projectState[path];
+    if (!ps) return null;
+    const wsId = ps.activeWorkspaceId;
+    if (wsId === "main") return null;
+    return ps.workspaces[wsId]?.path ?? null;
+  });
 
   // Worktrees fetched from git
   const [worktreeEntries, setWorktreeEntries] = useState<WorktreeEntry[]>([]);
@@ -76,21 +72,15 @@ export default function GitPanel() {
     return map;
   }, [worktreeEntries]);
 
-  // Clear viewing path if the worktree it pointed to no longer exists
-  const validViewingPath =
-    viewingPath && worktreeEntries.some((w) => w.path === viewingPath)
-      ? viewingPath
-      : null;
-
   // Label for the currently-viewed worktree branch
   const viewingBranch = useMemo(() => {
-    if (!validViewingPath) return null;
-    const entry = worktreeEntries.find((w) => w.path === validViewingPath);
+    if (!viewingPath) return null;
+    const entry = worktreeEntries.find((w) => w.path === viewingPath);
     return entry?.branch ?? null;
-  }, [validViewingPath, worktreeEntries]);
+  }, [viewingPath, worktreeEntries]);
 
   // Effective path: worktree path when viewing one, otherwise main repo
-  const effectivePath = validViewingPath ?? activeProjectPath;
+  const effectivePath = viewingPath ?? activeProjectPath;
 
   // Git status for the effective path
   const gitStatus = effectivePath ? projectGitStatus[effectivePath] : null;
@@ -99,31 +89,6 @@ export default function GitPanel() {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [diffContent, setDiffContent] = useState<string>("");
-
-  const handleSetViewingPath = useCallback((path: string | null) => {
-    setViewingPath(path);
-    setSelectedPath(null);
-    setSelectedArea(null);
-    setDiffContent("");
-  }, []);
-
-  // Watch the viewed worktree for file changes (not covered by AppShell watcher)
-  useEffect(() => {
-    if (!validViewingPath) return;
-    void watchRepo(validViewingPath);
-    refreshStatus(validViewingPath);
-
-    const unlisten = listen<{ paths: string[] }>("git-fs-changed", (event) => {
-      if (event.payload.paths.includes(validViewingPath)) {
-        refreshStatus(validViewingPath);
-      }
-    });
-
-    return () => {
-      void unwatchRepo(validViewingPath);
-      unlisten.then((f) => f());
-    };
-  }, [validViewingPath, refreshStatus]);
 
   const fetchFiles = useCallback(async () => {
     if (!effectivePath) return;
@@ -215,6 +180,17 @@ export default function GitPanel() {
     setDiffContent("");
   }, [fetchFiles]);
 
+  if (import.meta.env.DEV) {
+    console.log("[GitPanel]", {
+      activeProjectPath,
+      viewingPath,
+      effectivePath,
+      hasMainGitStatus: !!mainGitStatus,
+      isGitRepo: mainGitStatus?.is_git_repo,
+      hasGitStatus: !!gitStatus,
+    });
+  }
+
   if (!activeProjectPath) {
     return (
       <div className="absolute inset-0 flex items-center justify-center opacity-50">
@@ -231,26 +207,28 @@ export default function GitPanel() {
     );
   }
 
+  // Worktree path exists in workspace but git status hasn't loaded yet
+  if (viewingPath && !gitStatus) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center opacity-50">
+        Loading worktree status…
+      </div>
+    );
+  }
+
   return (
     <div className="git-panel">
       <div className="git-panel__header">
-        {validViewingPath ? (
-          /* Viewing a worktree — show branch name + back button */
+        {viewingPath ? (
+          /* Worktree workspace — branch is locked, show read-only */
           <>
             <GitFork size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
             <span className="git-panel__worktree-label">
-              {viewingBranch ?? validViewingPath.split("/").pop() ?? "Worktree"}
+              {viewingBranch ?? viewingPath.split("/").pop() ?? "Worktree"}
             </span>
-            <button
-              className="icon-btn git-panel__back-btn"
-              onClick={() => handleSetViewingPath(null)}
-              title="Back to main repo"
-            >
-              <X size={12} />
-            </button>
           </>
         ) : (
-          /* Normal view — branch dropdown */
+          /* Main workspace — full branch dropdown */
           <>
             <GitBranch size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
             <BranchDropdown
@@ -259,7 +237,6 @@ export default function GitPanel() {
               isWorktree={false}
               onBranchChanged={handleBranchChanged}
               worktreeMap={worktreeMap.size > 0 ? worktreeMap : undefined}
-              onViewWorktree={handleSetViewingPath}
             />
           </>
         )}
@@ -275,7 +252,7 @@ export default function GitPanel() {
                 : "rgb(74, 222, 128)",
           }}
         />
-        {!validViewingPath && (mainGitStatus.ahead > 0 || mainGitStatus.behind > 0) && (
+        {!viewingPath && (mainGitStatus.ahead > 0 || mainGitStatus.behind > 0) && (
           <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 4, flexShrink: 0 }}>
             {mainGitStatus.ahead > 0 && `↑${mainGitStatus.ahead}`}
             {mainGitStatus.ahead > 0 && mainGitStatus.behind > 0 && " "}

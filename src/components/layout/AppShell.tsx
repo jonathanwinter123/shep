@@ -120,15 +120,13 @@ export default function AppShell() {
   // every call — zustand v5 + useSyncExternalStore would infinite-loop otherwise.
   const projectState = useTerminalStore((s) => s.projectState);
 
-  // Git status polling: project roots + all active worktree paths
+  // Git status polling: project roots + all worktree workspace paths
   const gitPollPaths = useMemo(() => {
     const paths = repos.filter((r) => r.valid).map((r) => r.path);
     for (const ps of Object.values(projectState)) {
-      for (const ws of Object.values(ps.workspaces)) {
-        for (const tab of ws.tabs) {
-          if (tab.worktreePath && !paths.includes(tab.worktreePath)) {
-            paths.push(tab.worktreePath);
-          }
+      for (const [id, ws] of Object.entries(ps.workspaces)) {
+        if (id !== "main" && ws.path && !paths.includes(ws.path)) {
+          paths.push(ws.path);
         }
       }
     }
