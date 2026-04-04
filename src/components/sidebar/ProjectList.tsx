@@ -116,7 +116,6 @@ export default function ProjectList({
       {[...repos].sort((a, b) => a.name.localeCompare(b.name)).map((repo) => {
         const isActive = repo.path === activeRepoPath;
         const isExpanded = isActive && expandedPaths.has(repo.path);
-        const inWorktree = isActive && activeWorkspaceId !== "main";
         return (
           <div key={repo.path}>
             <ProjectItem
@@ -130,10 +129,8 @@ export default function ProjectList({
               onClick={() => handleProjectClick(repo.path)}
             />
             {isExpanded && (
-              <div 
-                className="mt-1 mb-2 flex flex-col gap-0.5 pl-2"
-                style={{ "--section-icon-color": inWorktree ? "#c084fc" : "inherit" } as React.CSSProperties}
-              >
+              <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
+
                 <WorkspaceRow
                   worktrees={workspaces}
                   activeWorkspaceId={activeWorkspaceId}

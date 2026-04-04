@@ -48,29 +48,35 @@ export default function WorkspaceRow({
 
   if (worktrees.length === 0) return null;
 
+  // Single workspace (no worktrees) — skip the workspace UI entirely
+  if (worktrees.length === 1 && worktrees[0].id === "main") {
+    return <>{activeContent}</>;
+  }
+
   return (
     <div className="tree-branch mt-0.5">
       {worktrees.map((wt) => {
         const isMain = wt.id === "main";
         const isActive = wt.id === activeWorkspaceId;
         const status = workspaceActivityDot(wt.tabs, tabActivity);
+        const label = isMain ? (currentBranch || "main") : wt.label;
 
         return (
           <div key={wt.id} className="tree-node">
             <button
-              className={`section-toggle ${isActive ? "!text-[var(--text-primary)] !bg-white/6" : ""}`}
+              className={`list-item ${isActive ? "active" : ""}`}
               onClick={() => onSwitchWorkspace(wt.id)}
               aria-pressed={isActive}
-              title={isMain ? `Current branch: ${currentBranch || "main"}` : `Worktree: ${wt.label}`}
+              title={isMain ? `Current branch: ${label}` : `Worktree: ${label}`}
             >
               <span
                 className="shrink-0 w-[14px] flex items-center justify-center"
-                style={{ color: isMain ? "var(--text-muted)" : "var(--section-icon-color, #c084fc)" }}
+                style={{ color: "var(--text-muted)" }}
               >
                 {isMain ? <GitBranch size={14} /> : <GitFork size={14} />}
               </span>
               <span className="truncate" style={{ opacity: isMain ? 0.78 : 1 }}>
-                {isMain ? (currentBranch || "main") : wt.label}
+                {label}
               </span>
               {wt.tabs.length > 0 && <span className="badge">{wt.tabs.length}</span>}
               <span style={{ flex: 1 }} />
