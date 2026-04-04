@@ -177,13 +177,24 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
       const path = state.activeProjectPath;
       if (!path) return state;
       const ps = state.projectState[path] ?? emptyState(path);
-      const wsId = ps.activeWorkspaceId;
-      const ws = ps.workspaces[wsId];
-      if (!ws) return state;
+
+      // Search all workspaces for the tab — auto-switch if needed
+      let targetWsId = ps.activeWorkspaceId;
+      const activeWs = ps.workspaces[targetWsId];
+      if (!activeWs || !activeWs.tabs.some((t) => t.id === id)) {
+        const found = Object.entries(ps.workspaces).find(([, ws]) =>
+          ws.tabs.some((t) => t.id === id),
+        );
+        if (!found) return state;
+        targetWsId = found[0];
+      }
+
+      const ws = ps.workspaces[targetWsId];
       const updatedWs: WorkspaceState = { ...ws, activeTabId: id };
       const updated: ProjectTerminalState = {
         ...ps,
-        workspaces: { ...ps.workspaces, [wsId]: updatedWs },
+        activeWorkspaceId: targetWsId,
+        workspaces: { ...ps.workspaces, [targetWsId]: updatedWs },
       };
       return {
         projectState: {

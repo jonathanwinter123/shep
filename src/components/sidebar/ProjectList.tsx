@@ -1,18 +1,17 @@
 import { useMemo, useState } from "react";
-import type { RepoInfo, TerminalTab, CommandState } from "../../lib/types";
+import type { RepoInfo, CommandState } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Sparkles, SquareTerminal } from "lucide-react";
+import { useTerminalStore } from "../../stores/useTerminalStore";
 import ProjectItem from "./ProjectItem";
 import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
 import CommandsRow from "./CommandsRow";
-import WorkspacePicker from "./WorkspacePicker";
 
 interface ProjectListProps {
   repos: RepoInfo[];
   activeRepoPath: string | null;
-  tabs: TerminalTab[];
   activeTabId: string | null;
   commands: CommandState[];
   projectActivity: Record<string, { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean }>;
@@ -30,7 +29,6 @@ interface ProjectListProps {
 export default function ProjectList({
   repos,
   activeRepoPath,
-  tabs,
   activeTabId,
   commands,
   projectActivity,
@@ -59,7 +57,6 @@ export default function ProjectList({
 
   const handleProjectClick = (repoPath: string) => {
     if (repoPath === activeRepoPath) {
-      // Toggle collapse/expand for the active project
       setExpandedPaths((prev) => {
         const next = new Set(prev);
         if (next.has(repoPath)) next.delete(repoPath);
@@ -82,14 +79,30 @@ export default function ProjectList({
     }
   };
 
+  // Get workspace data for the active project
+  const projectState = useTerminalStore(
+    (s) => activeRepoPath ? s.projectState[activeRepoPath] : null,
+  );
+
+  const activeWorkspaceId = projectState?.activeWorkspaceId ?? "main";
+  const activeWorkspace = projectState?.workspaces?.[activeWorkspaceId];
+  const activeTabs = activeWorkspace?.tabs ?? [];
+
+  const worktrees = useMemo(() => {
+    if (!projectState) return [];
+    return Object.entries(projectState.workspaces)
+      .filter(([id]) => id !== "main")
+      .map(([id, ws]) => ({ id, label: ws.label, tabs: ws.tabs.map((t) => ({ ptyId: t.ptyId })) }));
+  }, [projectState]);
+
   const assistantTabs = useMemo(
-    () => tabs.filter((t) => t.assistantId !== null),
-    [tabs],
+    () => activeTabs.filter((t) => t.assistantId !== null),
+    [activeTabs],
   );
 
   const shellTabs = useMemo(
-    () => tabs.filter((t) => !t.assistantId),
-    [tabs],
+    () => activeTabs.filter((t) => !t.assistantId),
+    [activeTabs],
   );
 
   const commandsBadge = String(commands.length);
@@ -106,17 +119,15 @@ export default function ProjectList({
               isActive={isActive}
               isExpanded={isExpanded}
               activity={projectActivity[repo.path]}
+              worktrees={isActive ? worktrees : []}
+              activeWorkspaceId={isActive ? activeWorkspaceId : "main"}
               onOpenInEditor={() => onOpenInEditor(repo.path)}
               onRemove={() => onRemoveProject(repo.path)}
               onClick={() => handleProjectClick(repo.path)}
+              onSwitchWorkspace={(wsId) => onSwitchWorkspace(repo.path, wsId)}
             />
             {isExpanded && (
               <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
-                <WorkspacePicker
-                  repoPath={repo.path}
-                  onSwitch={(wsId) => onSwitchWorkspace(repo.path, wsId)}
-                />
-
                 <CollapsibleSection
                   label="AI Assistants"
                   icon={<Sparkles size={14} />}

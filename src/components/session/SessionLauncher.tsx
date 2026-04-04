@@ -74,6 +74,12 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   const activeConfig = useRepoStore((s) => s.activeConfig);
   const pushNotice = useNoticeStore((s) => s.pushNotice);
 
+  // Detect if we're inside a worktree workspace
+  const activeWorkspaceId = useTerminalStore(
+    (s) => s.activeProjectPath ? s.projectState[s.activeProjectPath]?.activeWorkspaceId : "main",
+  ) ?? "main";
+  const inWorktree = activeWorkspaceId !== "main";
+
   const [selectedAssistant, setSelectedAssistant] = useState<CodingAssistant | null>(null);
   const [available, setAvailable] = useState<Record<string, boolean>>({});
   const [installPopover, setInstallPopover] = useState<string | null>(null);
@@ -231,6 +237,12 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         }
       }
 
+      // If we're in a worktree workspace and didn't create a new one,
+      // use the current workspace's path so the session runs there
+      if (!worktreePath && inWorktree) {
+        worktreePath = useTerminalStore.getState().getActiveWorkspacePath();
+      }
+
       const started = await onStartSession(selectedAssistant.id, mode, worktreePath);
       if (!started) {
         setLaunching(false);
@@ -354,8 +366,9 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         </div>
       )}
 
-      {/* Branch Section */}
-      {selectedAssistant && isGit && (
+      {/* Branch Section — hidden in worktree for standard mode (already on a branch),
+           but shown for worktree/yolo modes (creating a new worktree from base) */}
+      {selectedAssistant && isGit && !(inWorktree && !usesWorktree) && (
         <div className="mb-6">
           {usesWorktree ? (
             /* Worktree/YOLO: base branch picker + branch name */
@@ -482,6 +495,13 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
             </>
           )}
         </div>
+      )}
+
+      {/* Worktree context hint */}
+      {selectedAssistant && inWorktree && (
+        <p className="text-xs opacity-40 mb-4">
+          Launching in worktree <span className="font-mono">{activeWorkspaceId}</span>
+        </p>
       )}
 
       {/* Start Button */}

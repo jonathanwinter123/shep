@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { RepoInfo, TerminalTab, CommandState } from "../../lib/types";
+import type { RepoInfo, CommandState } from "../../lib/types";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import SectionHeader from "./SectionHeader";
@@ -10,7 +10,6 @@ import SidebarUsage from "./SidebarUsage";
 interface SidebarProps {
   repos: RepoInfo[];
   activeRepoPath: string | null;
-  tabs: TerminalTab[];
   activeTabId: string | null;
   commands: CommandState[];
   onSelectRepo: (repoPath: string) => void;
@@ -27,7 +26,6 @@ interface SidebarProps {
 export default function Sidebar({
   repos,
   activeRepoPath,
-  tabs,
   activeTabId,
   commands,
   onSelectRepo,
@@ -91,7 +89,6 @@ export default function Sidebar({
         <ProjectList
           repos={repos}
           activeRepoPath={activeRepoPath}
-          tabs={tabs}
           activeTabId={activeTabId}
           commands={commands}
           projectActivity={projectActivity}

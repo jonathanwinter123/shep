@@ -96,11 +96,15 @@ export default function AppShell() {
           store.addWorkspace(repoPath, wt.branch, wt.branch, wt.path);
         }
         // Remove workspaces for worktrees that no longer exist on disk
+        // Compare by branch name (workspace ID), not path — avoids
+        // mismatches between relative paths (../foo) and canonical paths
         const ps = store.projectState[repoPath];
         if (ps) {
-          const wtPaths = new Set(worktrees.map((w) => w.path));
-          for (const [wsId, ws] of Object.entries(ps.workspaces)) {
-            if (wsId !== "main" && !wtPaths.has(ws.path)) {
+          const wtBranches = new Set(
+            worktrees.filter((w) => !w.is_main && w.branch).map((w) => w.branch),
+          );
+          for (const wsId of Object.keys(ps.workspaces)) {
+            if (wsId !== "main" && !wtBranches.has(wsId)) {
               store.removeWorkspace(repoPath, wsId);
             }
           }
@@ -245,6 +249,7 @@ export default function AppShell() {
     return () => { unlisten.then((f) => f()); };
   }, [discoverWorkspaces]);
 
+
   const handleSelectRepo = useCallback(
     async (repoPath: string) => {
       if (repoPath === activeRepoPath) return;
@@ -351,10 +356,12 @@ export default function AppShell() {
     useUIStore.getState().deactivateCommandsPanel();
     useUIStore.getState().deactivateLauncher();
     useUIStore.getState().deactivateUsagePanel();
-    setActiveTab(tabId);
-    const tab = tabs.find((t) => t.id === tabId);
-    if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
-  }, [setActiveTab, tabs]);
+    setActiveTab(tabId); // auto-switches workspace if tab is in a different one
+    const store = useTerminalStore.getState();
+    const allTabs = activeRepoPath ? store.getAllProjectTabs(activeRepoPath) : [];
+    const tab = allTabs.find((t) => t.id === tabId);
+    if (tab) store.clearTabBell(tab.ptyId);
+  }, [setActiveTab, activeRepoPath]);
 
   const handleSwitchWorkspace = useCallback(
     async (repoPath: string, workspaceId: string) => {
@@ -608,7 +615,6 @@ export default function AppShell() {
           <Sidebar
             repos={repos}
             activeRepoPath={activeRepoPath}
-            tabs={tabs}
             activeTabId={showOverlay ? null : activeTabId}
             commands={commands}
             onSelectRepo={handleSelectRepo}

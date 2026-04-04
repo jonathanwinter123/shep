@@ -10,8 +10,8 @@ use tauri::Emitter;
 const DEBOUNCE_MS: u64 = 500;
 const FALLBACK_POLL_SECS: u64 = 60;
 
-/// Paths inside `.git/` to allow through the filter (branch switches, new commits).
-const GIT_PASSTHROUGH: &[&str] = &["HEAD", "refs"];
+/// Paths inside `.git/` to allow through the filter (branch switches, new commits, worktree changes).
+const GIT_PASSTHROUGH: &[&str] = &["HEAD", "refs", "worktrees"];
 
 /// Directories to ignore entirely — high-churn build artifacts.
 const IGNORED_DIRS: &[&str] = &["node_modules", "target", ".next", "dist", "__pycache__"];
