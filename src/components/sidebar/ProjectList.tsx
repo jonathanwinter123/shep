@@ -3,11 +3,13 @@ import type { RepoInfo, CommandState } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Sparkles, SquareTerminal } from "lucide-react";
 import { useTerminalStore } from "../../stores/useTerminalStore";
+import { useGitStore } from "../../stores/useGitStore";
 import ProjectItem from "./ProjectItem";
 import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
 import CommandsRow from "./CommandsRow";
+import WorkspaceRow from "./WorkspaceRow";
 
 interface ProjectListProps {
   repos: RepoInfo[];
@@ -83,15 +85,17 @@ export default function ProjectList({
   const projectState = useTerminalStore(
     (s) => activeRepoPath ? s.projectState[activeRepoPath] : null,
   );
-
   const activeWorkspaceId = projectState?.activeWorkspaceId ?? "main";
   const activeWorkspace = projectState?.workspaces?.[activeWorkspaceId];
   const activeTabs = activeWorkspace?.tabs ?? [];
 
-  const worktrees = useMemo(() => {
+  const currentBranch = useGitStore(
+    (s) => activeRepoPath ? s.projectGitStatus[activeRepoPath]?.branch ?? "" : "",
+  );
+
+  const workspaces = useMemo(() => {
     if (!projectState) return [];
     return Object.entries(projectState.workspaces)
-      .filter(([id]) => id !== "main")
       .map(([id, ws]) => ({ id, label: ws.label, tabs: ws.tabs.map((t) => ({ ptyId: t.ptyId })) }));
   }, [projectState]);
 
@@ -112,6 +116,7 @@ export default function ProjectList({
       {[...repos].sort((a, b) => a.name.localeCompare(b.name)).map((repo) => {
         const isActive = repo.path === activeRepoPath;
         const isExpanded = isActive && expandedPaths.has(repo.path);
+        const inWorktree = isActive && activeWorkspaceId !== "main";
         return (
           <div key={repo.path}>
             <ProjectItem
@@ -119,46 +124,57 @@ export default function ProjectList({
               isActive={isActive}
               isExpanded={isExpanded}
               activity={projectActivity[repo.path]}
-              worktrees={isActive ? worktrees : []}
               activeWorkspaceId={isActive ? activeWorkspaceId : "main"}
               onOpenInEditor={() => onOpenInEditor(repo.path)}
               onRemove={() => onRemoveProject(repo.path)}
               onClick={() => handleProjectClick(repo.path)}
-              onSwitchWorkspace={(wsId) => onSwitchWorkspace(repo.path, wsId)}
             />
             {isExpanded && (
-              <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
-                <CollapsibleSection
-                  label="AI Assistants"
-                  icon={<Sparkles size={14} />}
-                  badge={assistantTabs.length || null}
-                  hasItems={assistantTabs.length > 0}
-                  onAdd={onNewAssistant}
-                >
-                  <AssistantList
-                    assistantTabs={assistantTabs}
-                    activeTabId={activeTabId}
-                    onSelectTab={onSelectTab}
-                    onCloseTab={onCloseTab}
-                  />
-                </CollapsibleSection>
+              <div 
+                className="mt-1 mb-2 flex flex-col gap-0.5 pl-2"
+                style={{ "--section-icon-color": inWorktree ? "#c084fc" : "inherit" } as React.CSSProperties}
+              >
+                <WorkspaceRow
+                  worktrees={workspaces}
+                  activeWorkspaceId={activeWorkspaceId}
+                  currentBranch={currentBranch}
+                  onSwitchWorkspace={(wsId) => onSwitchWorkspace(repo.path, wsId)}
+                  activeContent={
+                    <>
+                      <CollapsibleSection
+                        label="AI Assistants"
+                        icon={<Sparkles size={14} />}
+                        badge={assistantTabs.length || null}
+                        hasItems={assistantTabs.length > 0}
+                        onAdd={onNewAssistant}
+                      >
+                        <AssistantList
+                          assistantTabs={assistantTabs}
+                          activeTabId={activeTabId}
+                          onSelectTab={onSelectTab}
+                          onCloseTab={onCloseTab}
+                        />
+                      </CollapsibleSection>
 
-                <CollapsibleSection
-                  label="Terminals"
-                  icon={<SquareTerminal size={14} />}
-                  badge={shellTabs.length || null}
-                  hasItems={shellTabs.length > 0}
-                  onAdd={onNewShell}
-                >
-                  <TerminalList
-                    tabs={shellTabs}
-                    activeTabId={activeTabId}
-                    onSelectTab={onSelectTab}
-                    onCloseTab={onCloseTab}
-                  />
-                </CollapsibleSection>
+                      <CollapsibleSection
+                        label="Terminals"
+                        icon={<SquareTerminal size={14} />}
+                        badge={shellTabs.length || null}
+                        hasItems={shellTabs.length > 0}
+                        onAdd={onNewShell}
+                      >
+                        <TerminalList
+                          tabs={shellTabs}
+                          activeTabId={activeTabId}
+                          onSelectTab={onSelectTab}
+                          onCloseTab={onCloseTab}
+                        />
+                      </CollapsibleSection>
 
-                <CommandsRow badge={commandsBadge} />
+                      <CommandsRow badge={commandsBadge} />
+                    </>
+                  }
+                />
               </div>
             )}
           </div>

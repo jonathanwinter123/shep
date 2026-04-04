@@ -26,7 +26,7 @@ export default function CollapsibleSection({
           className="flex items-center gap-1.5 flex-1 min-w-0"
           title={`New ${label.replace(/s$/, "").toLowerCase()}`}
         >
-          <span className="shrink-0 w-[14px] flex items-center justify-center">{icon}</span>
+          <span className="shrink-0 w-[14px] flex items-center justify-center" style={{ color: "var(--section-icon-color)" }}>{icon}</span>
           <span className="truncate">{label}</span>
           {badge != null && (
             <span className="badge">{badge}</span>

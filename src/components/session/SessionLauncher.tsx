@@ -16,7 +16,7 @@ import {
 } from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
-import { ChevronDown, GitBranch, GitFork, HandMetal, Play } from "lucide-react";
+import { ChevronDown, GitBranch, GitFork, HandMetal } from "lucide-react";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { ASSISTANT_INSTALL_URLS } from "../sidebar/constants";
 import { getErrorMessage } from "../../lib/errors";
@@ -39,33 +39,34 @@ function uniqueBranchName(base: string, existing: string[]): string {
   return `${base}-${i}`;
 }
 
-/** Format today's date as YYYYMMDD */
-function todayStamp(): string {
+/** Format today as YYYYMMDD-{base36 seconds since midnight} for short unique stamps */
+function dateTimeStamp(): string {
   const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  return `${y}${m}${day}`;
+  const secs = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+  return `${y}${m}${day}-${secs.toString(36)}`;
 }
 
 /** Mode labels for display */
 const MODE_LABELS: Record<SessionMode, string> = {
-  standard: "Standard",
+  standard: "Branch",
   worktree: "Worktree",
   yolo: "YOLO",
 };
 
 /** Mode icons */
 const MODE_ICONS: Record<SessionMode, React.ReactNode> = {
-  standard: <Play size={14} style={{ opacity: 0.5 }} />,
+  standard: <GitBranch size={14} style={{ opacity: 0.5 }} />,
   worktree: <GitFork size={14} style={{ opacity: 0.5 }} />,
   yolo: <HandMetal size={14} style={{ opacity: 0.5 }} />,
 };
 
-/** Short mode slug for branch naming */
-function modeBranchSlug(mode: SessionMode): string {
-  if (mode === "yolo") return "-yolo";
-  if (mode === "worktree") return "-wt";
+/** Branch prefix per mode */
+function modeBranchPrefix(mode: SessionMode): string {
+  if (mode === "yolo") return "yolo/";
+  if (mode === "worktree") return "wt/";
   return "";
 }
 
@@ -165,8 +166,12 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
       setBranchName("");
       return;
     }
-    const base = `shep${modeBranchSlug(mode)}-${todayStamp()}`;
-    setBranchName(uniqueBranchName(base, branches));
+    if (usesWorktree) {
+      const base = `${modeBranchPrefix(mode)}${dateTimeStamp()}`;
+      setBranchName(uniqueBranchName(base, branches));
+    } else {
+      setBranchName("");
+    }
   }, [mode, selectedAssistant, isGit, useCurrentBranch, branches]);
 
   const handleModeChange = (m: SessionMode) => {
@@ -191,9 +196,10 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
 
       if (usesWorktree && isGit) {
         // Worktree/YOLO: create worktree + branch
-        const finalBranch = branchName.trim() || `shep${modeBranchSlug(mode)}-${todayStamp()}`;
-        const folderName = finalBranch.replace(/\//g, "-") + "-wt";
-        worktreePath = `${activeRepoPath}/../.shep-worktrees/${folderName}`;
+        const finalBranch = branchName.trim() || `${modeBranchPrefix(mode)}${dateTimeStamp()}`;
+        const repoName = activeRepoPath.split("/").pop()!;
+        const folderName = finalBranch.replace(/\//g, "-");
+        worktreePath = `${activeRepoPath}/../.shep-worktrees/${repoName}/${folderName}`;
         await gitCreateWorktree(activeRepoPath, worktreePath, finalBranch);
 
         // Execute environment blueprint: copy files, create symlinks, run post-create commands
@@ -232,7 +238,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         }
         // Create new branch unless "use current branch" is checked
         if (!useCurrentBranch) {
-          const finalBranch = branchName.trim() || `shep-${todayStamp()}`;
+          const finalBranch = branchName.trim() || `feature/${dateTimeStamp()}`;
           await gitCreateBranch(activeRepoPath, finalBranch);
         }
       }
@@ -421,7 +427,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
                 type="text"
                 value={branchName}
                 onChange={(e) => setBranchName(e.target.value)}
-                placeholder={`shep${modeBranchSlug(mode)}-${todayStamp()}`}
+                placeholder={`${modeBranchPrefix(mode)}my-feature`}
               />
               <p className="text-xs opacity-40 mt-2">
                 Creates an isolated worktree branching from {selectedBranch}.
@@ -480,7 +486,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
                 value={useCurrentBranch ? selectedBranch : branchName}
                 onChange={(e) => setBranchName(e.target.value)}
                 disabled={useCurrentBranch}
-                placeholder={`shep-${todayStamp()}`}
+                placeholder="feature/my-feature"
               />
 
               <label className="flex items-center gap-2 cursor-pointer text-xs mt-3">
