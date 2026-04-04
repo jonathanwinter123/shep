@@ -8,7 +8,7 @@ import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
 import DevMemory from "./DevMemory";
-import BranchSwitcher from "../shared/BranchSwitcher";
+
 
 function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () => void; onNewShell: () => void }) {
   const [open, setOpen] = useState(false);
@@ -87,7 +87,6 @@ export default function TabBar({
   onNewShell,
   onNewAssistant,
 }: TabBarProps) {
-  const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
   const projectTerminals = useTerminalStore(
     (s) => (s.activeProjectPath ? s.projectState[s.activeProjectPath] : null),
   );
@@ -419,14 +418,6 @@ export default function TabBar({
 
       {import.meta.env.DEV && <DevMemory />}
 
-      {activeProjectPath && (
-        <div className="shrink-0 pl-3 border-l border-white/8">
-          <BranchSwitcher
-            repoPath={activeProjectPath}
-            onOpenGitPanel={activateGitPanel}
-          />
-        </div>
-      )}
     </div>
   );
 }
