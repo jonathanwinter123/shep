@@ -14,6 +14,7 @@ export default function GitStatusRow({ repoPath }: GitStatusRowProps) {
   if (!status?.is_git_repo) return null;
 
   const changeCount = status.staged + status.unstaged + status.untracked;
+  const label = status.branch && status.branch !== "(detached)" ? status.branch : "Git";
 
   return (
     <button
@@ -21,7 +22,7 @@ export default function GitStatusRow({ repoPath }: GitStatusRowProps) {
       className={`section-toggle ${gitPanelActive ? "!text-[var(--text-primary)] !bg-white/6" : ""}`}
     >
       <GitCommitHorizontal size={14} className="shrink-0" style={{ color: "var(--section-icon-color)" }} />
-      <span className="truncate">Git</span>
+      <span className="truncate" title={label}>{label}</span>
       {changeCount > 0 && (
         <span className="badge">{changeCount}</span>
       )}

@@ -60,11 +60,6 @@ export default function WorkspaceRow({
 
   if (worktrees.length === 0) return null;
 
-  // Single workspace (no worktrees) — skip the workspace UI entirely
-  if (worktrees.length === 1 && worktrees[0].id === "main") {
-    return <>{activeContent}</>;
-  }
-
   const menuItems: ContextMenuItem[] = menu && menu.wsId !== "main" && onRemoveWorktree
     ? [
         {
@@ -91,7 +86,7 @@ export default function WorkspaceRow({
               onClick={() => onSwitchWorkspace(wt.id)}
               onContextMenu={!isMain ? (e) => handleContextMenu(e, wt.id) : undefined}
               aria-pressed={isActive}
-              title={isMain ? `Current branch: ${label}` : `Worktree: ${label}`}
+              title={isMain ? `Open git for ${label}` : `Switch to ${label} and open git`}
             >
               <span
                 className="shrink-0 w-[14px] flex items-center justify-center"

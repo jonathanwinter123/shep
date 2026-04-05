@@ -6,6 +6,7 @@ import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
 import { useWorktreeDialogStore } from "../../stores/useWorktreeDialogStore";
 import { useNoticeStore } from "../../stores/useNoticeStore";
+import { useUIStore } from "../../stores/useUIStore";
 import { gitStatus, gitPushBranch, gitRemoveWorktree } from "../../lib/tauri";
 import { getErrorMessage } from "../../lib/errors";
 import ProjectItem from "./ProjectItem";
@@ -13,7 +14,6 @@ import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
 import CommandsRow from "./CommandsRow";
-import GitStatusRow from "./GitStatusRow";
 import IdeLaunchRow from "./IdeLaunchRow";
 import WorkspaceRow from "./WorkspaceRow";
 
@@ -98,6 +98,9 @@ export default function ProjectList({
   const currentBranch = useGitStore(
     (s) => activeRepoPath ? s.projectGitStatus[activeRepoPath]?.branch ?? "" : "",
   );
+  const activeRepoGitStatus = useGitStore(
+    (s) => activeRepoPath ? s.projectGitStatus[activeRepoPath] ?? null : null,
+  );
 
   const workspaces = useMemo(() => {
     if (!projectState) return [];
@@ -115,16 +118,8 @@ export default function ProjectList({
     [activeTabs],
   );
 
-  // Effective git path: resolve worktree path from git store by branch name
-  const worktreeBranch = activeWorkspaceId !== "main" ? activeWorkspaceId : null;
-  const effectiveGitPath = useGitStore((s) => {
-    if (!worktreeBranch || !activeRepoPath) return activeRepoPath;
-    const entries = s.worktreesByRepo[activeRepoPath];
-    if (!entries) return activeRepoPath;
-    return entries.find((e) => e.branch === worktreeBranch)?.path ?? activeRepoPath;
-  });
-
   const pushNotice = useNoticeStore((s) => s.pushNotice);
+  const openGitPanel = useUIStore((s) => s.openGitPanel);
 
   const handleRemoveWorktree = useCallback(async (workspaceId: string) => {
     if (!activeRepoPath) return;
@@ -174,6 +169,7 @@ export default function ProjectList({
   }, [activeRepoPath, projectState, pushNotice]);
 
   const commandsBadge = String(commands.length);
+  const showWorkspaceRow = !!activeRepoGitStatus?.is_git_repo;
 
   return (
     <div className="flex flex-col gap-0.5 px-2 pb-2">
@@ -195,50 +191,89 @@ export default function ProjectList({
             {isExpanded && (
               <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
 
-                <WorkspaceRow
-                  worktrees={workspaces}
-                  activeWorkspaceId={activeWorkspaceId}
-                  currentBranch={currentBranch}
-                  onSwitchWorkspace={(wsId) => onSwitchWorkspace(repo.path, wsId)}
-                  onRemoveWorktree={handleRemoveWorktree}
-                  activeContent={
-                    <>
-                      <CollapsibleSection
-                        label="AI Assistants"
-                        icon={<Sparkles size={14} />}
-                        badge={assistantTabs.length || null}
-                        hasItems={assistantTabs.length > 0}
-                        onAdd={onNewAssistant}
-                      >
-                        <AssistantList
-                          assistantTabs={assistantTabs}
-                          activeTabId={activeTabId}
-                          onSelectTab={onSelectTab}
-                          onCloseTab={onCloseTab}
-                        />
-                      </CollapsibleSection>
+                {showWorkspaceRow ? (
+                  <WorkspaceRow
+                    worktrees={workspaces}
+                    activeWorkspaceId={activeWorkspaceId}
+                    currentBranch={currentBranch}
+                    onSwitchWorkspace={(wsId) => {
+                      void onSwitchWorkspace(repo.path, wsId);
+                      openGitPanel();
+                    }}
+                    onRemoveWorktree={handleRemoveWorktree}
+                    activeContent={
+                      <>
+                        <CollapsibleSection
+                          label="AI Assistants"
+                          icon={<Sparkles size={14} />}
+                          badge={assistantTabs.length || null}
+                          hasItems={assistantTabs.length > 0}
+                          onAdd={onNewAssistant}
+                        >
+                          <AssistantList
+                            assistantTabs={assistantTabs}
+                            activeTabId={activeTabId}
+                            onSelectTab={onSelectTab}
+                            onCloseTab={onCloseTab}
+                          />
+                        </CollapsibleSection>
 
-                      <CollapsibleSection
-                        label="Terminals"
-                        icon={<SquareTerminal size={14} />}
-                        badge={shellTabs.length || null}
-                        hasItems={shellTabs.length > 0}
-                        onAdd={onNewShell}
-                      >
-                        <TerminalList
-                          tabs={shellTabs}
-                          activeTabId={activeTabId}
-                          onSelectTab={onSelectTab}
-                          onCloseTab={onCloseTab}
-                        />
-                      </CollapsibleSection>
+                        <CollapsibleSection
+                          label="Terminals"
+                          icon={<SquareTerminal size={14} />}
+                          badge={shellTabs.length || null}
+                          hasItems={shellTabs.length > 0}
+                          onAdd={onNewShell}
+                        >
+                          <TerminalList
+                            tabs={shellTabs}
+                            activeTabId={activeTabId}
+                            onSelectTab={onSelectTab}
+                            onCloseTab={onCloseTab}
+                          />
+                        </CollapsibleSection>
 
-                      <CommandsRow badge={commandsBadge} />
-                      {effectiveGitPath && <GitStatusRow repoPath={effectiveGitPath} />}
-                      <IdeLaunchRow repoPath={repo.path} onOpenInEditor={onOpenInEditor} />
-                    </>
-                  }
-                />
+                        <CommandsRow badge={commandsBadge} />
+                        <IdeLaunchRow repoPath={repo.path} onOpenInEditor={onOpenInEditor} />
+                      </>
+                    }
+                  />
+                ) : (
+                  <>
+                    <CollapsibleSection
+                      label="AI Assistants"
+                      icon={<Sparkles size={14} />}
+                      badge={assistantTabs.length || null}
+                      hasItems={assistantTabs.length > 0}
+                      onAdd={onNewAssistant}
+                    >
+                      <AssistantList
+                        assistantTabs={assistantTabs}
+                        activeTabId={activeTabId}
+                        onSelectTab={onSelectTab}
+                        onCloseTab={onCloseTab}
+                      />
+                    </CollapsibleSection>
+
+                    <CollapsibleSection
+                      label="Terminals"
+                      icon={<SquareTerminal size={14} />}
+                      badge={shellTabs.length || null}
+                      hasItems={shellTabs.length > 0}
+                      onAdd={onNewShell}
+                    >
+                      <TerminalList
+                        tabs={shellTabs}
+                        activeTabId={activeTabId}
+                        onSelectTab={onSelectTab}
+                        onCloseTab={onCloseTab}
+                      />
+                    </CollapsibleSection>
+
+                    <CommandsRow badge={commandsBadge} />
+                    <IdeLaunchRow repoPath={repo.path} onOpenInEditor={onOpenInEditor} />
+                  </>
+                )}
               </div>
             )}
           </div>
