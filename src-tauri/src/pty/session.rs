@@ -116,6 +116,7 @@ impl PtySession {
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
         let mut cmd = CommandBuilder::new(&shell);
         cmd.arg("-l");
+        cmd.arg("-i");
         cmd.arg("-c");
         cmd.arg(command);
         cmd.cwd(cwd);
