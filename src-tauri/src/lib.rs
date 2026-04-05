@@ -120,7 +120,6 @@ pub fn run() {
             commands::unwatch_repo,
             commands::list_listening_ports,
             commands::kill_port,
-            commands::debug_port_scan,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

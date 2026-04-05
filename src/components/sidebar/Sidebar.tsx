@@ -104,10 +104,7 @@ export default function Sidebar({
         />
       </div>
       <SidebarUsage />
-      <SidebarFooter
-        activeRepoPath={activeRepoPath}
-        onOpenInEditor={onOpenInEditor}
-      />
+      <SidebarFooter />
     </div>
   );
 }

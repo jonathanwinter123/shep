@@ -18,7 +18,7 @@ export default function IdeLaunchRow({
       className={`section-toggle ${settingsActive ? "!text-[var(--text-primary)] !bg-white/6" : ""}`}
     >
       <CodeXml size={14} className="shrink-0" />
-      <span className="truncate">Open in IDE</span>
+      <span className="truncate">IDE</span>
     </button>
   );
 }

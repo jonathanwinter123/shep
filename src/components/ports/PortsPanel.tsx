@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCcw, Skull, ExternalLink, Folder, Bug } from "lucide-react";
-import { listListeningPorts, killPort, debugPortScan } from "../../lib/tauri";
-import type { PortScanDebug } from "../../lib/tauri";
+import { RefreshCcw, Skull, ExternalLink, Folder } from "lucide-react";
+import { listListeningPorts, killPort } from "../../lib/tauri";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
 import type { PortInfo } from "../../lib/types";
@@ -24,8 +23,6 @@ export default function PortsPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [killing, setKilling] = useState<Set<number>>(new Set());
-  const [debug, setDebug] = useState<PortScanDebug | null>(null);
-  const [debugError, setDebugError] = useState<string | null>(null);
   const pushNotice = useNoticeStore((s) => s.pushNotice);
 
   const refresh = useCallback(async () => {
@@ -43,22 +40,9 @@ export default function PortsPanel() {
     }
   }, []);
 
-  const runDebug = useCallback(async () => {
-    setDebug(null);
-    setDebugError(null);
-    try {
-      const result = await debugPortScan();
-      setDebug(result);
-    } catch (err) {
-      setDebugError(getErrorMessage(err));
-    }
-  }, []);
-
-  // Initial load + auto-refresh every 5s
+  // Load once when panel mounts
   useEffect(() => {
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 5000);
-    return () => window.clearInterval(timer);
   }, [refresh]);
 
   const handleKill = useCallback(async (port: PortInfo) => {
@@ -107,56 +91,16 @@ export default function PortsPanel() {
     <div className="absolute inset-0 overflow-y-auto p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="section-label !p-0">Ports</h2>
-        <div className="flex items-center gap-2">
-          <button
-            className="icon-btn"
-            onClick={() => void runDebug()}
-            title="Run debug scan"
-            aria-label="Debug port scan"
-          >
-            <Bug size={14} />
-          </button>
-          <button
-            className="icon-btn"
-            onClick={() => void refresh()}
-            disabled={loading}
-            title="Refresh"
-            aria-label="Refresh port list"
-          >
-            <RefreshCcw size={14} className={loading ? "animate-spin" : ""} />
-          </button>
-        </div>
-      </div>
-
-      {/* Debug output */}
-      {(debug || debugError) && (
-        <div
-          className="mb-4 p-3 rounded-md text-xs font-mono overflow-auto"
-          style={{ background: "var(--bg-secondary, rgba(255,255,255,0.03))", maxHeight: "400px" }}
+        <button
+          className="icon-btn"
+          onClick={() => void refresh()}
+          disabled={loading}
+          title="Refresh"
+          aria-label="Refresh port list"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-sm font-sans">Debug Output</span>
-            <button className="icon-btn" onClick={() => { setDebug(null); setDebugError(null); }}>×</button>
-          </div>
-          {debugError && <p style={{ color: "var(--text-danger, #e55)" }}>Error: {debugError}</p>}
-          {debug && (
-            <>
-              <p><span className="opacity-50">Shell:</span> {debug.shell}</p>
-              <p><span className="opacity-50">Exit code:</span> {debug.lsof_exit}</p>
-              <p><span className="opacity-50">Lines parsed:</span> {debug.parsed_count}</p>
-              <p><span className="opacity-50">After filter (port &ge; 1024):</span> {debug.filtered_count}</p>
-              {debug.lsof_stderr && (
-                <>
-                  <p className="mt-2 opacity-50">stderr:</p>
-                  <pre className="whitespace-pre-wrap opacity-70">{debug.lsof_stderr}</pre>
-                </>
-              )}
-              <p className="mt-2 opacity-50">stdout ({debug.lsof_stdout.split("\n").length} lines):</p>
-              <pre className="whitespace-pre-wrap opacity-70">{debug.lsof_stdout || "(empty)"}</pre>
-            </>
-          )}
-        </div>
-      )}
+          <RefreshCcw size={14} className={loading ? "animate-spin" : ""} />
+        </button>
+      </div>
 
       {error && (
         <div className="text-sm mt-4 p-3 rounded-md" style={{ background: "rgba(255,80,80,0.1)", color: "var(--text-danger, #e55)" }}>
@@ -165,7 +109,7 @@ export default function PortsPanel() {
         </div>
       )}
 
-      {!error && ports.length === 0 && !loading && !debug && (
+      {!error && ports.length === 0 && !loading && (
         <p className="text-sm opacity-50 mt-8 text-center">
           No dev ports detected
         </p>

@@ -284,16 +284,3 @@ export function listListeningPorts(): Promise<PortInfo[]> {
 export function killPort(pid: number): Promise<void> {
   return invoke("kill_port", { pid });
 }
-
-export interface PortScanDebug {
-  shell: string;
-  lsof_exit: number;
-  lsof_stdout: string;
-  lsof_stderr: string;
-  parsed_count: number;
-  filtered_count: number;
-}
-
-export function debugPortScan(): Promise<PortScanDebug> {
-  return invoke("debug_port_scan");
-}

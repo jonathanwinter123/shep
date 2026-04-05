@@ -14,6 +14,7 @@ import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
 import CommandsRow from "./CommandsRow";
 import GitStatusRow from "./GitStatusRow";
+import IdeLaunchRow from "./IdeLaunchRow";
 import WorkspaceRow from "./WorkspaceRow";
 
 interface ProjectListProps {
@@ -234,6 +235,7 @@ export default function ProjectList({
 
                       <CommandsRow badge={commandsBadge} />
                       {effectiveGitPath && <GitStatusRow repoPath={effectiveGitPath} />}
+                      <IdeLaunchRow repoPath={repo.path} onOpenInEditor={onOpenInEditor} />
                     </>
                   }
                 />

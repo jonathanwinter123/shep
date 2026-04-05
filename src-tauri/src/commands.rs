@@ -518,54 +518,6 @@ fn editor_app_name(editor_id: &str) -> Option<&'static str> {
 
 // ── Port commands ─────────────────────────────────────────────────
 
-#[derive(serde::Serialize)]
-pub struct PortScanDebug {
-    pub shell: String,
-    pub lsof_exit: i32,
-    pub lsof_stdout: String,
-    pub lsof_stderr: String,
-    pub parsed_count: usize,
-    pub filtered_count: usize,
-}
-
-#[tauri::command]
-pub async fn debug_port_scan() -> Result<PortScanDebug, String> {
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-
-    // Try login shell first
-    let output = Command::new(&shell)
-        .args(["-l", "-c", "lsof -iTCP -sTCP:LISTEN -n -P 2>&1"])
-        .output()
-        .map_err(|e| format!("Failed to spawn shell: {e}"))?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let exit = output.status.code().unwrap_or(-1);
-
-    // Count what parsing would find
-    let mut parsed = 0;
-    let mut filtered = 0;
-    for line in stdout.lines().skip(1) {
-        let cols: Vec<&str> = line.split_whitespace().collect();
-        if cols.len() < 9 { continue; }
-        parsed += 1;
-        if let Some(port_str) = cols.get(8).and_then(|n| n.rsplit(':').next()) {
-            if let Ok(port) = port_str.parse::<u16>() {
-                if port >= 1024 { filtered += 1; }
-            }
-        }
-    }
-
-    Ok(PortScanDebug {
-        shell,
-        lsof_exit: exit,
-        lsof_stdout: stdout,
-        lsof_stderr: stderr,
-        parsed_count: parsed,
-        filtered_count: filtered,
-    })
-}
-
 #[derive(serde::Serialize, Clone)]
 pub struct PortInfo {
     pub port: u16,
@@ -578,24 +530,56 @@ pub struct PortInfo {
     pub memory_kb: u64,
 }
 
+/// Run a command with a timeout. Returns stdout on success, empty string on
+/// failure or timeout. Prevents hangs from stalling the app (e.g. NFS mounts,
+/// broken pipes). Matches port-whisperer's 5-10s timeout pattern.
+fn run_with_timeout(cmd: &str, args: &[&str], timeout: std::time::Duration) -> String {
+    let mut child = match Command::new(cmd).args(args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn() {
+        Ok(c) => c,
+        Err(_) => return String::new(),
+    };
+
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) => {
+                if start.elapsed() > timeout {
+                    let _ = child.kill();
+                    return String::new();
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Err(_) => return String::new(),
+        }
+    }
+
+    child.stdout.take()
+        .and_then(|mut out| {
+            let mut buf = String::new();
+            std::io::Read::read_to_string(&mut out, &mut buf).ok()?;
+            Some(buf)
+        })
+        .unwrap_or_default()
+}
+
 #[tauri::command]
 pub async fn list_listening_ports(
     workspace: State<'_, WorkspaceManager>,
 ) -> Result<Vec<PortInfo>, String> {
     let repos = workspace.list_repos().unwrap_or_default();
     let repo_paths: Vec<String> = repos.iter().map(|r| r.path.clone()).collect();
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let timeout = std::time::Duration::from_secs(5);
 
     // ── Step 1: lsof to find listening ports ──────────────────────────
-    // Matching port-whisperer's approach: parts[8] is the NAME field
-    let lsof_output = Command::new(&shell)
-        .args(["-l", "-c", "lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null"])
-        .output()
-        .map_err(|e| format!("Failed to run lsof: {e}"))?;
+    // Matching port-whisperer: parts[8] is the NAME field.
+    // fix_path_env already set PATH at startup, so lsof is findable.
+    let stdout = run_with_timeout("lsof", &["-iTCP", "-sTCP:LISTEN", "-P", "-n"], timeout);
 
-    let stdout = String::from_utf8_lossy(&lsof_output.stdout);
-    let mut port_map: std::collections::HashMap<u16, bool> = std::collections::HashMap::new();
-
+    let mut port_map: std::collections::HashSet<u16> = std::collections::HashSet::new();
     struct Entry { port: u16, pid: u32, process_name: String }
     let mut entries: Vec<Entry> = Vec::new();
 
@@ -607,15 +591,13 @@ pub async fn list_listening_ports(
         let pid: u32 = match parts[1].parse() { Ok(p) => p, Err(_) => continue };
 
         // NAME is at index 8 (fixed position), e.g. "*:3000" or "127.0.0.1:8080"
-        let name_field = parts[8];
-        let port: u16 = match extract_port(name_field) {
+        let port: u16 = match extract_port(parts[8]) {
             Some(p) => p,
             None => continue,
         };
 
         // Deduplicate by port (first entry wins, like port-whisperer)
-        if port_map.contains_key(&port) { continue; }
-        port_map.insert(port, true);
+        if !port_map.insert(port) { continue; }
 
         // Filter out system/desktop apps
         if !is_dev_process(&process_name) { continue; }
@@ -629,17 +611,10 @@ pub async fn list_listening_ports(
 
     // ── Step 2: Batch ps call for all PIDs ────────────────────────────
     let pid_list: String = entries.iter().map(|e| e.pid.to_string()).collect::<Vec<_>>().join(",");
-    let ps_output = Command::new(&shell)
-        .args(["-c", &format!("ps -p {pid_list} -o pid=,rss=,etime=,command= 2>/dev/null")])
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .unwrap_or_default();
+    let ps_stdout = run_with_timeout("ps", &["-p", &pid_list, "-o", "pid=,rss=,etime=,command="], timeout);
 
-    // Parse ps: PID RSS ETIME COMMAND...
-    // split_whitespace handles any amount of whitespace between fields
     let mut ps_map: std::collections::HashMap<u32, (u64, String, String)> = std::collections::HashMap::new();
-    for line in ps_output.lines() {
+    for line in ps_stdout.lines() {
         let trimmed = line.trim();
         if trimmed.is_empty() { continue; }
         let mut parts = trimmed.splitn(4, char::is_whitespace);
@@ -651,15 +626,10 @@ pub async fn list_listening_ports(
     }
 
     // ── Step 3: Batch cwd via single lsof call ───────────────────────
-    let cwd_output = Command::new(&shell)
-        .args(["-c", &format!("lsof -a -d cwd -p {pid_list} 2>/dev/null")])
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .unwrap_or_default();
+    let cwd_stdout = run_with_timeout("lsof", &["-a", "-d", "cwd", "-p", &pid_list], timeout);
 
     let mut cwd_map: std::collections::HashMap<u32, String> = std::collections::HashMap::new();
-    for line in cwd_output.lines().skip(1) {
+    for line in cwd_stdout.lines().skip(1) {
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() < 9 { continue; }
         if let Ok(pid) = parts[1].parse::<u32>() {
@@ -671,7 +641,7 @@ pub async fn list_listening_ports(
     }
 
     // ── Step 4: Assemble results ─────────────────────────────────────
-    let mut results: Vec<PortInfo> = Vec::new();
+    let mut results: Vec<PortInfo> = Vec::with_capacity(entries.len());
 
     for entry in entries {
         let (memory_kb, uptime, cmdline) = ps_map.get(&entry.pid)
@@ -679,7 +649,6 @@ pub async fn list_listening_ports(
             .unwrap_or((0, "", ""));
         let raw_cwd = cwd_map.get(&entry.pid).cloned().unwrap_or_default();
 
-        // Walk up to find project root (like port-whisperer's findProjectRoot)
         let project_root = find_project_root(&raw_cwd);
         let framework = detect_framework(&entry.process_name, cmdline, &project_root);
         let project = match_project(&project_root, &repo_paths);
@@ -803,15 +772,18 @@ fn match_project(cwd: &str, repo_paths: &[String]) -> String {
 
 #[tauri::command]
 pub async fn kill_port(pid: u32) -> Result<(), String> {
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-    let status = Command::new(&shell)
-        .args(["-c", &format!("kill {pid} 2>/dev/null || kill -9 {pid}")])
+    // SIGTERM first, then SIGKILL if needed
+    let pid_str = pid.to_string();
+    let status = Command::new("kill")
+        .arg(&pid_str)
         .status()
         .map_err(|e| format!("Failed to kill process {pid}: {e}"))?;
 
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("Failed to kill process {pid}"))
+    if !status.success() {
+        Command::new("kill")
+            .args(["-9", &pid_str])
+            .status()
+            .map_err(|e| format!("Failed to force-kill process {pid}: {e}"))?;
     }
+    Ok(())
 }
