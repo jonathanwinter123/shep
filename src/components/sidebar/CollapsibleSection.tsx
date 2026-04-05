@@ -34,7 +34,7 @@ export default function CollapsibleSection({
         </button>
       </div>
       {hasItems && (
-        <div className="tree-branch mt-0.5">
+        <div className="mt-0.5 pl-4">
           {children}
         </div>
       )}

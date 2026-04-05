@@ -64,9 +64,13 @@ export default function GitPanel() {
   const [commitMsg, setCommitMsg] = useState("");
   const [committing, setCommitting] = useState(false);
   const [pushing, setPushing] = useState(false);
+  const canLoadGitFiles = !!effectivePath && !!mainGitStatus?.is_git_repo && (!worktreeBranch || !!worktreePath);
 
   const fetchFiles = useCallback(async () => {
-    if (!effectivePath) return;
+    if (!canLoadGitFiles || !effectivePath) {
+      setFiles([]);
+      return;
+    }
     try {
       const result = await gitChangedFiles(effectivePath);
       setFiles(result);
@@ -74,7 +78,7 @@ export default function GitPanel() {
       setFiles([]);
       pushNotice({ tone: "error", title: "Couldn't load changed files", message: getErrorMessage(error) });
     }
-  }, [effectivePath, pushNotice]);
+  }, [canLoadGitFiles, effectivePath, pushNotice]);
 
   const statusKey = gitStatus
     ? `${gitStatus.staged}:${gitStatus.unstaged}:${gitStatus.untracked}`

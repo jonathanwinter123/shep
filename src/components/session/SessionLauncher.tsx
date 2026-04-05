@@ -328,6 +328,10 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
           <input
             className="branch-dropdown__input w-full max-w-md"
             type="text"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             value={branchName}
             onChange={(e) => setBranchName(e.target.value)}
             placeholder={`${mode === "yolo" ? "yolo" : "wt"}/my-feature`}
@@ -366,6 +370,10 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
             <input
               className="branch-dropdown__input w-full max-w-md mt-3"
               type="text"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               value={branchName}
               onChange={(e) => setBranchName(e.target.value)}
               placeholder="feature/my-feature"

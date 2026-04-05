@@ -17,7 +17,7 @@ export default function AssistantList({
   return (
     <>
       {assistantTabs.map((tab) => (
-        <div key={tab.id} className="tree-node">
+        <div key={tab.id}>
           <AssistantButton
             tab={tab}
             isActive={tab.id === activeTabId}

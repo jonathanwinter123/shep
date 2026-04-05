@@ -172,6 +172,10 @@ export default function BranchDropdown({
                   className="branch-dropdown__input"
                   type="text"
                   autoFocus
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   placeholder="new-branch-name"
                   value={newBranchName}
                   onChange={(e) => setNewBranchName(e.target.value)}

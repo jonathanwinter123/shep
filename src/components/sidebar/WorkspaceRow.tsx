@@ -72,7 +72,7 @@ export default function WorkspaceRow({
     : [];
 
   return (
-    <div className="tree-branch mt-0.5">
+    <div className="mt-0.5 flex flex-col gap-0.5">
       {worktrees.map((wt) => {
         const isMain = wt.id === "main";
         const isActive = wt.id === activeWorkspaceId;
@@ -80,7 +80,7 @@ export default function WorkspaceRow({
         const label = isMain ? (currentBranch || "main") : wt.label;
 
         return (
-          <div key={wt.id} className="tree-node">
+          <div key={wt.id}>
             <button
               className={`list-item ${isActive ? "active" : ""}`}
               onClick={() => onSwitchWorkspace(wt.id)}
@@ -104,7 +104,7 @@ export default function WorkspaceRow({
               )}
             </button>
             {isActive && activeContent ? (
-              <div className="tree-branch mt-0.5">
+              <div className="mt-0.5 pl-4">
                 {activeContent}
               </div>
             ) : null}

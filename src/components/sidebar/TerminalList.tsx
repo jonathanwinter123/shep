@@ -17,7 +17,7 @@ export default function TerminalList({
   return (
     <>
       {tabs.map((tab) => (
-        <div key={tab.id} className="tree-node">
+        <div key={tab.id}>
           <TerminalItem
             tab={tab}
             isActive={tab.id === activeTabId}
