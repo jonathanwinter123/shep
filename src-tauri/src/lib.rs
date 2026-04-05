@@ -22,7 +22,10 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(PtyManager::new())
         .manage(WorkspaceManager::new())
-        .manage(UsageDb::open().expect("Failed to initialize usage database"))
+        .manage(UsageDb::open().unwrap_or_else(|e| {
+            eprintln!("Usage database failed to open ({e}), using in-memory fallback");
+            UsageDb::open_in_memory()
+        }))
         .setup(|app| {
             // Run migration from old project-based config
             let workspace = app.state::<WorkspaceManager>();

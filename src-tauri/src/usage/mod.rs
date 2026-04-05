@@ -11,33 +11,104 @@ pub use types::{LocalUsageDetails, ProviderUsageSnapshot, UsageOverview};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use types::UsageWindowSnapshot;
-use helpers::{now_epoch_seconds, now_iso_string};
+use helpers::now_epoch_seconds;
 
-/// Minimum seconds between provider API calls to avoid rate limiting.
-const PROVIDER_API_COOLDOWN_SECS: u64 = 300; // 5 minutes
+/// Cooldown after a successful provider API call.
+const COOLDOWN_SUCCESS_SECS: u64 = 300; // 5 minutes
 
-/// Cached provider API responses so we don't lose data on rate limit errors.
+/// Initial cooldown after a failed provider API call.
+const COOLDOWN_ERROR_BASE_SECS: u64 = 30;
+
+/// Maximum cooldown after repeated failures (caps the exponential backoff).
+const COOLDOWN_ERROR_MAX_SECS: u64 = 300; // 5 minutes
+
+struct ProviderState {
+    cache: Option<ProviderCacheData>,
+    fetched_at: u64,
+    consecutive_errors: u32,
+    last_error: String,
+    last_error_logged: bool,
+}
+
+impl ProviderState {
+    const fn new() -> Self {
+        Self {
+            cache: None,
+            fetched_at: 0,
+            consecutive_errors: 0,
+            last_error: String::new(),
+            last_error_logged: false,
+        }
+    }
+
+    fn cooldown_secs(&self) -> u64 {
+        if self.consecutive_errors == 0 {
+            return COOLDOWN_SUCCESS_SECS;
+        }
+        // Exponential backoff: 30s, 60s, 120s, 240s, capped at 300s
+        let backoff = COOLDOWN_ERROR_BASE_SECS * (1u64 << (self.consecutive_errors - 1).min(4));
+        backoff.min(COOLDOWN_ERROR_MAX_SECS)
+    }
+
+    fn is_stale(&self, now: u64) -> bool {
+        now - self.fetched_at >= self.cooldown_secs()
+    }
+
+    fn record_success(&mut self, now: u64) {
+        self.fetched_at = now;
+        self.consecutive_errors = 0;
+        self.last_error.clear();
+        self.last_error_logged = false;
+    }
+
+    fn record_error(&mut self, now: u64, error: &str) {
+        self.fetched_at = now;
+        // Only log if the error message changed or this is the first occurrence
+        if self.last_error != error {
+            self.last_error = error.to_string();
+            self.last_error_logged = false;
+        }
+        if !self.last_error_logged {
+            self.last_error_logged = true;
+            // Will be logged by caller
+        }
+        self.consecutive_errors = self.consecutive_errors.saturating_add(1);
+    }
+
+    fn should_log_error(&self) -> bool {
+        // Log on first occurrence or when error message changes
+        // (last_error_logged is set to false when error changes)
+        !self.last_error_logged
+    }
+}
+
+enum ProviderCacheData {
+    Claude(Vec<UsageWindowSnapshot>, Vec<UsageWindowSnapshot>),
+    Codex(Vec<UsageWindowSnapshot>),
+}
+
 struct ProviderCache {
-    claude: Option<(Vec<UsageWindowSnapshot>, Vec<UsageWindowSnapshot>)>,
-    codex: Option<Vec<UsageWindowSnapshot>>,
-    claude_fetched_at: u64,
-    codex_fetched_at: u64,
+    claude: ProviderState,
+    codex: ProviderState,
 }
 
 static PROVIDER_CACHE: Mutex<ProviderCache> = Mutex::new(ProviderCache {
-    claude: None,
-    codex: None,
-    claude_fetched_at: 0,
-    codex_fetched_at: 0,
+    claude: ProviderState::new(),
+    codex: ProviderState::new(),
 });
+
+/// Which providers are enabled (passed from frontend settings).
+pub struct EnabledProviders {
+    pub claude: bool,
+    pub codex: bool,
+}
 
 /// Fetch snapshots for all providers from whatever is currently in the DB.
 /// Does NOT trigger ingestion — that runs in the background.
 /// Provider API refresh happens in a background thread so this never blocks
 /// on network I/O.
-pub fn get_all_usage_snapshots(db: &UsageDb) -> Vec<ProviderUsageSnapshot> {
-    // Kick off provider API refresh in the background (non-blocking)
-    spawn_provider_refresh();
+pub fn get_all_usage_snapshots(db: &UsageDb, enabled: &EnabledProviders) -> Vec<ProviderUsageSnapshot> {
+    spawn_provider_refresh(enabled);
 
     let conn = db.conn.lock().unwrap();
     vec![
@@ -48,8 +119,8 @@ pub fn get_all_usage_snapshots(db: &UsageDb) -> Vec<ProviderUsageSnapshot> {
 }
 
 /// Fetch snapshot for a single provider.
-pub fn get_usage_snapshot(db: &UsageDb, provider: &str) -> Result<ProviderUsageSnapshot, String> {
-    spawn_provider_refresh();
+pub fn get_usage_snapshot(db: &UsageDb, provider: &str, enabled: &EnabledProviders) -> Result<ProviderUsageSnapshot, String> {
+    spawn_provider_refresh(enabled);
 
     let conn = db.conn.lock().unwrap();
     match provider {
@@ -95,15 +166,18 @@ static PROVIDER_REFRESH_RUNNING: AtomicBool = AtomicBool::new(false);
 
 /// Spawn a background thread to refresh provider API data if cooldown has
 /// elapsed. Returns immediately — never blocks the calling thread on network I/O.
-fn spawn_provider_refresh() {
+fn spawn_provider_refresh(enabled: &EnabledProviders) {
     let now = now_epoch_seconds();
-    {
+    let (refresh_claude, refresh_codex) = {
         let cache = PROVIDER_CACHE.lock().unwrap();
-        let claude_stale = now - cache.claude_fetched_at >= PROVIDER_API_COOLDOWN_SECS;
-        let codex_stale = now - cache.codex_fetched_at >= PROVIDER_API_COOLDOWN_SECS;
-        if !claude_stale && !codex_stale {
-            return; // Cache is fresh, nothing to do
-        }
+        (
+            enabled.claude && cache.claude.is_stale(now),
+            enabled.codex && cache.codex.is_stale(now),
+        )
+    };
+
+    if !refresh_claude && !refresh_codex {
+        return;
     }
 
     // Only allow one refresh thread at a time
@@ -111,55 +185,49 @@ fn spawn_provider_refresh() {
         return;
     }
 
+    let do_claude = refresh_claude;
+    let do_codex = refresh_codex;
     std::thread::spawn(move || {
-        refresh_provider_cache_sync();
+        refresh_provider_cache_sync(do_claude, do_codex);
         PROVIDER_REFRESH_RUNNING.store(false, Ordering::SeqCst);
     });
 }
 
 /// Actual (blocking) provider refresh — only called from background thread.
-fn refresh_provider_cache_sync() {
+fn refresh_provider_cache_sync(do_claude: bool, do_codex: bool) {
     let now = now_epoch_seconds();
 
-    // Check + fetch Claude
-    {
-        let needs_refresh = {
-            let cache = PROVIDER_CACHE.lock().unwrap();
-            now - cache.claude_fetched_at >= PROVIDER_API_COOLDOWN_SECS
-        };
-        if needs_refresh {
-            match providers::claude_provider_windows() {
-                Ok(data) => {
-                    let mut cache = PROVIDER_CACHE.lock().unwrap();
-                    cache.claude = Some(data);
-                    cache.claude_fetched_at = now;
-                }
-                Err(e) => {
+    if do_claude {
+        match providers::claude_provider_windows() {
+            Ok(data) => {
+                let mut cache = PROVIDER_CACHE.lock().unwrap();
+                cache.claude.cache = Some(ProviderCacheData::Claude(data.0, data.1));
+                cache.claude.record_success(now);
+            }
+            Err(e) => {
+                let mut cache = PROVIDER_CACHE.lock().unwrap();
+                let should_log = cache.claude.should_log_error() || cache.claude.last_error != e;
+                cache.claude.record_error(now, &e);
+                if should_log {
                     eprintln!("Claude provider API error (using cache): {e}");
-                    let mut cache = PROVIDER_CACHE.lock().unwrap();
-                    cache.claude_fetched_at = now;
                 }
             }
         }
     }
 
-    // Check + fetch Codex
-    {
-        let needs_refresh = {
-            let cache = PROVIDER_CACHE.lock().unwrap();
-            now - cache.codex_fetched_at >= PROVIDER_API_COOLDOWN_SECS
-        };
-        if needs_refresh {
-            match providers::codex_provider_windows() {
-                Ok(data) => {
-                    let mut cache = PROVIDER_CACHE.lock().unwrap();
-                    cache.codex = Some(data);
-                    cache.codex_fetched_at = now;
-                }
-                Err(e) => {
+    if do_codex {
+        match providers::codex_provider_windows() {
+            Ok(data) => {
+                let mut cache = PROVIDER_CACHE.lock().unwrap();
+                cache.codex.cache = Some(ProviderCacheData::Codex(data));
+                cache.codex.record_success(now);
+            }
+            Err(e) => {
+                let mut cache = PROVIDER_CACHE.lock().unwrap();
+                let should_log = cache.codex.should_log_error() || cache.codex.last_error != e;
+                cache.codex.record_error(now, &e);
+                if should_log {
                     eprintln!("Codex provider API error (using cache): {e}");
-                    let mut cache = PROVIDER_CACHE.lock().unwrap();
-                    cache.codex_fetched_at = now;
                 }
             }
         }
@@ -167,10 +235,13 @@ fn refresh_provider_cache_sync() {
 }
 
 fn codex_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
-    let fetched_at = now_iso_string();
+    let fetched_at = helpers::now_iso_string();
     let local = queries::local_details(conn, "codex");
     let cache = PROVIDER_CACHE.lock().unwrap();
-    let cached_windows = cache.codex.clone();
+    let cached_windows: Option<Vec<UsageWindowSnapshot>> = match &cache.codex.cache {
+        Some(ProviderCacheData::Codex(w)) => Some(w.clone()),
+        _ => None,
+    };
     drop(cache);
 
     let mut summary_windows = Vec::new();
@@ -207,10 +278,13 @@ fn codex_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
 }
 
 fn claude_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
-    let fetched_at = now_iso_string();
+    let fetched_at = helpers::now_iso_string();
     let local = queries::local_details(conn, "claude");
     let cache = PROVIDER_CACHE.lock().unwrap();
-    let cached_data = cache.claude.clone();
+    let cached_data: Option<(Vec<UsageWindowSnapshot>, Vec<UsageWindowSnapshot>)> = match &cache.claude.cache {
+        Some(ProviderCacheData::Claude(p, e)) => Some((p.clone(), e.clone())),
+        _ => None,
+    };
     drop(cache);
 
     let mut summary_windows = Vec::new();
@@ -249,7 +323,7 @@ fn claude_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
 }
 
 fn gemini_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
-    let fetched_at = now_iso_string();
+    let fetched_at = helpers::now_iso_string();
     let local = queries::local_details(conn, "gemini");
     let mut summary_windows = Vec::new();
 

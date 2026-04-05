@@ -386,13 +386,30 @@ pub fn check_command_exists(command: &str) -> bool {
 }
 
 #[tauri::command]
-pub async fn get_all_usage_snapshots(db: State<'_, UsageDb>) -> Result<Vec<ProviderUsageSnapshot>, String> {
-    Ok(crate::usage::get_all_usage_snapshots(&db))
+pub async fn get_all_usage_snapshots(
+    db: State<'_, UsageDb>,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<Vec<ProviderUsageSnapshot>, String> {
+    let enabled = enabled_providers(&workspace);
+    Ok(crate::usage::get_all_usage_snapshots(&db, &enabled))
 }
 
 #[tauri::command]
-pub async fn get_usage_snapshot(db: State<'_, UsageDb>, provider: String) -> Result<ProviderUsageSnapshot, String> {
-    crate::usage::get_usage_snapshot(&db, &provider)
+pub async fn get_usage_snapshot(
+    db: State<'_, UsageDb>,
+    workspace: State<'_, WorkspaceManager>,
+    provider: String,
+) -> Result<ProviderUsageSnapshot, String> {
+    let enabled = enabled_providers(&workspace);
+    crate::usage::get_usage_snapshot(&db, &provider, &enabled)
+}
+
+fn enabled_providers(workspace: &State<'_, WorkspaceManager>) -> crate::usage::EnabledProviders {
+    let settings = workspace.load_usage_settings().unwrap_or_default();
+    crate::usage::EnabledProviders {
+        claude: settings.show_claude,
+        codex: settings.show_codex,
+    }
 }
 
 #[tauri::command]

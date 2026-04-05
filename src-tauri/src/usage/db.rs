@@ -8,6 +8,16 @@ pub struct UsageDb {
 }
 
 impl UsageDb {
+    /// Fallback: in-memory DB so the app still opens even if the disk DB fails.
+    /// Usage data won't persist across restarts but nothing blocks.
+    pub fn open_in_memory() -> Self {
+        let conn = Connection::open_in_memory()
+            .expect("Failed to open in-memory SQLite — this should never fail");
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;").ok();
+        let _ = migrate(&conn);
+        Self { conn: Arc::new(Mutex::new(conn)) }
+    }
+
     pub fn open() -> Result<Self, String> {
         let db_path = db_path()?;
         if let Some(parent) = db_path.parent() {
