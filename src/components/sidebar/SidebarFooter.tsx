@@ -1,4 +1,4 @@
-import { CodeXml, ChartNoAxesCombined } from "lucide-react";
+import { CodeXml, ChartNoAxesCombined, Radio } from "lucide-react";
 import { useUIStore } from "../../stores/useUIStore";
 import GearIcon from "./icons/GearIcon";
 
@@ -13,7 +13,8 @@ export default function SidebarFooter({
 }: SidebarFooterProps) {
   const settingsTabOpen = useUIStore((s) => s.settingsTabOpen);
   const usageTabOpen = useUIStore((s) => s.usageTabOpen);
-  const { toggleSettings, toggleUsagePanel } = useUIStore.getState();
+  const portsPanelOpen = useUIStore((s) => s.portsPanelOpen);
+  const { toggleSettings, toggleUsagePanel, togglePortsPanel } = useUIStore.getState();
   const editorDisabled = !activeRepoPath;
   const footerButtonClass = "tab !flex-1 !shrink !justify-center !gap-0.5 !px-2 !py-1.5 flex-col min-w-0";
 
@@ -35,6 +36,14 @@ export default function SidebarFooter({
         >
           <ChartNoAxesCombined size={18} />
           <span className="text-[10px]">Usage</span>
+        </button>
+        <button
+          onClick={togglePortsPanel}
+          className={`${footerButtonClass} ${portsPanelOpen ? "active" : ""}`}
+          aria-label="Open ports"
+        >
+          <Radio size={18} />
+          <span className="text-[10px]">Ports</span>
         </button>
         <button
           onClick={() => {

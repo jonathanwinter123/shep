@@ -11,6 +11,8 @@ interface UIStore {
   launcherActive: boolean;    // launcher panel is the active view
   usageTabOpen: boolean;      // usage tab visible in tab bar
   usagePanelActive: boolean;  // usage panel is the active view
+  portsPanelOpen: boolean;    // ports tab visible in tab bar
+  portsPanelActive: boolean;  // ports panel is the active view
   sidebarVisible: boolean;    // sidebar visibility
   username: string | null;
   computerName: string | null;
@@ -38,6 +40,11 @@ interface UIStore {
   activateUsagePanel: () => void;
   deactivateUsagePanel: () => void;
   toggleUsagePanel: () => void;
+  openPortsPanel: () => void;
+  closePortsPanel: () => void;
+  activatePortsPanel: () => void;
+  deactivatePortsPanel: () => void;
+  togglePortsPanel: () => void;
   toggleSidebar: () => void;
   setUsername: (name: string) => void;
   setComputerName: (name: string) => void;
@@ -51,6 +58,7 @@ function activateNextOpen(s: UIStore, excluding: string): Partial<UIStore> {
     ["commands", s.commandsPanelOpen],
     ["launcher", s.launcherOpen],
     ["usage", s.usageTabOpen],
+    ["ports", s.portsPanelOpen],
   ];
   for (const [name, isOpen] of candidates) {
     if (name === excluding || !isOpen) continue;
@@ -60,6 +68,7 @@ function activateNextOpen(s: UIStore, excluding: string): Partial<UIStore> {
       case "commands": return { commandsPanelActive: true };
       case "launcher": return { launcherActive: true };
       case "usage": return { usagePanelActive: true };
+      case "ports": return { portsPanelActive: true };
     }
   }
   return {};
@@ -71,6 +80,7 @@ const deactivateAll = {
   commandsPanelActive: false,
   launcherActive: false,
   usagePanelActive: false,
+  portsPanelActive: false,
 };
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -84,6 +94,8 @@ export const useUIStore = create<UIStore>((set) => ({
   launcherActive: false,
   usageTabOpen: false,
   usagePanelActive: false,
+  portsPanelOpen: false,
+  portsPanelActive: false,
   sidebarVisible: true,
   username: null,
   computerName: null,
@@ -206,6 +218,32 @@ export const useUIStore = create<UIStore>((set) => ({
         return { ...deactivateAll, usagePanelActive: true };
       }
       return { usageTabOpen: true, ...deactivateAll, usagePanelActive: true };
+    }),
+  openPortsPanel: () => set({
+    portsPanelOpen: true,
+    ...deactivateAll,
+    portsPanelActive: true,
+  }),
+  closePortsPanel: () =>
+    set((s) => ({
+      portsPanelOpen: false,
+      portsPanelActive: false,
+      ...activateNextOpen(s, "ports"),
+    })),
+  activatePortsPanel: () => set({
+    ...deactivateAll,
+    portsPanelActive: true,
+  }),
+  deactivatePortsPanel: () => set({ portsPanelActive: false }),
+  togglePortsPanel: () =>
+    set((s) => {
+      if (s.portsPanelOpen && s.portsPanelActive) {
+        return { portsPanelOpen: false, portsPanelActive: false, ...activateNextOpen(s, "ports") };
+      }
+      if (s.portsPanelOpen) {
+        return { ...deactivateAll, portsPanelActive: true };
+      }
+      return { portsPanelOpen: true, ...deactivateAll, portsPanelActive: true };
     }),
   toggleSidebar: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })),
   setUsername: (name: string) => set({ username: name }),

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { useShallow } from "zustand/shallow";
-import { GitBranch, GitFork, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined } from "lucide-react";
+import { GitBranch, GitFork, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined, Radio } from "lucide-react";
 import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
@@ -160,6 +160,7 @@ export default function TabBar({
     launcherOpen, launcherActive,
     commandsPanelOpen, commandsPanelActive,
     usageTabOpen, usagePanelActive,
+    portsPanelOpen, portsPanelActive,
   } = useUIStore(useShallow((s) => ({
     settingsTabOpen: s.settingsTabOpen,
     settingsActive: s.settingsActive,
@@ -171,6 +172,8 @@ export default function TabBar({
     commandsPanelActive: s.commandsPanelActive,
     usageTabOpen: s.usageTabOpen,
     usagePanelActive: s.usagePanelActive,
+    portsPanelOpen: s.portsPanelOpen,
+    portsPanelActive: s.portsPanelActive,
   })));
 
   // Actions are stable — grab via getState() to avoid subscribing
@@ -180,9 +183,10 @@ export default function TabBar({
     activateLauncher, closeLauncher,
     activateCommandsPanel, closeCommandsPanel,
     activateUsagePanel, closeUsageTab,
+    activatePortsPanel, closePortsPanel,
   } = useUIStore.getState();
 
-  const anyOverlay = settingsActive || launcherActive || gitPanelActive || commandsPanelActive || usagePanelActive;
+  const anyOverlay = settingsActive || launcherActive || gitPanelActive || commandsPanelActive || usagePanelActive || portsPanelActive;
 
   const handleSelectTab = (tabId: string) => {
     useUIStore.getState().deactivateSettings();
@@ -190,6 +194,7 @@ export default function TabBar({
     useUIStore.getState().deactivateGitPanel();
     useUIStore.getState().deactivateCommandsPanel();
     useUIStore.getState().deactivateUsagePanel();
+    useUIStore.getState().deactivatePortsPanel();
     setActiveTab(tabId);
     const tab = tabs.find((t) => t.id === tabId);
     if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
@@ -381,6 +386,31 @@ export default function TabBar({
               onClick={(e) => {
                 e.stopPropagation();
                 closeUsageTab();
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {portsPanelOpen && (
+          <div
+            className={`tab ${portsPanelActive ? "active" : ""}`}
+            onClick={activatePortsPanel}
+            onKeyDown={(event) => handleActionKey(event, activatePortsPanel)}
+            role="tab"
+            tabIndex={0}
+            aria-selected={portsPanelActive}
+            aria-label="Open ports panel"
+          >
+            <Radio size={12} />
+            <span>Ports</span>
+            <button
+              className="icon-btn ml-0.5"
+              aria-label="Close ports panel"
+              onClick={(e) => {
+                e.stopPropagation();
+                closePortsPanel();
               }}
             >
               ×

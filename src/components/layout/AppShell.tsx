@@ -11,6 +11,7 @@ import SessionLauncher from "../session/SessionLauncher";
 import NoticeCenter from "../shared/NoticeCenter";
 import WorktreeCloseDialog from "../shared/WorktreeCloseDialog";
 import UsagePanel from "../usage/UsagePanel";
+import PortsPanel from "../ports/PortsPanel";
 import { PanelLeft, PanelLeftOpen } from "lucide-react";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
@@ -177,13 +178,14 @@ export default function AppShell() {
   );
 
   const {
-    settingsActive, gitPanelActive, commandsPanelActive, launcherActive, usagePanelActive, sidebarVisible,
+    settingsActive, gitPanelActive, commandsPanelActive, launcherActive, usagePanelActive, portsPanelActive, sidebarVisible,
   } = useUIStore(useShallow((s) => ({
     settingsActive: s.settingsActive,
     gitPanelActive: s.gitPanelActive,
     commandsPanelActive: s.commandsPanelActive,
     launcherActive: s.launcherActive,
     usagePanelActive: s.usagePanelActive,
+    portsPanelActive: s.portsPanelActive,
     sidebarVisible: s.sidebarVisible,
   })));
   const { loadSettings: loadEditorSettings } = useEditorStore.getState();
@@ -347,6 +349,7 @@ export default function AppShell() {
     useUIStore.getState().deactivateCommandsPanel();
     useUIStore.getState().deactivateLauncher();
     useUIStore.getState().deactivateUsagePanel();
+    useUIStore.getState().deactivatePortsPanel();
     setActiveTab(tabId); // auto-switches workspace if tab is in a different one
     const store = useTerminalStore.getState();
     const allTabs = activeRepoPath ? store.getAllProjectTabs(activeRepoPath) : [];
@@ -407,6 +410,7 @@ export default function AppShell() {
         ui.deactivateGitPanel();
         ui.deactivateCommandsPanel();
         ui.deactivateUsagePanel();
+        ui.deactivatePortsPanel();
         useUIStore.setState({ launcherOpen: false });
         return true;
       }
@@ -421,6 +425,7 @@ export default function AppShell() {
     useUIStore.getState().deactivateGitPanel();
     useUIStore.getState().deactivateCommandsPanel();
     useUIStore.getState().deactivateUsagePanel();
+    useUIStore.getState().deactivatePortsPanel();
     const { cols, rows } = getTerminalDimensions();
     spawnBlankShell(cols, rows);
   }, [spawnBlankShell, getTerminalDimensions]);
@@ -567,7 +572,7 @@ export default function AppShell() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleNewShell, handleNewAssistant]);
 
-  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive;
+  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive || portsPanelActive;
 
   return (
     <div className="app-shell">
@@ -644,6 +649,7 @@ export default function AppShell() {
             )}
             {launcherActive && <SessionLauncher onStartSession={handleStartSession} />}
             {usagePanelActive && <UsagePanel />}
+            {portsPanelActive && <PortsPanel />}
 
             {!showOverlay && tabs.length === 0 && (
               <div className="terminal-empty">

@@ -515,3 +515,303 @@ fn editor_app_name(editor_id: &str) -> Option<&'static str> {
         _ => None,
     }
 }
+
+// ── Port commands ─────────────────────────────────────────────────
+
+#[derive(serde::Serialize)]
+pub struct PortScanDebug {
+    pub shell: String,
+    pub lsof_exit: i32,
+    pub lsof_stdout: String,
+    pub lsof_stderr: String,
+    pub parsed_count: usize,
+    pub filtered_count: usize,
+}
+
+#[tauri::command]
+pub async fn debug_port_scan() -> Result<PortScanDebug, String> {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+
+    // Try login shell first
+    let output = Command::new(&shell)
+        .args(["-l", "-c", "lsof -iTCP -sTCP:LISTEN -n -P 2>&1"])
+        .output()
+        .map_err(|e| format!("Failed to spawn shell: {e}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let exit = output.status.code().unwrap_or(-1);
+
+    // Count what parsing would find
+    let mut parsed = 0;
+    let mut filtered = 0;
+    for line in stdout.lines().skip(1) {
+        let cols: Vec<&str> = line.split_whitespace().collect();
+        if cols.len() < 9 { continue; }
+        parsed += 1;
+        if let Some(port_str) = cols.get(8).and_then(|n| n.rsplit(':').next()) {
+            if let Ok(port) = port_str.parse::<u16>() {
+                if port >= 1024 { filtered += 1; }
+            }
+        }
+    }
+
+    Ok(PortScanDebug {
+        shell,
+        lsof_exit: exit,
+        lsof_stdout: stdout,
+        lsof_stderr: stderr,
+        parsed_count: parsed,
+        filtered_count: filtered,
+    })
+}
+
+#[derive(serde::Serialize, Clone)]
+pub struct PortInfo {
+    pub port: u16,
+    pub pid: u32,
+    pub process: String,
+    pub cwd: String,
+    pub project: String,
+    pub framework: String,
+    pub uptime: String,
+    pub memory_kb: u64,
+}
+
+#[tauri::command]
+pub async fn list_listening_ports(
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<Vec<PortInfo>, String> {
+    let repos = workspace.list_repos().unwrap_or_default();
+    let repo_paths: Vec<String> = repos.iter().map(|r| r.path.clone()).collect();
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+
+    // ── Step 1: lsof to find listening ports ──────────────────────────
+    // Matching port-whisperer's approach: parts[8] is the NAME field
+    let lsof_output = Command::new(&shell)
+        .args(["-l", "-c", "lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null"])
+        .output()
+        .map_err(|e| format!("Failed to run lsof: {e}"))?;
+
+    let stdout = String::from_utf8_lossy(&lsof_output.stdout);
+    let mut port_map: std::collections::HashMap<u16, bool> = std::collections::HashMap::new();
+
+    struct Entry { port: u16, pid: u32, process_name: String }
+    let mut entries: Vec<Entry> = Vec::new();
+
+    for line in stdout.lines().skip(1) {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 9 { continue; }
+
+        let process_name = parts[0].to_string();
+        let pid: u32 = match parts[1].parse() { Ok(p) => p, Err(_) => continue };
+
+        // NAME is at index 8 (fixed position), e.g. "*:3000" or "127.0.0.1:8080"
+        let name_field = parts[8];
+        let port: u16 = match extract_port(name_field) {
+            Some(p) => p,
+            None => continue,
+        };
+
+        // Deduplicate by port (first entry wins, like port-whisperer)
+        if port_map.contains_key(&port) { continue; }
+        port_map.insert(port, true);
+
+        // Filter out system/desktop apps
+        if !is_dev_process(&process_name) { continue; }
+
+        entries.push(Entry { port, pid, process_name });
+    }
+
+    if entries.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // ── Step 2: Batch ps call for all PIDs ────────────────────────────
+    let pid_list: String = entries.iter().map(|e| e.pid.to_string()).collect::<Vec<_>>().join(",");
+    let ps_output = Command::new(&shell)
+        .args(["-c", &format!("ps -p {pid_list} -o pid=,rss=,etime=,command= 2>/dev/null")])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .unwrap_or_default();
+
+    // Parse ps: PID RSS ETIME COMMAND...
+    // split_whitespace handles any amount of whitespace between fields
+    let mut ps_map: std::collections::HashMap<u32, (u64, String, String)> = std::collections::HashMap::new();
+    for line in ps_output.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() { continue; }
+        let mut parts = trimmed.splitn(4, char::is_whitespace);
+        let pid: u32 = match parts.next().and_then(|s| s.parse().ok()) { Some(p) => p, None => continue };
+        let rss: u64 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+        let etime = parts.next().unwrap_or("").to_string();
+        let command = parts.next().unwrap_or("").to_string();
+        ps_map.insert(pid, (rss, etime, command));
+    }
+
+    // ── Step 3: Batch cwd via single lsof call ───────────────────────
+    let cwd_output = Command::new(&shell)
+        .args(["-c", &format!("lsof -a -d cwd -p {pid_list} 2>/dev/null")])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .unwrap_or_default();
+
+    let mut cwd_map: std::collections::HashMap<u32, String> = std::collections::HashMap::new();
+    for line in cwd_output.lines().skip(1) {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 9 { continue; }
+        if let Ok(pid) = parts[1].parse::<u32>() {
+            let path = parts[8..].join(" ");
+            if path.starts_with('/') {
+                cwd_map.insert(pid, path);
+            }
+        }
+    }
+
+    // ── Step 4: Assemble results ─────────────────────────────────────
+    let mut results: Vec<PortInfo> = Vec::new();
+
+    for entry in entries {
+        let (memory_kb, uptime, cmdline) = ps_map.get(&entry.pid)
+            .map(|(rss, etime, cmd)| (*rss, etime.as_str(), cmd.as_str()))
+            .unwrap_or((0, "", ""));
+        let raw_cwd = cwd_map.get(&entry.pid).cloned().unwrap_or_default();
+
+        // Walk up to find project root (like port-whisperer's findProjectRoot)
+        let project_root = find_project_root(&raw_cwd);
+        let framework = detect_framework(&entry.process_name, cmdline, &project_root);
+        let project = match_project(&project_root, &repo_paths);
+
+        results.push(PortInfo {
+            port: entry.port,
+            pid: entry.pid,
+            process: entry.process_name,
+            cwd: project_root,
+            project,
+            framework,
+            uptime: uptime.to_string(),
+            memory_kb,
+        });
+    }
+
+    results.sort_by_key(|p| p.port);
+    Ok(results)
+}
+
+/// Extract port number from lsof NAME field like "*:3000", "127.0.0.1:8080", "[::1]:5173"
+fn extract_port(name_field: &str) -> Option<u16> {
+    name_field.rsplit(':').next()?.parse().ok()
+}
+
+/// Filter out system/desktop apps — only show dev processes.
+/// Matches port-whisperer's isDevProcess systemApps list.
+fn is_dev_process(process_name: &str) -> bool {
+    let name = process_name.to_lowercase();
+    let system_apps = [
+        "spotify", "raycast", "tableplus", "postman", "linear", "controlce",
+        "rapportd", "superhuma", "setappage", "slack", "discord", "firefox",
+        "chrome", "google", "safari", "figma", "notion", "zoom", "teams",
+        "iterm2", "warp", "arc", "loginwindow", "windowserver", "systemuise",
+        "kernel_tas", "launchd", "mdworker", "mds_store", "cfprefsd",
+        "coreaudio", "corebrigh", "airportd", "bluetoothd", "sharingd",
+        "usernoted", "notificat", "cloudd",
+    ];
+    for app in &system_apps {
+        if name.starts_with(app) { return false; }
+    }
+    true
+}
+
+/// Walk up from cwd to find project root via marker files (package.json, Cargo.toml, etc.)
+/// Matches port-whisperer's findProjectRoot.
+fn find_project_root(cwd: &str) -> String {
+    if cwd.is_empty() { return String::new(); }
+    let markers = ["package.json", "Cargo.toml", "go.mod", "pyproject.toml", "Gemfile", "pom.xml", "build.gradle"];
+    let mut current = std::path::PathBuf::from(cwd);
+    for _ in 0..15 {
+        for marker in &markers {
+            if current.join(marker).exists() {
+                return current.to_string_lossy().to_string();
+            }
+        }
+        if !current.pop() { break; }
+    }
+    cwd.to_string()
+}
+
+/// Detect framework — first from command line, then from project files.
+/// Matches port-whisperer's detectFrameworkFromCommand + detectFramework.
+fn detect_framework(process: &str, cmdline: &str, project_root: &str) -> String {
+    // 1. Command line detection
+    let cmd = cmdline.to_lowercase();
+    if cmd.contains("next") { return "Next.js".to_string(); }
+    if cmd.contains("vite") { return "Vite".to_string(); }
+    if cmd.contains("nuxt") { return "Nuxt".to_string(); }
+    if cmd.contains("angular") || cmd.contains("ng serve") { return "Angular".to_string(); }
+    if cmd.contains("webpack") { return "Webpack".to_string(); }
+    if cmd.contains("remix") { return "Remix".to_string(); }
+    if cmd.contains("astro") { return "Astro".to_string(); }
+    if cmd.contains("gatsby") { return "Gatsby".to_string(); }
+    if cmd.contains("flask") { return "Flask".to_string(); }
+    if cmd.contains("django") || cmd.contains("manage.py") { return "Django".to_string(); }
+    if cmd.contains("uvicorn") { return "FastAPI".to_string(); }
+    if cmd.contains("rails") { return "Rails".to_string(); }
+    if cmd.contains("cargo") || cmd.contains("rustc") { return "Rust".to_string(); }
+    if cmd.contains("storybook") { return "Storybook".to_string(); }
+
+    // 2. Process name fallback
+    let name = process.to_lowercase();
+    if name == "node" { return "Node.js".to_string(); }
+    if name.starts_with("python") { return "Python".to_string(); }
+    if name.starts_with("ruby") { return "Ruby".to_string(); }
+    if name.starts_with("java") { return "Java".to_string(); }
+    if name == "go" { return "Go".to_string(); }
+    if name.contains("postgres") || name == "postmaster" { return "PostgreSQL".to_string(); }
+    if name.contains("redis") { return "Redis".to_string(); }
+    if name.contains("mongod") { return "MongoDB".to_string(); }
+    if name.contains("mysqld") { return "MySQL".to_string(); }
+    if name.contains("docker") || name.starts_with("com.docke") { return "Docker".to_string(); }
+    if name.contains("nginx") { return "nginx".to_string(); }
+
+    // 3. Project file detection (like port-whisperer's detectFramework)
+    if !project_root.is_empty() {
+        let root = Path::new(project_root);
+        if root.join("vite.config.ts").exists() || root.join("vite.config.js").exists() { return "Vite".to_string(); }
+        if root.join("next.config.js").exists() || root.join("next.config.mjs").exists() { return "Next.js".to_string(); }
+        if root.join("angular.json").exists() { return "Angular".to_string(); }
+        if root.join("Cargo.toml").exists() { return "Rust".to_string(); }
+        if root.join("go.mod").exists() { return "Go".to_string(); }
+        if root.join("manage.py").exists() { return "Django".to_string(); }
+        if root.join("Gemfile").exists() { return "Ruby".to_string(); }
+    }
+
+    String::new()
+}
+
+fn match_project(cwd: &str, repo_paths: &[String]) -> String {
+    if cwd.is_empty() { return String::new(); }
+    repo_paths
+        .iter()
+        .filter(|repo| cwd.starts_with(repo.as_str()))
+        .max_by_key(|repo| repo.len())
+        .and_then(|repo| repo.rsplit('/').next())
+        .unwrap_or("")
+        .to_string()
+}
+
+#[tauri::command]
+pub async fn kill_port(pid: u32) -> Result<(), String> {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let status = Command::new(&shell)
+        .args(["-c", &format!("kill {pid} 2>/dev/null || kill -9 {pid}")])
+        .status()
+        .map_err(|e| format!("Failed to kill process {pid}: {e}"))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("Failed to kill process {pid}"))
+    }
+}

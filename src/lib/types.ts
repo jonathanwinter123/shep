@@ -137,6 +137,19 @@ export interface ChangedFile {
   old_path: string | null;
 }
 
+// ── Port info ───────────────────────────────────────────────────────
+
+export interface PortInfo {
+  port: number;
+  pid: number;
+  process: string;
+  cwd: string;
+  project: string;
+  framework: string;
+  uptime: string;
+  memory_kb: number;
+}
+
 // ── PTY output ──────────────────────────────────────────────────────
 
 export type PtyOutput =

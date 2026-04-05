@@ -15,6 +15,7 @@ import type {
   LocalUsageDetails,
   UsageSettings,
   UsageOverview,
+  PortInfo,
 } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -272,4 +273,27 @@ export interface MemoryStats {
 
 export function getMemoryStats(): Promise<MemoryStats> {
   return invoke("get_memory_stats");
+}
+
+// ── Port commands ─────────────────────────────────────────────────
+
+export function listListeningPorts(): Promise<PortInfo[]> {
+  return invoke("list_listening_ports");
+}
+
+export function killPort(pid: number): Promise<void> {
+  return invoke("kill_port", { pid });
+}
+
+export interface PortScanDebug {
+  shell: string;
+  lsof_exit: number;
+  lsof_stdout: string;
+  lsof_stderr: string;
+  parsed_count: number;
+  filtered_count: number;
+}
+
+export function debugPortScan(): Promise<PortScanDebug> {
+  return invoke("debug_port_scan");
 }
