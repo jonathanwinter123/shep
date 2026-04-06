@@ -244,7 +244,7 @@ export default function ProjectItem({
   return (
     <>
       <div
-        className={`list-item ${isActive ? "project-active" : ""} ${!repo.valid ? "opacity-50" : ""}`}
+        className={`list-item ${isActive ? "project-active" : ""}`}
         onClick={onClick}
         onContextMenu={handleContextMenu}
         onKeyDown={(event) => handleActionKey(event, onClick)}
@@ -252,7 +252,7 @@ export default function ProjectItem({
         role="button"
         tabIndex={0}
         aria-expanded={isExpanded}
-        aria-label={`${repo.name}${repo.valid ? "" : " unavailable"}`}
+        aria-label={repo.name}
       >
         {worktreeParent ? (
           <GitFork size={14} className="shrink-0" style={{ opacity: 0.6 }} />

@@ -115,7 +115,6 @@ pub fn list_repos() -> Result<Vec<RepoInfo>, String> {
             RepoInfo {
                 path: entry.path.clone(),
                 name,
-                valid: true,
             }
         })
         .collect();

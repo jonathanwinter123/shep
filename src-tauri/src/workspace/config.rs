@@ -139,7 +139,6 @@ pub struct RepoEntry {
 pub struct RepoInfo {
     pub path: String,
     pub name: String,
-    pub valid: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

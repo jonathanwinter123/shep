@@ -91,7 +91,7 @@ export default function AppShell() {
 
   // Git watching: main repo paths only — worktree paths are discovered automatically
   const gitRepoPaths = useMemo(
-    () => repos.filter((r) => r.valid).map((r) => r.path),
+    () => repos.map((r) => r.path),
     [repos],
   );
   useGitWatcher(gitRepoPaths);
@@ -438,8 +438,8 @@ export default function AppShell() {
 
     const storedRepoPath = window.localStorage.getItem(LAST_REPO_STORAGE_KEY);
     const initialRepo =
-      repos.find((repo) => repo.valid && repo.path === storedRepoPath) ??
-      repos.find((repo) => repo.valid);
+      repos.find((repo) => repo.path === storedRepoPath) ??
+      repos[0];
 
     if (initialRepo) {
       void handleSelectRepo(initialRepo.path);

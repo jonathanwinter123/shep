@@ -3,7 +3,6 @@
 export interface RepoInfo {
   path: string;
   name: string;
-  valid: boolean;
 }
 
 export interface CommandConfig {
