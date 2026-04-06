@@ -97,6 +97,7 @@ pub fn run() {
             commands::git_list_branches,
             commands::git_push_branch,
             commands::git_list_worktrees,
+            commands::git_create_worktree,
             commands::git_status,
             commands::git_changed_files,
             commands::git_file_diff,

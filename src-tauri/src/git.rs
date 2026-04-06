@@ -206,6 +206,12 @@ pub struct WorktreeEntry {
     pub is_main: bool,
 }
 
+#[derive(serde::Serialize, Clone)]
+pub struct CreatedWorktree {
+    pub path: String,
+    pub branch: String,
+}
+
 pub fn list_worktrees(path: &str) -> Result<Vec<WorktreeEntry>, String> {
     let output = Command::new("git")
         .args(["-C", path, "worktree", "list", "--porcelain"])
@@ -249,6 +255,86 @@ pub fn list_worktrees(path: &str) -> Result<Vec<WorktreeEntry>, String> {
     }
 
     Ok(entries)
+}
+
+pub fn create_worktree(path: &str, branch_name: &str) -> Result<CreatedWorktree, String> {
+    let branch_name = branch_name.trim();
+    if branch_name.is_empty() {
+        return Err("Branch name is required".to_string());
+    }
+
+    let repo_path = std::path::Path::new(path)
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve repo path: {e}"))?;
+
+    if repo_path.join(".git").is_file() {
+        return Err("Create worktree is only available from the main repo checkout".to_string());
+    }
+
+    let validate = Command::new("git")
+        .args(["-C", path, "check-ref-format", "--branch", branch_name])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !validate.status.success() {
+        let stderr = String::from_utf8_lossy(&validate.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            format!("Invalid branch name: {branch_name}")
+        } else {
+            stderr
+        });
+    }
+
+    let repo_name = repo_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Could not determine repo name".to_string())?;
+    let repo_parent = repo_path
+        .parent()
+        .ok_or_else(|| "Could not determine repo parent".to_string())?;
+
+    let branch_slug = branch_name
+        .chars()
+        .map(|c| match c {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' => c,
+            _ => '-',
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    let branch_slug = if branch_slug.is_empty() {
+        "worktree".to_string()
+    } else {
+        branch_slug
+    };
+
+    let worktree_path = repo_parent
+        .join(".shep-worktrees")
+        .join(repo_name)
+        .join(branch_slug);
+
+    if worktree_path.exists() {
+        return Err(format!("Worktree path already exists: {}", worktree_path.display()));
+    }
+
+    if let Some(parent) = worktree_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create worktree directory: {e}"))?;
+    }
+
+    let worktree_path_string = worktree_path.to_string_lossy().to_string();
+    let output = Command::new("git")
+        .args(["-C", path, "worktree", "add", "-b", branch_name, &worktree_path_string])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+
+    Ok(CreatedWorktree {
+        path: worktree_path_string,
+        branch: branch_name.to_string(),
+    })
 }
 
 // ── Changed files (porcelain v2 parsing) ────────────────────────────

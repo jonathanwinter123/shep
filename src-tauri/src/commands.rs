@@ -5,7 +5,7 @@ use tauri::ipc::Channel;
 use tauri::{Emitter, State};
 
 use crate::git;
-use crate::git::{ChangedFile, GitStatus, WorktreeEntry};
+use crate::git::{ChangedFile, CreatedWorktree, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::PtyOutput;
 use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
@@ -235,6 +235,11 @@ pub async fn git_push_branch(path: String, branch: String) -> Result<(), String>
 #[tauri::command]
 pub async fn git_list_worktrees(path: String) -> Result<Vec<WorktreeEntry>, String> {
     git::list_worktrees(&path)
+}
+
+#[tauri::command]
+pub async fn git_create_worktree(path: String, branch_name: String) -> Result<CreatedWorktree, String> {
+    git::create_worktree(&path, &branch_name)
 }
 
 #[tauri::command]

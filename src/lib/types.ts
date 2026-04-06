@@ -120,6 +120,11 @@ export interface WorktreeEntry {
   is_main: boolean;
 }
 
+export interface CreatedWorktree {
+  path: string;
+  branch: string;
+}
+
 // ── Git changed files ────────────────────────────────────────────────
 
 export interface ChangedFile {

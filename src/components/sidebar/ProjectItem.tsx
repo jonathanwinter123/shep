@@ -7,6 +7,7 @@ import {
   FolderOpen,
   FolderOpen as FolderOpenIcon,
   GitFork,
+  Plus,
   Copy,
   Trash2,
   SquareArrowOutUpRight,
@@ -18,7 +19,7 @@ import type { ContextMenuItem } from "../shared/ContextMenu";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
 import { handleActionKey } from "../../lib/a11y";
-import { gitListWorktrees, revealInFinder } from "../../lib/tauri";
+import { gitCreateWorktree, gitListWorktrees, revealInFinder } from "../../lib/tauri";
 
 interface ProjectItemProps {
   repo: RepoInfo;
@@ -64,6 +65,10 @@ export default function ProjectItem({
   const [wtEntries, setWtEntries] = useState<WorktreeEntry[]>([]);
   const [wtSelected, setWtSelected] = useState<Set<string>>(new Set());
   const wtRef = useRef<HTMLDivElement>(null);
+  const [wtCreate, setWtCreate] = useState<{ x: number; y: number } | null>(null);
+  const [wtBranchName, setWtBranchName] = useState("");
+  const [creatingWorktree, setCreatingWorktree] = useState(false);
+  const wtCreateRef = useRef<HTMLDivElement>(null);
 
   // Close picker on outside click
   useEffect(() => {
@@ -83,6 +88,28 @@ export default function ProjectItem({
       document.removeEventListener("keydown", handleKey);
     };
   }, [wtPicker]);
+
+  useEffect(() => {
+    if (!wtCreate) return;
+    const handle = (e: MouseEvent) => {
+      if (wtCreateRef.current && !wtCreateRef.current.contains(e.target as Node)) {
+        setWtCreate(null);
+        setWtBranchName("");
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setWtCreate(null);
+        setWtBranchName("");
+      }
+    };
+    document.addEventListener("mousedown", handle, true);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handle, true);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [wtCreate]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -119,7 +146,48 @@ export default function ProjectItem({
     setWtPicker(null);
   };
 
+  const handleOpenCreateWorktree = () => {
+    setWtCreate(menu ?? { x: 200, y: 200 });
+    setWtBranchName("");
+  };
+
+  const handleCreateWorktree = async () => {
+    const branchName = wtBranchName.trim();
+    if (!branchName || creatingWorktree) return;
+    setCreatingWorktree(true);
+    try {
+      const created = await gitCreateWorktree(repo.path, branchName);
+      onAddProject(created.path);
+      setWtCreate(null);
+      setWtBranchName("");
+    } catch (error) {
+      pushNotice({
+        tone: "error",
+        title: "Couldn't create worktree",
+        message: getErrorMessage(error),
+      });
+    } finally {
+      setCreatingWorktree(false);
+    }
+  };
+
+  const branchSlugPreview = wtBranchName
+    .trim()
+    .split("")
+    .map((char) => (/^[A-Za-z0-9_-]$/.test(char) ? char : "-"))
+    .join("")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const createPathPreview = branchSlugPreview
+    ? `.shep-worktrees/${repo.name}/${branchSlugPreview}`
+    : null;
+
   const menuItems: ContextMenuItem[] = [
+    ...(!worktreeParent ? [{
+      label: "Create Worktree",
+      icon: <Plus size={14} />,
+      onClick: handleOpenCreateWorktree,
+    }] : []),
     {
       label: editorActionLabel,
       icon: <SquareArrowOutUpRight size={14} />,
@@ -250,6 +318,56 @@ export default function ProjectItem({
               onClick={handleAddSelected}
             >
               Add{wtSelected.size > 0 ? ` (${wtSelected.size})` : ""}
+            </button>
+          </div>
+        </div>,
+        document.body,
+      )}
+      {wtCreate && createPortal(
+        <div
+          ref={wtCreateRef}
+          className="context-menu"
+          style={{ left: wtCreate.x, top: wtCreate.y, minWidth: 280 }}
+        >
+          <div style={{ padding: "6px 10px 2px", fontSize: 11, opacity: 0.5 }}>
+            Create worktree
+          </div>
+          <form
+            className="branch-dropdown__create-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleCreateWorktree();
+            }}
+            style={{ padding: "8px" }}
+          >
+            <input
+              className="branch-dropdown__input"
+              type="text"
+              autoFocus
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              placeholder="feature/my-change"
+              value={wtBranchName}
+              onChange={(e) => setWtBranchName(e.target.value)}
+              disabled={creatingWorktree}
+            />
+          </form>
+          <div style={{ padding: "0 10px 8px", fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>
+            Creates a new branch and worktree under
+            <div style={{ marginTop: 4, opacity: 0.8, wordBreak: "break-all" }}>
+              {createPathPreview ?? `.shep-worktrees/${repo.name}/...`}
+            </div>
+          </div>
+          <div style={{ padding: "6px 8px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            <button
+              className="btn-primary"
+              style={{ width: "100%", fontSize: 12, padding: "4px 0" }}
+              disabled={!wtBranchName.trim() || creatingWorktree}
+              onClick={() => void handleCreateWorktree()}
+            >
+              {creatingWorktree ? "Creating..." : "Create Worktree"}
             </button>
           </div>
         </div>,

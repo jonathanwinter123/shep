@@ -97,10 +97,26 @@ export default function ProjectList({
   const commandsBadge = commands.length > 0 ? String(commands.length) : null;
   const gitStatuses = useGitStore((s) => s.projectGitStatus);
   const existingPaths = useMemo(() => new Set(repos.map((r) => r.path)), [repos]);
+  const sortedRepos = useMemo(() => {
+    return [...repos].sort((a, b) => {
+      const aWorktreeParent = gitStatuses[a.path]?.worktree_parent ?? null;
+      const bWorktreeParent = gitStatuses[b.path]?.worktree_parent ?? null;
+
+      const aGroup = aWorktreeParent ?? a.name;
+      const bGroup = bWorktreeParent ?? b.name;
+      const groupCompare = aGroup.localeCompare(bGroup);
+      if (groupCompare !== 0) return groupCompare;
+
+      if (aWorktreeParent == null && bWorktreeParent != null) return -1;
+      if (aWorktreeParent != null && bWorktreeParent == null) return 1;
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [repos, gitStatuses]);
 
   return (
     <div className="flex flex-col gap-0.5 px-2 pb-2">
-      {[...repos].sort((a, b) => a.name.localeCompare(b.name)).map((repo) => {
+      {sortedRepos.map((repo) => {
         const isActive = repo.path === activeRepoPath;
         const isExpanded = isActive && expandedPaths.has(repo.path);
         const worktreeParent = gitStatuses[repo.path]?.worktree_parent ?? null;

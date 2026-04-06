@@ -7,6 +7,7 @@ import type {
   GitStatus,
   ChangedFile,
   WorktreeEntry,
+  CreatedWorktree,
   EditorSettings,
   KeybindingSettings,
   TerminalSettings,
@@ -159,6 +160,10 @@ export function gitPushBranch(path: string, branch: string): Promise<void> {
 
 export function gitListWorktrees(path: string): Promise<WorktreeEntry[]> {
   return invoke("git_list_worktrees", { path });
+}
+
+export function gitCreateWorktree(path: string, branchName: string): Promise<CreatedWorktree> {
+  return invoke("git_create_worktree", { path, branchName });
 }
 
 export function gitStatus(path: string): Promise<GitStatus> {

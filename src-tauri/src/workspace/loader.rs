@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use super::config::{
     CommandConfig, EditorSettings, GlobalConfig, KeybindingSettings, RegisteredRepo, RepoEntry,
@@ -95,9 +96,14 @@ pub fn save_usage_settings(settings: &UsageSettings) -> Result<(), String> {
 // ── Repo operations ─────────────────────────────────────────────────
 
 pub fn list_repos() -> Result<Vec<RepoInfo>, String> {
-    let config = load_global_config()?;
-    let repos = config
-        .repos
+    let mut config = load_global_config()?;
+    let original_len = config.repos.len();
+    config.repos.retain(|entry| should_keep_registered_repo(&entry.path));
+    if config.repos.len() != original_len {
+        save_global_config(&config)?;
+    }
+
+    let repos = config.repos
         .iter()
         .map(|entry| {
             let path = Path::new(&entry.path);
@@ -106,11 +112,10 @@ pub fn list_repos() -> Result<Vec<RepoInfo>, String> {
                 .and_then(|n| n.to_str())
                 .unwrap_or("unknown")
                 .to_string();
-            let valid = path.is_dir();
             RepoInfo {
                 path: entry.path.clone(),
                 name,
-                valid,
+                valid: true,
             }
         })
         .collect();
@@ -137,11 +142,9 @@ pub fn register_repo(repo_path: &str) -> Result<RegisteredRepo, String> {
         save_global_config(&config)?;
     }
 
-    // Create .shep/ in repo if needed
-    ensure_repo_shep_dir(&canonical_str)?;
-
-    // Load or create workspace config
-    let workspace = load_or_create_workspace(&canonical_str)?;
+    // Load existing workspace config or return an in-memory default. We create
+    // `.shep` lazily only when the user actually saves project config.
+    let workspace = load_or_default_workspace(&canonical_str)?;
     Ok(RegisteredRepo {
         path: canonical_str,
         workspace,
@@ -157,7 +160,7 @@ pub fn unregister_repo(repo_path: &str) -> Result<(), String> {
 // ── Per-repo workspace ──────────────────────────────────────────────
 
 pub fn load_repo_workspace(repo_path: &str) -> Result<WorkspaceConfig, String> {
-    load_or_create_workspace(repo_path)
+    load_or_default_workspace(repo_path)
 }
 
 pub fn save_repo_workspace(repo_path: &str, config: &WorkspaceConfig) -> Result<(), String> {
@@ -283,7 +286,7 @@ fn ensure_repo_shep_dir(repo_path: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn load_or_create_workspace(repo_path: &str) -> Result<WorkspaceConfig, String> {
+fn load_or_default_workspace(repo_path: &str) -> Result<WorkspaceConfig, String> {
     let path = repo_workspace_file(repo_path);
     if path.exists() {
         let content = fs::read_to_string(&path)
@@ -303,7 +306,31 @@ fn load_or_create_workspace(repo_path: &str) -> Result<WorkspaceConfig, String> 
             assistants: Vec::new(),
         };
 
-        save_repo_workspace(repo_path, &config)?;
         Ok(config)
     }
+}
+
+fn should_keep_registered_repo(repo_path: &str) -> bool {
+    let path = Path::new(repo_path);
+    if !path.is_dir() {
+        return false;
+    }
+
+    // Shep-managed worktrees live under `.shep-worktrees`. If one has been
+    // removed by git but a leftover directory remains (for example only app
+    // metadata), do not keep showing it as a normal folder project.
+    let is_shep_managed_worktree = path
+        .components()
+        .filter_map(|component| component.as_os_str().to_str())
+        .any(|component| component == ".shep-worktrees");
+
+    if !is_shep_managed_worktree {
+        return true;
+    }
+
+    Command::new("git")
+        .args(["-C", repo_path, "rev-parse", "--git-dir"])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
