@@ -170,16 +170,6 @@ pub struct AssistantConfig {
     pub yolo_flag: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct WorktreeConfig {
-    #[serde(default)]
-    pub copy: Vec<String>,
-    #[serde(default)]
-    pub symlink: Vec<String>,
-    #[serde(default)]
-    pub post_create: Vec<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceConfig {
     pub name: String,
@@ -187,6 +177,4 @@ pub struct WorkspaceConfig {
     pub commands: Vec<CommandConfig>,
     #[serde(default)]
     pub assistants: Vec<AssistantConfig>,
-    #[serde(default)]
-    pub worktree: WorktreeConfig,
 }

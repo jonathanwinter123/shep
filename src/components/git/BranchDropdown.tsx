@@ -10,6 +10,10 @@ interface BranchDropdownProps {
   onBranchChanged: () => void;
   /** Map of branch name → worktree path for branches checked out in worktrees */
   worktreeMap?: Map<string, string>;
+  /** When true, selecting a worktree branch calls onSelectWorktree instead of blocking */
+  allowWorktreeSelect?: boolean;
+  /** Called when a worktree branch is selected (only when allowWorktreeSelect is true) */
+  onSelectWorktree?: (branch: string, worktreePath: string) => void;
 }
 
 export default function BranchDropdown({
@@ -18,6 +22,8 @@ export default function BranchDropdown({
   isWorktree,
   onBranchChanged,
   worktreeMap,
+  allowWorktreeSelect,
+  onSelectWorktree,
 }: BranchDropdownProps) {
   const refreshStatus = useGitStore((s) => s.refreshStatus);
   const [open, setOpen] = useState(false);
@@ -92,11 +98,17 @@ export default function BranchDropdown({
 
   const handleClick = useCallback(
     (branch: string) => {
-      const isWorktreeBranch = worktreeMap?.has(branch) ?? false;
-      if (isWorktreeBranch) return; // Can't switch to a branch checked out in a worktree
+      const worktreePath = worktreeMap?.get(branch);
+      if (worktreePath) {
+        if (allowWorktreeSelect && onSelectWorktree) {
+          onSelectWorktree(branch, worktreePath);
+          setOpen(false);
+        }
+        return; // In git-switch mode, can't switch to a branch checked out in a worktree
+      }
       handleSwitch(branch);
     },
-    [worktreeMap, handleSwitch],
+    [worktreeMap, handleSwitch, allowWorktreeSelect, onSelectWorktree],
   );
 
   // Worktree sessions: branch is locked, show read-only

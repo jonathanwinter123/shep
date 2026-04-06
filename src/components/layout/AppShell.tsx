@@ -9,7 +9,6 @@ import GitPanel from "../git/GitPanel";
 import CommandsPanel from "../commands/CommandsPanel";
 import SessionLauncher from "../session/SessionLauncher";
 import NoticeCenter from "../shared/NoticeCenter";
-import WorktreeCloseDialog from "../shared/WorktreeCloseDialog";
 import UsagePanel from "../usage/UsagePanel";
 import PortsPanel from "../ports/PortsPanel";
 import { PanelLeft, PanelLeftOpen } from "lucide-react";
@@ -155,7 +154,6 @@ export default function AppShell() {
         name: activeConfig?.name ?? fallbackWorkspaceName(activeRepoPath),
         assistants: activeConfig?.assistants ?? [],
         commands: nextCommands,
-        worktree: activeConfig?.worktree ?? { copy: [], symlink: [], post_create: [] },
       };
 
       try {
@@ -358,37 +356,13 @@ export default function AppShell() {
   }, [setActiveTab, activeRepoPath]);
 
   const handleSwitchWorkspace = useCallback(
-    async (repoPath: string, workspaceId: string) => {
+    (repoPath: string, workspaceId: string) => {
       const store = useTerminalStore.getState();
       const ps = store.projectState[repoPath];
       if (!ps || ps.activeWorkspaceId === workspaceId) return;
-
       store.switchWorkspace(repoPath, workspaceId);
-
-      // Prompt to restart running commands in the new workspace
-      const cmds = useCommandStore.getState().projectCommands[repoPath] ?? [];
-      const runningCmds = cmds.filter((c) => c.status === "running");
-      if (runningCmds.length > 0) {
-        const ws = ps.workspaces[workspaceId];
-        const wsLabel = ws?.label ?? workspaceId;
-        for (const cmd of runningCmds) {
-          const confirmed = await ask(
-            `Restart "${cmd.name}" in ${wsLabel}?`,
-            { title: "Restart command", kind: "info", okLabel: "Restart", cancelLabel: "Skip" },
-          );
-          if (confirmed) {
-            await stopCommand(cmd.name);
-            const { cols, rows } = getTerminalDimensions();
-            await startCommand(
-              { name: cmd.name, command: cmd.command, autostart: cmd.autostart, env: cmd.env, cwd: cmd.cwd },
-              cols,
-              rows,
-            );
-          }
-        }
-      }
     },
-    [stopCommand, startCommand, getTerminalDimensions],
+    [],
   );
 
   const handleNewAssistant = useCallback(() => {
@@ -577,7 +551,6 @@ export default function AppShell() {
   return (
     <div className="app-shell">
       <NoticeCenter />
-      <WorktreeCloseDialog />
       <div
         className="drag-region"
         aria-hidden="true"

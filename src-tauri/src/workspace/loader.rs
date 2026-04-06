@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use super::config::{
     CommandConfig, EditorSettings, GlobalConfig, KeybindingSettings, RegisteredRepo, RepoEntry,
-    RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig, WorktreeConfig,
+    RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
 };
 
 // ── Paths ───────────────────────────────────────────────────────────
@@ -250,7 +250,6 @@ pub fn migrate_old_projects() -> Result<(), String> {
             },
             commands,
             assistants: Vec::new(),
-            worktree: WorktreeConfig::default(),
         };
 
         // Write to repo's .shep/workspace.yml
@@ -302,7 +301,6 @@ fn load_or_create_workspace(repo_path: &str) -> Result<WorkspaceConfig, String> 
             name,
             commands: Vec::new(),
             assistants: Vec::new(),
-            worktree: WorktreeConfig::default(),
         };
 
         save_repo_workspace(repo_path, &config)?;
