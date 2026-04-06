@@ -488,19 +488,81 @@ const githubDark: ShepTheme = {
   termBrightWhite: "#ffffff",
 };
 
+/* ── Gruvbox Light ────────────────────────────────────── */
+const gruvboxLight: ShepTheme = {
+  id: "gruvbox-light",
+  name: "Gruvbox Light",
+  isTransparent: false,
+
+  bgRadial1: "rgba(69, 133, 136, 0.08)",
+  bgRadial2: "rgba(177, 98, 134, 0.05)",
+  bgRadial3: "rgba(152, 151, 26, 0.05)",
+
+  bgLinearFrom: "#f2e5bc",
+  bgLinearMid: "#fbf1c7",
+  bgLinearTo: "#f2e5bc",
+
+  frameTint: "#fbf1c7",
+  panelTint: "rgba(251, 241, 199, 0.60)",
+  glassBorder: "rgba(60, 56, 54, 0.25)",
+  glassPanelStrong: "rgba(251, 241, 199, 0.78)",
+  glassBorderStrong: "rgba(60, 56, 54, 0.35)",
+
+  statusRunning: "#458588",
+  statusStopped: "#928374",
+  statusCrashed: "#cc241d",
+  statusAttention: "#d79921",
+
+  appBg: "#fbf1c7",
+  appFg: "#3c3836",
+
+  termForeground: "#3c3836",
+  termCursor: "#3c3836",
+  termSelection: "#3c3836",
+  termBlack: "#fbf1c7",
+  termRed: "#cc241d",
+  termGreen: "#98971a",
+  termYellow: "#d79921",
+  termBlue: "#458588",
+  termMagenta: "#b16286",
+  termCyan: "#689d6a",
+  termWhite: "#7c6f64",
+  termBrightBlack: "#928374",
+  termBrightRed: "#9d0006",
+  termBrightGreen: "#79740e",
+  termBrightYellow: "#b57614",
+  termBrightBlue: "#076678",
+  termBrightMagenta: "#8f3f71",
+  termBrightCyan: "#427b58",
+  termBrightWhite: "#3c3836",
+};
+
 export const THEMES: Record<string, ShepTheme> = {
-  dracula,
+  catppuccin,
   "tokyo-night": tokyoNight,
   ayu,
+  dracula,
   gotham,
-  catppuccin,
   kanagawa,
   "night-owl": nightOwl,
   "github-dark": githubDark,
   clear,
+  "gruvbox-light": gruvboxLight,
 };
 
 export const THEME_LIST: ShepTheme[] = Object.values(THEMES);
+
+/** Relative luminance of a hex color (0 = black, 1 = white) */
+function hexLuminance(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const toLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+}
+
+export const DARK_THEMES: ShepTheme[] = THEME_LIST.filter((t) => hexLuminance(t.appBg) <= 0.3);
+export const LIGHT_THEMES: ShepTheme[] = THEME_LIST.filter((t) => hexLuminance(t.appBg) > 0.3);
 
 export const DEFAULT_THEME_ID = "catppuccin";
 

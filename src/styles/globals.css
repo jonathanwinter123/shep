@@ -39,12 +39,15 @@ body,
   color-scheme: dark;
   --app-bg: #282a36;
   --app-fg: #f8f8f2;
+  --overlay: #ffffff;
+  --bg-mix-edge: 30%;
+  --bg-mix-mid: 20%;
   --glass-panel-strong: rgba(22, 22, 30, 0.78);
-  --glass-panel-soft: rgba(255, 255, 255, 0.05);
+  --glass-panel-soft: color-mix(in srgb, var(--overlay) 5%, transparent);
   --glass-border: rgba(169, 177, 214, 0.12);
   --glass-border-strong: rgba(169, 177, 214, 0.18);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
-  --glass-highlight: rgba(255, 255, 255, 0.2);
+  --glass-highlight: color-mix(in srgb, var(--overlay) 20%, transparent);
   --glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
 
   /* Theme-driven vars (defaults = Shibuya) */
@@ -70,16 +73,16 @@ body,
   --radius-lg: 12px;
 
   /* Text colors */
-  --text-primary: #ffffff;
-  --text-secondary: rgb(203, 213, 225);   /* slate-300 */
-  --text-muted: rgb(148, 163, 184);       /* slate-400 */
+  --text-primary: var(--app-fg);
+  --text-secondary: color-mix(in srgb, var(--app-fg), transparent 15%);
+  --text-muted: color-mix(in srgb, var(--app-fg), transparent 40%);
 
   /* Interactive surface */
-  --surface-hover: rgba(255, 255, 255, 0.05);
-  --surface-active: rgba(255, 255, 255, 0.06);
+  --surface-hover: color-mix(in srgb, var(--overlay) 5%, transparent);
+  --surface-active: color-mix(in srgb, var(--overlay) 6%, transparent);
   --surface-raised: rgba(30, 35, 44, 0.95);
-  --border-hover: rgba(255, 255, 255, 0.08);
-  --border-active: rgba(255, 255, 255, 0.12);
+  --border-hover: color-mix(in srgb, var(--overlay) 8%, transparent);
+  --border-active: color-mix(in srgb, var(--overlay) 12%, transparent);
 
   /* Status (theme-driven, defaults for initial render) */
   --status-running: #7aa2f7;
@@ -104,14 +107,14 @@ body:not(.theme-clear) {
     radial-gradient(circle at 85% 16%, var(--bg-radial-2), transparent 22%),
     radial-gradient(circle at 50% 100%, var(--bg-radial-3), transparent 28%),
     linear-gradient(145deg,
-      color-mix(in srgb, var(--frame-tint), black 30%) 0%,
-      color-mix(in srgb, var(--frame-tint), black 20%) 45%,
-      color-mix(in srgb, var(--frame-tint), black 30%) 100%);
+      color-mix(in srgb, var(--frame-tint), black var(--bg-mix-edge)) 0%,
+      color-mix(in srgb, var(--frame-tint), black var(--bg-mix-mid)) 45%,
+      color-mix(in srgb, var(--frame-tint), black var(--bg-mix-edge)) 100%);
 }
 
 /* Opaque themes: derive raised surfaces from --frame-tint */
 body:not(.theme-clear) {
-  --surface-raised: color-mix(in srgb, var(--frame-tint), white 8%);
+  --surface-raised: color-mix(in srgb, var(--frame-tint), var(--overlay) 8%);
 }
 
 /* Opaque themes: strip glass overlays so --frame-tint is exact */
@@ -191,7 +194,7 @@ select {
 }
 .list-item.active {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--overlay) 6%, transparent);
 }
 .list-item.project-active {
   color: var(--text-primary);
@@ -204,7 +207,7 @@ select {
   bottom: 6px;
   width: 3px;
   border-radius: 1px;
-  background: rgba(255, 255, 255, 0.4);
+  background: color-mix(in srgb, var(--overlay) 40%, transparent);
 }
 
 /* Context menu (right-click) */
@@ -215,7 +218,7 @@ select {
   padding: 4px;
   border-radius: var(--radius-md);
   background: var(--surface-raised);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid color-mix(in srgb, var(--overlay) 10%, transparent);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
@@ -266,7 +269,7 @@ select {
   transition: background 300ms ease;
 }
 .sidebar-status-dot--idle {
-  background: rgba(255, 255, 255, 0.25);
+  background: color-mix(in srgb, var(--overlay) 25%, transparent);
 }
 .sidebar-status-dot--active {
   background: rgb(45, 212, 191);  /* teal-400 */
@@ -319,7 +322,7 @@ select {
 /* Settings layout helpers */
 .settings-divider {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid color-mix(in srgb, var(--overlay) 6%, transparent);
   margin: 24px 0;
 }
 .settings-row {
@@ -333,7 +336,7 @@ select {
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   min-width: 90px;
   flex-shrink: 0;
 }
@@ -363,7 +366,7 @@ select {
 .update-progress-track {
   height: 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
   max-width: 320px;
   overflow: hidden;
 }
@@ -410,7 +413,7 @@ select {
 }
 .keybinding-card__action {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
 }
 .keybinding-kbd {
   display: inline-flex;
@@ -422,9 +425,9 @@ select {
   font-size: 14px;
   font-family: inherit;
   line-height: 1;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--overlay) 10%, transparent);
+  color: var(--text-secondary);
 }
 
 /* Info tooltip */
@@ -443,9 +446,9 @@ select {
   border-radius: 6px;
   font-size: 12px;
   line-height: 1.4;
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(30, 30, 30, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  background: var(--glass-panel-strong);
+  border: 1px solid color-mix(in srgb, var(--overlay) 10%, transparent);
   white-space: nowrap;
   pointer-events: none;
   z-index: 50;
@@ -463,13 +466,13 @@ select {
   font-size: var(--text-body);
   font-weight: 500;
   border: 1px solid var(--border-active);
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
   color: var(--text-primary);
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease;
 }
 .btn-primary:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--overlay) 12%, transparent);
   border-color: var(--glass-highlight);
 }
 .btn-primary:focus-visible {
@@ -503,7 +506,7 @@ select {
   gap: 10px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--overlay) 12%, transparent);
   background: color-mix(in srgb, var(--surface-raised), transparent 10%);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(18px);
@@ -555,7 +558,7 @@ select {
   font-size: 12px;
   line-height: 20px;
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--overlay) 6%, transparent);
 }
 
 /* Assistant item — reveal refresh on hover */
@@ -588,7 +591,7 @@ select {
 }
 .tab:hover {
   background: var(--surface-hover);
-  color: rgb(241, 245, 249);
+  color: var(--text-primary);
 }
 .tab:focus-visible {
   outline: 2px solid rgba(122, 162, 247, 0.75);
@@ -611,7 +614,7 @@ select {
   bottom: 4px;
   width: 2px;
   border-radius: 1px;
-  background: rgba(255, 255, 255, 0.4);
+  background: color-mix(in srgb, var(--overlay) 40%, transparent);
 }
 .tab.drop-before::before {
   left: -2px;
@@ -632,7 +635,7 @@ select {
 .tab-rename-input {
   background: transparent;
   border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom: 1px solid color-mix(in srgb, var(--overlay) 30%, transparent);
   outline: none;
   color: var(--text-primary);
   font: inherit;
@@ -669,7 +672,7 @@ select {
   transition: background 160ms ease, color 160ms ease;
 }
 .section-toggle:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--overlay) 4%, transparent);
   color: var(--text-secondary);
 }
 .section-toggle:focus-visible {
@@ -702,8 +705,8 @@ select {
   gap: 8px;
   padding: 8px;
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--overlay) 3%, transparent);
+  border: 1px solid color-mix(in srgb, var(--overlay) 6%, transparent);
 }
 
 .command-form__input {
@@ -712,7 +715,7 @@ select {
   border-radius: var(--radius-sm);
   font-size: 12px;
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--overlay) 6%, transparent);
   border: 1px solid var(--border-hover);
   outline: none;
 }
@@ -738,7 +741,7 @@ select {
   font-size: 12px;
   font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--overlay) 6%, transparent);
   border: 1px solid var(--border-hover);
   outline: none;
 }
@@ -798,7 +801,7 @@ select {
   border-radius: 9999px;
   line-height: 16px;
   font-variant-numeric: tabular-nums;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
   color: var(--text-secondary);
 }
 .badge-success {
@@ -842,14 +845,14 @@ select {
   border-radius: var(--radius-md);
   font-size: var(--text-body);
   color: var(--text-secondary);
-  border: 1px dashed rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed color-mix(in srgb, var(--overlay) 22%, transparent);
+  background: color-mix(in srgb, var(--overlay) 2%, transparent);
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 .btn-ghost:hover {
   background: var(--surface-hover);
-  border-color: rgba(255, 255, 255, 0.32);
+  border-color: color-mix(in srgb, var(--overlay) 32%, transparent);
   color: var(--text-primary);
 }
 .btn-ghost:focus-visible {
@@ -881,7 +884,7 @@ select {
 /* ── Sidebar usage section ─────────────────────────────── */
 
 .sidebar-usage {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--overlay) 8%, transparent);
   padding-top: 4px;
   padding-bottom: 8px;
 }
@@ -898,7 +901,7 @@ select {
   display: flex;
   gap: 1px;
   padding: 2px;
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--overlay) 3%, transparent);
   border-radius: 6px;
 }
 
@@ -920,7 +923,7 @@ select {
 
 .sidebar-usage__window-btn--active {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
 }
 
 .sidebar-usage__providers {
@@ -994,7 +997,7 @@ select {
   top: -2px;
   bottom: -2px;
   width: 2px;
-  background: rgba(255, 255, 255, 0.4);
+  background: color-mix(in srgb, var(--overlay) 40%, transparent);
   border-radius: 1px;
   transform: translateX(-1px);
   transition: left 400ms ease;
@@ -1038,7 +1041,7 @@ select {
   border-radius: 16px;
   background:
     var(--glass-noise),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)),
+    linear-gradient(180deg, color-mix(in srgb, var(--overlay) 5%, transparent), color-mix(in srgb, var(--overlay) 1.5%, transparent)),
     var(--frame-tint);
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(18px) saturate(145%);
@@ -1058,10 +1061,10 @@ select {
   border: 1px solid var(--glass-border);
   background:
     var(--glass-noise),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025)),
+    linear-gradient(180deg, color-mix(in srgb, var(--overlay) 7%, transparent), color-mix(in srgb, var(--overlay) 2.5%, transparent)),
     var(--panel-tint);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 color-mix(in srgb, var(--overlay) 6%, transparent),
     0 14px 36px rgba(0, 0, 0, 0.16);
   backdrop-filter: blur(24px) saturate(155%);
   -webkit-backdrop-filter: blur(24px) saturate(155%);
@@ -1078,8 +1081,8 @@ select {
 }
 
 .glass-button:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--overlay) 7%, transparent);
+  border-color: color-mix(in srgb, var(--overlay) 8%, transparent);
 }
 
 .glass-button:active {
@@ -1104,7 +1107,7 @@ select {
 .usage-filter-tabs {
   display: flex;
   gap: 2px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid color-mix(in srgb, var(--overlay) 6%, transparent);
 }
 
 .usage-filter-tab {
@@ -1128,7 +1131,7 @@ select {
 
 .usage-filter-tab--active {
   color: var(--text-primary);
-  border-bottom-color: rgba(255, 255, 255, 0.4);
+  border-bottom-color: color-mix(in srgb, var(--overlay) 40%, transparent);
 }
 
 /* ── Time window selector ──────────────────────────────── */
@@ -1138,7 +1141,7 @@ select {
   gap: 2px;
   margin-top: 8px;
   padding: 3px;
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--overlay) 3%, transparent);
   border-radius: 8px;
   width: fit-content;
 }
@@ -1161,7 +1164,7 @@ select {
 
 .usage-window-tab--active {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
 }
 
 /* ── Usage detail panel ────────────────────────────────── */
@@ -1211,8 +1214,8 @@ select {
   gap: 4px;
   padding: 10px 14px;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid color-mix(in srgb, var(--overlay) 6%, transparent);
+  background: color-mix(in srgb, var(--overlay) 2%, transparent);
 }
 
 .usage-stat__label {
@@ -1267,7 +1270,7 @@ select {
   min-height: 6px;
   border-radius: 5px;
   border: 1px solid var(--border-hover);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--overlay) 8%, transparent);
 }
 
 .usage-chart__label {
@@ -1375,7 +1378,7 @@ select {
 
 .usage-heatmap__cell {
   border: 1px solid var(--border-hover);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--overlay) 8%, transparent);
 }
 
 .usage-heatmap__empty {
@@ -1567,7 +1570,7 @@ select {
   top: -3px;
   bottom: -3px;
   width: 2px;
-  background: rgba(255, 255, 255, 0.4);
+  background: color-mix(in srgb, var(--overlay) 40%, transparent);
   border-radius: 1px;
   transform: translateX(-1px);
   transition: left 400ms ease;
@@ -1660,7 +1663,7 @@ select {
   gap: 12px;
   overflow: hidden;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--overlay) 8%, transparent);
 }
 
 /* ── Git Panel ─────────────────────────────────────────── */
@@ -1714,7 +1717,7 @@ select {
 .git-panel__commit-input {
   width: 100%;
   resize: none;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--overlay) 4%, transparent);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
@@ -1810,7 +1813,7 @@ select {
   padding: 6px 10px;
   border-radius: var(--radius-md);
   color: var(--text-secondary);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid color-mix(in srgb, var(--overlay) 8%, transparent);
   cursor: pointer;
 }
 
@@ -1837,8 +1840,8 @@ select {
   gap: 12px;
   padding: 10px 12px;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid color-mix(in srgb, var(--overlay) 6%, transparent);
+  background: color-mix(in srgb, var(--overlay) 2%, transparent);
   transition: background 160ms ease, border-color 160ms ease;
   flex-wrap: nowrap;
   flex: 1;
@@ -1847,8 +1850,8 @@ select {
 
 .commands-panel__row:hover,
 .commands-panel__row.is-new {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--overlay) 4%, transparent);
+  border-color: color-mix(in srgb, var(--overlay) 6%, transparent);
 }
 
 .commands-panel__row-line {
@@ -1873,7 +1876,7 @@ select {
   border-radius: var(--radius-sm);
   font-size: 12px;
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--overlay) 6%, transparent);
   border: 1px solid var(--border-hover);
   outline: none;
 }
@@ -2092,7 +2095,7 @@ select {
   font-size: 12px;
   font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--overlay) 6%, transparent);
   border: 1px solid var(--border-hover);
   outline: none;
   transition: border-color 160ms ease;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getIdentifier, getName, getTauriVersion, getVersion } from "@tauri-apps/api/app";
 import { EDITOR_OPTIONS } from "../../lib/editors";
-import { THEME_LIST } from "../../lib/themes";
+import { DARK_THEMES, LIGHT_THEMES } from "../../lib/themes";
 import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useThemeStore } from "../../stores/useThemeStore";
@@ -120,7 +120,7 @@ export default function SettingsPanel() {
       <h2 className="section-label !p-0 mb-4">Theme</h2>
 
       <div className="flex flex-wrap gap-3">
-        {THEME_LIST.map((t) => {
+        {DARK_THEMES.map((t) => {
           const active = t.id === themeId;
           return (
             <button
@@ -134,10 +134,6 @@ export default function SettingsPanel() {
                   width: 24,
                   height: 24,
                   background: `linear-gradient(135deg, ${t.bgRadial1} 0%, ${t.bgLinearMid} 50%, ${t.bgRadial3} 100%)`,
-                  outline: active
-                    ? "2px solid rgba(255,255,255,0.7)"
-                    : "2px solid transparent",
-                  outlineOffset: 2,
                 }}
               />
               <span>{t.name}</span>
@@ -145,6 +141,41 @@ export default function SettingsPanel() {
           );
         })}
       </div>
+
+      {LIGHT_THEMES.length > 0 && (
+        <>
+          <hr className="settings-divider" />
+
+          <h2 className="section-label !p-0 mb-4">Light</h2>
+
+          <div className="flex flex-wrap gap-3">
+            {LIGHT_THEMES.map((t) => {
+              const active = t.id === themeId;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTheme(t.id)}
+                  className={`${optionClass} ${active ? "selected" : ""}`}
+                >
+                  <div
+                    className="shrink-0 rounded-full"
+                    style={{
+                      width: 24,
+                      height: 24,
+                      background: `linear-gradient(135deg, ${t.bgRadial1} 0%, ${t.bgLinearMid} 50%, ${t.bgRadial3} 100%)`,
+                    }}
+                  />
+                  <span>{t.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <p className="text-xs text-[var(--text-muted)] mt-4">
+        Note: CLI tools may need to be relaunched after switching themes. Use /theme to select light or dark if not updating.
+      </p>
 
       <hr className="settings-divider" />
 
@@ -173,7 +204,7 @@ export default function SettingsPanel() {
         })}
       </div>
 
-      {isSaving && <div className="mt-2 text-xs text-white/40">Saving...</div>}
+      {isSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving...</div>}
       {error && <div className="mt-2 text-sm text-red-300">{error}</div>}
 
       <hr className="settings-divider" />
@@ -201,7 +232,7 @@ export default function SettingsPanel() {
         })}
       </div>
 
-      {kbIsSaving && <div className="mt-2 text-xs text-white/40">Saving keybindings...</div>}
+      {kbIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving keybindings...</div>}
       {kbError && <div className="mt-2 text-sm text-red-300">{kbError}</div>}
 
       <hr className="settings-divider" />
@@ -293,7 +324,7 @@ export default function SettingsPanel() {
         </div>
       </div>
 
-      {termIsSaving && <div className="mt-2 text-xs text-white/40">Saving terminal settings...</div>}
+      {termIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving terminal settings...</div>}
       {termError && <div className="mt-2 text-sm text-red-300">{termError}</div>}
 
       <hr className="settings-divider" />
@@ -320,10 +351,10 @@ export default function SettingsPanel() {
         })}
       </div>
 
-      {usageIsSaving && <div className="mt-2 text-xs text-white/40">Saving...</div>}
+      {usageIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving...</div>}
       {usageError && <div className="mt-2 text-sm text-red-300">{usageError}</div>}
 
-      <p className="text-xs text-white/30 mt-6">
+      <p className="text-xs text-[var(--text-muted)] mt-6">
         Settings are saved to ~/.shep/config.yml
       </p>
 
@@ -342,7 +373,7 @@ export default function SettingsPanel() {
             <div className="settings-meta-row">
               <span className="settings-meta-row__label">Release notes</span>
               <button
-                className="text-sm underline text-white/60 hover:text-white/80 bg-transparent border-0 cursor-pointer p-0"
+                className="text-sm underline text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-transparent border-0 cursor-pointer p-0"
                 onClick={() => import("@tauri-apps/plugin-shell").then((mod) => mod.open(releaseNotesUrl))}
               >
                 View on GitHub
@@ -363,13 +394,13 @@ export default function SettingsPanel() {
           <div className="update-progress-track mb-2">
             <div className="update-progress-fill" style={{ width: `${downloadProgress}%` }} />
           </div>
-          <div className="text-xs text-white/40">Downloading... {downloadProgress}%</div>
+          <div className="text-xs text-[var(--text-muted)]">Downloading... {downloadProgress}%</div>
         </div>
       )}
 
       {updateStatus === "ready" && (
         <div className="mb-4">
-          <div className="text-sm text-white/60 mb-2">Update downloaded and ready to install.</div>
+          <div className="text-sm text-[var(--text-secondary)] mb-2">Update downloaded and ready to install.</div>
           <button className="btn-primary" onClick={() => void restartApp()}>
             Restart Now
           </button>
@@ -391,7 +422,7 @@ export default function SettingsPanel() {
       )}
 
       {updateStatus === "idle" && hasChecked && (
-        <div className="text-xs text-white/40 mt-2">You're on the latest version.</div>
+        <div className="text-xs text-[var(--text-muted)] mt-2">You're on the latest version.</div>
       )}
 
       <hr className="settings-divider" />
@@ -420,10 +451,10 @@ export default function SettingsPanel() {
       ) : appMetaError ? (
         <div className="mt-2 text-sm text-red-300">{appMetaError}</div>
       ) : (
-        <div className="mt-2 text-xs text-white/40">Loading app info...</div>
+        <div className="mt-2 text-xs text-[var(--text-muted)]">Loading app info...</div>
       )}
 
-      <p className="text-xs text-white/40 mt-4 max-w-lg leading-5">
+      <p className="text-xs text-[var(--text-muted)] mt-4 max-w-lg leading-5">
         For tester reports, include the app version, what you were doing, and whether the issue happened in a packaged build or dev mode.
       </p>
     </div>

@@ -1,5 +1,6 @@
 import { useCallback } from "react";
-import { spawnPty, killPty, getDefaultShell } from "../lib/tauri";
+import { spawnPty, killPty, getDefaultShell, writePty } from "../lib/tauri";
+import { useThemeStore } from "../stores/useThemeStore";
 import type { PtyOutput, CommandConfig, SessionMode } from "../lib/types";
 import { useCommandStore } from "../stores/useCommandStore";
 import { useTerminalStore, nextTabId } from "../stores/useTerminalStore";
@@ -60,7 +61,34 @@ export function unregisterTerminal(ptyId: number) {
   writeBatchScheduled.delete(ptyId);
 }
 
+/** Relative luminance of a hex color (0 = black, 1 = white) */
+function hexLuminance(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const toLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+}
+
+// Respond to OSC 11 background color queries immediately — before xterm
+// processes the data — so CLI tools (Claude Code, Gemini) that query during
+// startup get a response within their detection timeout.
+const OSC_11_QUERY = "\x1b]11;?\x1b\\";
+const OSC_11_QUERY_BEL = "\x1b]11;?\x07";
+
+function handleOsc11Query(ptyId: number, data: string): void {
+  if (data.includes(OSC_11_QUERY) || data.includes(OSC_11_QUERY_BEL)) {
+    const hex = useThemeStore.getState().theme.appBg;
+    const r = hex.slice(1, 3);
+    const g = hex.slice(3, 5);
+    const b = hex.slice(5, 7);
+    const response = `\x1b]11;rgb:${r}${r}/${g}${g}/${b}${b}\x1b\\`;
+    writePty(ptyId, response).catch(() => {});
+  }
+}
+
 function writeToPty(ptyId: number, data: string) {
+  handleOsc11Query(ptyId, data);
   const term = terminalInstances.get(ptyId);
   if (term) {
     // Accumulate data and flush once per animation frame so xterm processes
@@ -167,7 +195,14 @@ export function usePty() {
       let resolvedPtyId: number | null = null;
       const bufferedMessages: PtyOutput[] = [];
 
-      const ptyId = await spawnPty(command, repoPath, env, cols, rows, (msg) => {
+      // Signal terminal background brightness to CLI tools via COLORFGBG.
+      // Claude Code uses this to resolve "auto" theme when OSC 11 is unavailable.
+      const theme = useThemeStore.getState().theme;
+      const lum = hexLuminance(theme.appBg);
+      const colorfgbg = lum > 0.3 ? "0;15" : "15;0";
+      const fullEnv = { COLORFGBG: colorfgbg, ...env };
+
+      const ptyId = await spawnPty(command, repoPath, fullEnv, cols, rows, (msg) => {
         if (resolvedPtyId === null) {
           bufferedMessages.push(msg);
           return;
@@ -341,15 +376,6 @@ export function usePty() {
       let command = assistant.command;
       if (mode === "yolo" && assistant.yoloFlag) {
         command = `${command} ${assistant.yoloFlag}`;
-      }
-
-      // Ensure OpenCode uses the "system" theme so its ANSI colors
-      // match the active Shep terminal theme. Only writes the config
-      // if it doesn't already exist (respects user overrides).
-      if (assistantId === "opencode") {
-        const tuiDir = "$HOME/.config/opencode";
-        const tuiFile = `${tuiDir}/tui.json`;
-        command = `mkdir -p ${tuiDir} && [ ! -f ${tuiFile} ] && echo '{"$schema":"https://opencode.ai/tui.json","theme":"system"}' > ${tuiFile}; ${command}`;
       }
 
       try {

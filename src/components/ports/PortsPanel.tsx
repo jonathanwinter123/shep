@@ -134,7 +134,7 @@ export default function PortsPanel() {
               <div
                 key={`${port.pid}-${port.port}`}
                 className="flex items-center gap-3 px-3 py-2 rounded-md"
-                style={{ background: "var(--bg-secondary, rgba(255,255,255,0.03))" }}
+                style={{ background: "var(--surface-hover)" }}
               >
                 <span
                   className="font-mono text-sm font-semibold shrink-0"
@@ -149,7 +149,7 @@ export default function PortsPanel() {
                     {port.framework && (
                       <span
                         className="text-xs px-1.5 py-0.5 rounded shrink-0"
-                        style={{ background: "var(--bg-tertiary, rgba(255,255,255,0.06))" }}
+                        style={{ background: "var(--surface-active)" }}
                       >
                         {port.framework}
                       </span>

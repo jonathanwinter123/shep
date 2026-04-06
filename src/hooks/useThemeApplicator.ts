@@ -24,6 +24,15 @@ const CSS_VAR_MAP: [keyof ShepTheme, string][] = [
   ["statusAttention", "--status-attention"],
 ];
 
+/** Relative luminance of a hex color (0 = black, 1 = white) */
+function hexLuminance(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const toLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+}
+
 export function useThemeApplicator(): void {
   const theme = useThemeStore((s) => s.theme);
 
@@ -33,10 +42,15 @@ export function useThemeApplicator(): void {
       style.setProperty(cssVar, theme[key] as string);
     }
 
-    // Derive UI text colors from terminal palette
-    style.setProperty("--text-primary", theme.termBrightWhite);
-    style.setProperty("--text-secondary", theme.termWhite);
-    style.setProperty("--text-muted", `color-mix(in srgb, ${theme.termBrightWhite}, transparent 45%)`);
+    // Overlay color: white for dark themes, black for light themes
+    const isLight = hexLuminance(theme.appBg) > 0.3;
+    style.setProperty("--overlay", isLight ? "#000000" : "#ffffff");
+    style.setProperty("--bg-mix-edge", isLight ? "8%" : "30%");
+    style.setProperty("--bg-mix-mid", isLight ? "4%" : "20%");
+    document.documentElement.style.setProperty(
+      "color-scheme",
+      isLight ? "light" : "dark",
+    );
 
     applyThemeToTerminals(theme);
 

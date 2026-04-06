@@ -14,13 +14,23 @@ function withAlpha(hex: string, alpha: number): string {
   return hex;
 }
 
+function isLightTheme(theme: ShepTheme): boolean {
+  const hex = theme.appBg;
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const toLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b) > 0.3;
+}
+
 export function createTerminalTheme(theme: ShepTheme): ITheme {
+  const light = isLightTheme(theme);
   return {
     background: "transparent",
     foreground: theme.termForeground,
     cursor: theme.termCursor,
     selectionBackground: theme.termSelection,
-    black: withAlpha(theme.termBlack, 0.4),
+    black: light ? theme.termBlack : withAlpha(theme.termBlack, 0.4),
     red: theme.termRed,
     green: theme.termGreen,
     yellow: theme.termYellow,
@@ -28,7 +38,7 @@ export function createTerminalTheme(theme: ShepTheme): ITheme {
     magenta: theme.termMagenta,
     cyan: theme.termCyan,
     white: theme.termWhite,
-    brightBlack: withAlpha(theme.termBrightBlack, 0.4),
+    brightBlack: light ? theme.termBrightBlack : withAlpha(theme.termBrightBlack, 0.4),
     brightRed: theme.termBrightRed,
     brightGreen: theme.termBrightGreen,
     brightYellow: theme.termBrightYellow,

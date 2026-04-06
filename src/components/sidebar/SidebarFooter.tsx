@@ -10,7 +10,7 @@ export default function SidebarFooter() {
   const footerButtonClass = "tab !flex-1 !shrink !justify-center !gap-0.5 !px-2 !py-1.5 flex-col min-w-0";
 
   return (
-    <div className="border-t border-white/8 px-2 pt-2 pb-1.5">
+    <div className="border-t border-[var(--glass-border)] px-2 pt-2 pb-1.5">
       <div className="flex items-stretch gap-1">
         <button
           onClick={toggleSettings}

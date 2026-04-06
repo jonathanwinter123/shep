@@ -79,7 +79,7 @@ export default function Sidebar({
   }, [repos, projectState, projectCommands, activityKey]);
 
   return (
-    <div className="w-72 shrink-0 flex flex-col h-full pr-4 mr-4 border-r border-white/8" onContextMenu={(e) => e.preventDefault()}>
+    <div className="w-72 shrink-0 flex flex-col h-full pr-4 mr-4 border-r border-[var(--glass-border)]" onContextMenu={(e) => e.preventDefault()}>
       <div className="flex-1 overflow-y-auto min-h-0">
         <SectionHeader label="Projects" />
         <ProjectList
