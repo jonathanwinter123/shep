@@ -3,7 +3,7 @@ import type { TerminalTab, TabActivity } from "../../lib/types";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { handleActionKey } from "../../lib/a11y";
-import { X, GitFork } from "lucide-react";
+import { X } from "lucide-react";
 import ContextMenu from "../shared/ContextMenu";
 import type { ContextMenuItem } from "../shared/ContextMenu";
 
@@ -60,12 +60,6 @@ export default function AssistantButton({
       >
         {logoUrl && <img src={logoUrl} alt="" width={14} height={14} />}
         <span className="truncate text-left">{tab.label}</span>
-        {tab.worktreePath && tab.branch && (
-          <span className="inline-flex items-center gap-0.5 shrink-0 text-[10px] opacity-50" title={`Worktree: ${tab.branch}`}>
-            <GitFork size={10} />
-            <span className="max-w-[60px] truncate">{tab.branch}</span>
-          </span>
-        )}
         <span className={`sidebar-status-dot ${dotClass(activity)}`} />
       </div>
       {menu && (

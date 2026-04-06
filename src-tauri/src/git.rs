@@ -10,6 +10,8 @@ pub struct GitStatus {
     pub untracked: u32,
     pub ahead: u32,
     pub behind: u32,
+    /// If this is a worktree, the name of the parent repo (derived from its path)
+    pub worktree_parent: Option<String>,
 }
 
 impl Default for GitStatus {
@@ -23,6 +25,7 @@ impl Default for GitStatus {
             untracked: 0,
             ahead: 0,
             behind: 0,
+            worktree_parent: None,
         }
     }
 }
@@ -76,6 +79,31 @@ pub fn status(path: &str) -> GitStatus {
 
     let dirty = staged > 0 || unstaged > 0 || untracked > 0;
 
+    // Detect if this is a worktree by checking if .git is a file (not a directory)
+    let git_path = std::path::Path::new(path).join(".git");
+    let worktree_parent = if git_path.is_file() {
+        // This is a worktree — resolve the main repo path via git-common-dir
+        Command::new("git")
+            .args(["-C", path, "rev-parse", "--git-common-dir"])
+            .output()
+            .ok()
+            .and_then(|o| {
+                if o.status.success() {
+                    let common = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                    // common is something like /path/to/main-repo/.git
+                    // Get the parent directory name
+                    std::path::Path::new(&common)
+                        .parent()
+                        .and_then(|p| p.file_name())
+                        .map(|n| n.to_string_lossy().to_string())
+                } else {
+                    None
+                }
+            })
+    } else {
+        None
+    };
+
     GitStatus {
         is_git_repo: true,
         branch,
@@ -85,6 +113,7 @@ pub fn status(path: &str) -> GitStatus {
         untracked,
         ahead,
         behind,
+        worktree_parent,
     }
 }
 

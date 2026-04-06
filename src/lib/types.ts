@@ -71,8 +71,6 @@ export interface TerminalTab {
   commandName: string | null; // null = blank shell or assistant
   assistantId: string | null; // null = not an assistant tab
   sessionMode: SessionMode | null; // null = not an assistant tab
-  worktreePath: string | null; // set for YOLO worktree sessions
-  branch: string | null; // git branch at launch (refreshable)
 }
 
 // ── Tab activity tracking ────────────────────────────────────────────
@@ -111,6 +109,7 @@ export interface GitStatus {
   untracked: number;
   ahead: number;
   behind: number;
+  worktree_parent: string | null;
 }
 
 // ── Git worktree ─────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { useShallow } from "zustand/shallow";
-import { GitBranch, GitFork, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined, Radio } from "lucide-react";
+import { GitBranch, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined, Radio } from "lucide-react";
 import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
@@ -236,9 +236,6 @@ export default function TabBar({
               {logoUrl ? (
                 <img src={logoUrl} alt="" width={12} height={12} />
               ) : null}
-              {tab.worktreePath && (
-                <GitFork size={11} style={{ opacity: 0.5, flexShrink: 0 }} />
-              )}
               {editingTabId === tab.id ? (
                 <input
                   className="tab-rename-input"
@@ -274,9 +271,6 @@ export default function TabBar({
                   >
                     {tab.label}
                   </span>
-                  {tab.worktreePath && tab.branch && (
-                    <span className="tab-branch-label">{tab.branch}</span>
-                  )}
                 </>
               )}
               <button

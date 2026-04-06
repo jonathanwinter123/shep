@@ -1,22 +1,9 @@
 import { create } from "zustand";
 import type { TerminalTab, TabActivity } from "../lib/types";
 
-export interface WorkspaceState {
-  label: string;
-  path: string;
-  tabs: TerminalTab[];
-  activeTabId: string | null;
-}
-
 interface ProjectTerminalState {
-  /** Active workspace's tabs — for backward-compatible access */
   tabs: TerminalTab[];
-  /** Active workspace's active tab — for backward-compatible access */
   activeTabId: string | null;
-  /** All workspaces keyed by ID ("main", branch names, etc.) */
-  workspaces: Record<string, WorkspaceState>;
-  /** Currently active workspace */
-  activeWorkspaceId: string;
 }
 
 interface TerminalStore {
@@ -38,34 +25,11 @@ interface TerminalStore {
   setTabBell: (ptyId: number) => void;
   clearTabBell: (ptyId: number) => void;
   removeActivity: (ptyId: number) => void;
-  getActiveWorkspacePath: () => string | null;
   getAllProjectTabs: (repoPath: string) => TerminalTab[];
 }
 
-function emptyWorkspace(label: string, path: string): WorkspaceState {
-  return { label, path, tabs: [], activeTabId: null };
-}
-
-function emptyState(repoPath: string): ProjectTerminalState {
-  const main = emptyWorkspace("main", repoPath);
-  return {
-    tabs: main.tabs,
-    activeTabId: main.activeTabId,
-    workspaces: { main },
-    activeWorkspaceId: "main",
-  };
-}
-
-/** Sync the top-level tabs/activeTabId from the active workspace */
-function syncFromWorkspace(ps: ProjectTerminalState): ProjectTerminalState {
-  const ws = ps.workspaces[ps.activeWorkspaceId];
-  if (!ws) return ps;
-  return { ...ps, tabs: ws.tabs, activeTabId: ws.activeTabId };
-}
-
-function getActiveState(state: TerminalStore): ProjectTerminalState {
-  if (!state.activeProjectPath) return emptyState("");
-  return state.projectState[state.activeProjectPath] ?? emptyState(state.activeProjectPath);
+function emptyState(): ProjectTerminalState {
+  return { tabs: [], activeTabId: null };
 }
 
 let tabCounter = 0;
@@ -84,7 +48,7 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
         return { activeProjectPath: repoPath };
       }
       return {
-        projectState: { ...state.projectState, [repoPath]: emptyState(repoPath) },
+        projectState: { ...state.projectState, [repoPath]: emptyState() },
         activeProjectPath: repoPath,
       };
     });
@@ -94,14 +58,13 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     set((state) => {
       const projectState = { ...state.projectState };
       const project = projectState[repoPath];
-      const allTabs = project
-        ? Object.values(project.workspaces).flatMap((ws) => ws.tabs)
-        : [];
       delete projectState[repoPath];
 
       const tabActivity = { ...state.tabActivity };
-      for (const tab of allTabs) {
-        delete tabActivity[tab.ptyId];
+      if (project) {
+        for (const tab of project.tabs) {
+          delete tabActivity[tab.ptyId];
+        }
       }
 
       return {
@@ -118,22 +81,14 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     set((state) => {
       const path = state.activeProjectPath;
       if (!path) return state;
-      const ps = state.projectState[path] ?? emptyState(path);
-      const wsId = ps.activeWorkspaceId;
-      const ws = ps.workspaces[wsId] ?? emptyWorkspace("main", path);
-      const updatedWs: WorkspaceState = {
-        ...ws,
-        tabs: [...ws.tabs, tab],
-        activeTabId: tab.id,
-      };
-      const updated: ProjectTerminalState = {
-        ...ps,
-        workspaces: { ...ps.workspaces, [wsId]: updatedWs },
-      };
+      const ps = state.projectState[path] ?? emptyState();
       return {
         projectState: {
           ...state.projectState,
-          [path]: syncFromWorkspace(updated),
+          [path]: {
+            tabs: [...ps.tabs, tab],
+            activeTabId: tab.id,
+          },
         },
       };
     });
@@ -143,26 +98,17 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     set((state) => {
       const path = state.activeProjectPath;
       if (!path) return state;
-      const ps = state.projectState[path] ?? emptyState(path);
-      const wsId = ps.activeWorkspaceId;
-      const ws = ps.workspaces[wsId];
-      if (!ws) return state;
-      const tabs = ws.tabs.filter((t) => t.id !== id);
+      const ps = state.projectState[path];
+      if (!ps) return state;
+      const tabs = ps.tabs.filter((t) => t.id !== id);
       const activeTabId =
-        ws.activeTabId === id
-          ? tabs.length > 0
-            ? tabs[tabs.length - 1].id
-            : null
-          : ws.activeTabId;
-      const updatedWs: WorkspaceState = { ...ws, tabs, activeTabId };
-      const updated: ProjectTerminalState = {
-        ...ps,
-        workspaces: { ...ps.workspaces, [wsId]: updatedWs },
-      };
+        ps.activeTabId === id
+          ? tabs.length > 0 ? tabs[tabs.length - 1].id : null
+          : ps.activeTabId;
       return {
         projectState: {
           ...state.projectState,
-          [path]: syncFromWorkspace(updated),
+          [path]: { tabs, activeTabId },
         },
       };
     });
@@ -172,30 +118,12 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     set((state) => {
       const path = state.activeProjectPath;
       if (!path) return state;
-      const ps = state.projectState[path] ?? emptyState(path);
-
-      // Search all workspaces for the tab — auto-switch if needed
-      let targetWsId = ps.activeWorkspaceId;
-      const activeWs = ps.workspaces[targetWsId];
-      if (!activeWs || !activeWs.tabs.some((t) => t.id === id)) {
-        const found = Object.entries(ps.workspaces).find(([, ws]) =>
-          ws.tabs.some((t) => t.id === id),
-        );
-        if (!found) return state;
-        targetWsId = found[0];
-      }
-
-      const ws = ps.workspaces[targetWsId];
-      const updatedWs: WorkspaceState = { ...ws, activeTabId: id };
-      const updated: ProjectTerminalState = {
-        ...ps,
-        activeWorkspaceId: targetWsId,
-        workspaces: { ...ps.workspaces, [targetWsId]: updatedWs },
-      };
+      const ps = state.projectState[path];
+      if (!ps || !ps.tabs.some((t) => t.id === id)) return state;
       return {
         projectState: {
           ...state.projectState,
-          [path]: syncFromWorkspace(updated),
+          [path]: { ...ps, activeTabId: id },
         },
       };
     });
@@ -205,22 +133,15 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     set((state) => {
       const path = state.activeProjectPath;
       if (!path) return state;
-      const ps = state.projectState[path] ?? emptyState(path);
-      const wsId = ps.activeWorkspaceId;
-      const ws = ps.workspaces[wsId];
-      if (!ws) return state;
-      const tabs = ws.tabs.map((t) =>
-        t.id === id ? { ...t, ...patch } : t,
-      );
-      const updatedWs: WorkspaceState = { ...ws, tabs };
-      const updated: ProjectTerminalState = {
-        ...ps,
-        workspaces: { ...ps.workspaces, [wsId]: updatedWs },
-      };
+      const ps = state.projectState[path];
+      if (!ps) return state;
       return {
         projectState: {
           ...state.projectState,
-          [path]: syncFromWorkspace(updated),
+          [path]: {
+            ...ps,
+            tabs: ps.tabs.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+          },
         },
       };
     });
@@ -230,42 +151,39 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     set((state) => {
       const path = state.activeProjectPath;
       if (!path) return state;
-      const ps = state.projectState[path] ?? emptyState(path);
-      const wsId = ps.activeWorkspaceId;
-      const ws = ps.workspaces[wsId];
-      if (!ws) return state;
-      const fromIndex = ws.tabs.findIndex((t) => t.id === tabId);
+      const ps = state.projectState[path];
+      if (!ps) return state;
+      const fromIndex = ps.tabs.findIndex((t) => t.id === tabId);
       if (fromIndex === -1) return state;
 
-      const boundedIndex = Math.max(0, Math.min(toIndex, ws.tabs.length));
+      const boundedIndex = Math.max(0, Math.min(toIndex, ps.tabs.length));
       const targetIndex = boundedIndex > fromIndex ? boundedIndex - 1 : boundedIndex;
       if (fromIndex === targetIndex) return state;
 
-      const tabs = [...ws.tabs];
+      const tabs = [...ps.tabs];
       const [moved] = tabs.splice(fromIndex, 1);
       tabs.splice(targetIndex, 0, moved);
-      const updatedWs: WorkspaceState = { ...ws, tabs };
-      const updated: ProjectTerminalState = {
-        ...ps,
-        workspaces: { ...ps.workspaces, [wsId]: updatedWs },
-      };
       return {
         projectState: {
           ...state.projectState,
-          [path]: syncFromWorkspace(updated),
+          [path]: { ...ps, tabs },
         },
       };
     });
   },
 
   findTabByCommand: (commandName: string) => {
-    const active = getActiveState(get());
-    return active.tabs.find((t) => t.commandName === commandName);
+    const state = get();
+    if (!state.activeProjectPath) return undefined;
+    const ps = state.projectState[state.activeProjectPath];
+    return ps?.tabs.find((t) => t.commandName === commandName);
   },
 
   findTabByPtyId: (ptyId: number) => {
-    const active = getActiveState(get());
-    return active.tabs.find((t) => t.ptyId === ptyId);
+    const state = get();
+    if (!state.activeProjectPath) return undefined;
+    const ps = state.projectState[state.activeProjectPath];
+    return ps?.tabs.find((t) => t.ptyId === ptyId);
   },
 
   initActivity: (ptyId: number) => {
@@ -316,20 +234,8 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     });
   },
 
-  getActiveWorkspacePath: () => {
-    const state = get();
-    if (!state.activeProjectPath) return null;
-    const ps = state.projectState[state.activeProjectPath];
-    if (!ps) return null;
-    // Derive from active tab's worktreePath, falling back to repo path
-    const ws = ps.workspaces[ps.activeWorkspaceId];
-    const activeTab = ws?.tabs.find((t) => t.id === ws.activeTabId);
-    return activeTab?.worktreePath ?? state.activeProjectPath;
-  },
-
   getAllProjectTabs: (repoPath: string) => {
     const ps = get().projectState[repoPath];
-    if (!ps) return [];
-    return Object.values(ps.workspaces).flatMap((ws) => ws.tabs);
+    return ps?.tabs ?? [];
   },
 }));

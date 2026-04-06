@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { spawnPty, killPty, gitCurrentBranch, getDefaultShell } from "../lib/tauri";
+import { spawnPty, killPty, getDefaultShell } from "../lib/tauri";
 import type { PtyOutput, CommandConfig, SessionMode } from "../lib/types";
 import { useCommandStore } from "../stores/useCommandStore";
 import { useTerminalStore, nextTabId } from "../stores/useTerminalStore";
@@ -193,8 +193,7 @@ export function usePty() {
       if (!activeRepoPath) return;
       const commandName = command.name;
 
-      // Use the active workspace path as base
-      const basePath = useTerminalStore.getState().getActiveWorkspacePath() ?? activeRepoPath;
+      const basePath = activeRepoPath;
 
       try {
         const ptyId = await spawnSession(
@@ -223,8 +222,6 @@ export function usePty() {
             commandName,
             assistantId: null,
             sessionMode: null,
-            worktreePath: null,
-            branch: null,
           });
         }
 
@@ -292,7 +289,6 @@ export function usePty() {
       if (!activeRepoPath) return;
 
       try {
-        const workspacePath = useTerminalStore.getState().getActiveWorkspacePath() ?? activeRepoPath;
         const shell = await getDefaultShell();
         const ptyId = await spawnSession(
           `${shell} -l`,
@@ -300,7 +296,7 @@ export function usePty() {
           cols,
           rows,
           null,
-          workspacePath,
+          activeRepoPath,
         );
         if (!ptyId) return;
 
@@ -313,8 +309,6 @@ export function usePty() {
           commandName: null,
           assistantId: null,
           sessionMode: null,
-          worktreePath: null,
-          branch: null,
         });
 
         return ptyId;
@@ -339,7 +333,6 @@ export function usePty() {
       cols: number,
       rows: number,
       mode: SessionMode = "standard",
-      worktreePath: string | null = null,
     ) => {
       if (!activeRepoPath) return;
       const assistant = CODING_ASSISTANTS.find((a) => a.id === assistantId);
@@ -359,19 +352,14 @@ export function usePty() {
         command = `mkdir -p ${tuiDir} && [ ! -f ${tuiFile} ] && echo '{"$schema":"https://opencode.ai/tui.json","theme":"system"}' > ${tuiFile}; ${command}`;
       }
 
-      const cwd = worktreePath ?? activeRepoPath;
-
       try {
-        // Fetch current branch for display
-        const branch = await gitCurrentBranch(cwd).catch(() => null);
-
         const ptyId = await spawnSession(
           command,
           {},
           cols,
           rows,
           null,
-          cwd,
+          activeRepoPath,
         );
         if (!ptyId) return;
 
@@ -384,8 +372,6 @@ export function usePty() {
           commandName: null,
           assistantId,
           sessionMode: mode,
-          worktreePath,
-          branch,
         });
 
         return ptyId;

@@ -3,17 +3,14 @@ import type { CodingAssistant, SessionMode } from "../../lib/types";
 import { CODING_ASSISTANTS } from "../sidebar/constants";
 import { checkCommandExists } from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
-import { useGitStore } from "../../stores/useGitStore";
 import { HandMetal } from "lucide-react";
 import { assistantLogoSrc } from "../../lib/assistantLogos";
 import { ASSISTANT_INSTALL_URLS } from "../sidebar/constants";
-import BranchDropdown from "../git/BranchDropdown";
 
 interface SessionLauncherProps {
   onStartSession: (
     assistantId: string,
     mode: SessionMode,
-    worktreePath: string | null,
   ) => Promise<boolean>;
 }
 
@@ -25,8 +22,6 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   const [installPopover, setInstallPopover] = useState<string | null>(null);
   const [mode, setMode] = useState<SessionMode>("standard");
   const [launching, setLaunching] = useState(false);
-  const [selectedWorktreePath, setSelectedWorktreePath] = useState<string | null>(null);
-  const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
 
   // Check which assistants are installed
   useEffect(() => {
@@ -54,29 +49,11 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
     };
   }, [installPopover]);
 
-  // Git state
-  const gitStatus = useGitStore(
-    (s) => activeRepoPath ? s.projectGitStatus[activeRepoPath] ?? null : null,
-  );
-  const isGit = gitStatus?.is_git_repo ?? false;
-  const currentBranch = gitStatus?.branch ?? "";
-
-  const handleBranchChanged = () => {
-    // Branch was switched via the dropdown — clear worktree selection
-    setSelectedWorktreePath(null);
-    setSelectedBranch(null);
-  };
-
-  const handleSelectWorktree = (branch: string, worktreePath: string) => {
-    setSelectedWorktreePath(worktreePath);
-    setSelectedBranch(branch);
-  };
-
   const handleStart = async () => {
     if (!selectedAssistant || !activeRepoPath || launching) return;
     setLaunching(true);
 
-    const started = await onStartSession(selectedAssistant.id, mode, selectedWorktreePath);
+    const started = await onStartSession(selectedAssistant.id, mode);
     if (!started) {
       setLaunching(false);
     }
@@ -143,21 +120,6 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
           })}
         </div>
       </div>
-
-      {/* Branch picker */}
-      {selectedAssistant && isGit && activeRepoPath && (
-        <div className="mb-6">
-          <label className="section-label !p-0 mb-3 block text-xs opacity-50">Branch</label>
-          <BranchDropdown
-            repoPath={activeRepoPath}
-            currentBranch={selectedBranch ?? currentBranch}
-            isWorktree={false}
-            onBranchChanged={handleBranchChanged}
-            allowWorktreeSelect
-            onSelectWorktree={handleSelectWorktree}
-          />
-        </div>
-      )}
 
       {/* Mode picker */}
       {selectedAssistant && (

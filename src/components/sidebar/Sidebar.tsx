@@ -57,9 +57,7 @@ export default function Sidebar({
     const activity: Record<string, { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean }> = {};
     for (const repo of repos) {
       const ps = projectState[repo.path];
-      const repoTabs = ps
-        ? Object.values(ps.workspaces).flatMap((ws) => ws.tabs)
-        : [];
+      const repoTabs = ps?.tabs ?? [];
       const cmds = projectCommands[repo.path] ?? [];
       let hasAttention = false;
       let hasCrash = false;

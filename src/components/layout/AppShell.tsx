@@ -98,9 +98,7 @@ export default function AppShell() {
   const allTabs = useMemo(() => {
     const all: TerminalTab[] = [];
     for (const ps of Object.values(projectState)) {
-      for (const ws of Object.values(ps.workspaces)) {
-        all.push(...ws.tabs);
-      }
+      all.push(...ps.tabs);
     }
 
     // Keep terminal DOM order stable even when the visible tab order changes.
@@ -317,9 +315,9 @@ export default function AppShell() {
   }, []);
 
   const handleStartSession = useCallback(
-    async (assistantId: string, mode: SessionMode, worktreePath: string | null) => {
+    async (assistantId: string, mode: SessionMode) => {
       const { cols, rows } = getTerminalDimensions();
-      const ptyId = await launchAssistant(assistantId, cols, rows, mode, worktreePath);
+      const ptyId = await launchAssistant(assistantId, cols, rows, mode);
       if (ptyId) {
         // Close the launcher tab and deactivate all overlays so the new
         // terminal tab is immediately visible. closeLauncher() alone would

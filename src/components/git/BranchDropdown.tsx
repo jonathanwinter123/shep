@@ -8,10 +8,6 @@ interface BranchDropdownProps {
   currentBranch: string;
   isWorktree: boolean;
   onBranchChanged: () => void;
-  /** When true, selecting a worktree branch calls onSelectWorktree instead of blocking */
-  allowWorktreeSelect?: boolean;
-  /** Called when a worktree branch is selected (only when allowWorktreeSelect is true) */
-  onSelectWorktree?: (branch: string, worktreePath: string) => void;
 }
 
 export default function BranchDropdown({
@@ -19,8 +15,6 @@ export default function BranchDropdown({
   currentBranch,
   isWorktree,
   onBranchChanged,
-  allowWorktreeSelect,
-  onSelectWorktree,
 }: BranchDropdownProps) {
   const refreshStatus = useGitStore((s) => s.refreshStatus);
   const [open, setOpen] = useState(false);
@@ -76,26 +70,12 @@ export default function BranchDropdown({
         onBranchChanged();
         setOpen(false);
       } catch (e) {
-        const msg = String(e);
-        // If switch failed because the branch is in a worktree, and we allow
-        // worktree selection, look up the path and select it automatically
-        if (allowWorktreeSelect && onSelectWorktree && msg.includes("already used by worktree")) {
-          try {
-            const wts = await gitListWorktrees(repoPath);
-            const wt = wts.find((w) => w.branch === branch);
-            if (wt) {
-              onSelectWorktree(branch, wt.path);
-              setOpen(false);
-              return;
-            }
-          } catch { /* fall through to show original error */ }
-        }
-        setError(msg);
+        setError(String(e));
       } finally {
         setSwitching(false);
       }
     },
-    [repoPath, currentBranch, refreshStatus, onBranchChanged, allowWorktreeSelect, onSelectWorktree],
+    [repoPath, currentBranch, refreshStatus, onBranchChanged],
   );
 
   const handleCreate = useCallback(async () => {
@@ -119,17 +99,11 @@ export default function BranchDropdown({
 
   const handleClick = useCallback(
     (branch: string) => {
-      const worktreePath = worktreeMap?.get(branch);
-      if (worktreePath) {
-        if (allowWorktreeSelect && onSelectWorktree) {
-          onSelectWorktree(branch, worktreePath);
-          setOpen(false);
-        }
-        return; // In git-switch mode, can't switch to a branch checked out in a worktree
-      }
+      // Can't switch to a branch checked out in a worktree
+      if (worktreeMap.has(branch)) return;
       handleSwitch(branch);
     },
-    [worktreeMap, handleSwitch, allowWorktreeSelect, onSelectWorktree],
+    [worktreeMap, handleSwitch],
   );
 
   // Worktree sessions: branch is locked, show read-only

@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import type { TerminalTab, TabActivity } from "../../lib/types";
-import { Terminal, GitFork, X } from "lucide-react";
+import { Terminal, X } from "lucide-react";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { handleActionKey } from "../../lib/a11y";
 import ContextMenu from "../shared/ContextMenu";
@@ -55,17 +55,8 @@ export default function TerminalItem({
         aria-pressed={isActive}
         aria-label={`Open terminal tab ${tab.label}`}
       >
-        {tab.worktreePath ? (
-          <GitFork size={14} className="shrink-0" style={{ opacity: 0.6 }} />
-        ) : (
-          <Terminal size={14} className="shrink-0" />
-        )}
+        <Terminal size={14} className="shrink-0" />
         <span className="min-w-0 truncate text-left">{tab.label}</span>
-        {tab.worktreePath && tab.branch && (
-          <span className="inline-flex items-center gap-0.5 shrink-0 text-[10px] opacity-50" title={`Worktree: ${tab.branch}`}>
-            <span className="max-w-[60px] truncate">{tab.branch}</span>
-          </span>
-        )}
         <span className={`sidebar-status-dot ${dotClass(activity)}`} />
       </div>
       {menu && (

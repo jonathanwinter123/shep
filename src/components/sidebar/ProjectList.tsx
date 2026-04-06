@@ -3,6 +3,7 @@ import type { RepoInfo, CommandState } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Sparkles, SquareTerminal } from "lucide-react";
 import { useTerminalStore } from "../../stores/useTerminalStore";
+import { useGitStore } from "../../stores/useGitStore";
 import ProjectItem from "./ProjectItem";
 import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
@@ -78,28 +79,31 @@ export default function ProjectList({
     }
   };
 
-  // Get the workspaces record (stable ref) and derive flat tab lists
-  const workspaces = useTerminalStore(
-    (s) => activeRepoPath ? s.projectState[activeRepoPath]?.workspaces ?? null : null,
+  // Get tabs for the active project (stable ref from store)
+  const projectTabs = useTerminalStore(
+    (s) => activeRepoPath ? s.projectState[activeRepoPath]?.tabs ?? null : null,
   );
 
   const assistantTabs = useMemo(() => {
-    if (!workspaces) return [];
-    return Object.values(workspaces).flatMap((ws) => ws.tabs).filter((t) => t.assistantId !== null);
-  }, [workspaces]);
+    if (!projectTabs) return [];
+    return projectTabs.filter((t) => t.assistantId !== null);
+  }, [projectTabs]);
 
   const shellTabs = useMemo(() => {
-    if (!workspaces) return [];
-    return Object.values(workspaces).flatMap((ws) => ws.tabs).filter((t) => !t.assistantId);
-  }, [workspaces]);
+    if (!projectTabs) return [];
+    return projectTabs.filter((t) => !t.assistantId);
+  }, [projectTabs]);
 
   const commandsBadge = String(commands.length);
+  const gitStatuses = useGitStore((s) => s.projectGitStatus);
+  const existingPaths = useMemo(() => new Set(repos.map((r) => r.path)), [repos]);
 
   return (
     <div className="flex flex-col gap-0.5 px-2 pb-2">
       {[...repos].sort((a, b) => a.name.localeCompare(b.name)).map((repo) => {
         const isActive = repo.path === activeRepoPath;
         const isExpanded = isActive && expandedPaths.has(repo.path);
+        const worktreeParent = gitStatuses[repo.path]?.worktree_parent ?? null;
         return (
           <div key={repo.path}>
             <ProjectItem
@@ -107,9 +111,12 @@ export default function ProjectList({
               isActive={isActive}
               isExpanded={isExpanded}
               activity={projectActivity[repo.path]}
+              worktreeParent={worktreeParent}
+              existingPaths={existingPaths}
               onOpenInEditor={() => onOpenInEditor(repo.path)}
               onRemove={() => onRemoveProject(repo.path)}
               onClick={() => handleProjectClick(repo.path)}
+              onAddProject={onAddProject}
             />
             {isExpanded && (
               <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">

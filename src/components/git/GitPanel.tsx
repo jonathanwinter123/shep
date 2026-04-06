@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { GitBranch, GitFork, Upload } from "lucide-react";
+import { GitBranch, Upload } from "lucide-react";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import {
@@ -18,25 +18,8 @@ export default function GitPanel() {
   const refreshStatus = useGitStore((s) => s.refreshStatus);
   const pushNotice = useNoticeStore((s) => s.pushNotice);
 
-  // Derive worktree context from the active tab
-  const activeTab = useTerminalStore((s) => {
-    const path = s.activeProjectPath;
-    if (!path) return null;
-    const ps = s.projectState[path];
-    if (!ps) return null;
-    const ws = ps.workspaces[ps.activeWorkspaceId];
-    if (!ws) return null;
-    return ws.tabs.find((t) => t.id === ws.activeTabId) ?? null;
-  });
-
-  const worktreeBranch = activeTab?.worktreePath ? activeTab.branch : null;
-  const effectivePath = activeTab?.worktreePath ?? activeProjectPath;
-
-  const mainGitStatus = useGitStore(
-    (s) => activeProjectPath ? s.projectGitStatus[activeProjectPath] ?? null : null,
-  );
   const gitStatus = useGitStore(
-    (s) => effectivePath ? s.projectGitStatus[effectivePath] ?? null : null,
+    (s) => activeProjectPath ? s.projectGitStatus[activeProjectPath] ?? null : null,
   );
 
   const [files, setFiles] = useState<ChangedFile[]>([]);
@@ -46,108 +29,104 @@ export default function GitPanel() {
   const [commitMsg, setCommitMsg] = useState("");
   const [committing, setCommitting] = useState(false);
   const [pushing, setPushing] = useState(false);
-  const canLoadGitFiles = !!effectivePath && !!mainGitStatus?.is_git_repo;
+  const canLoadGitFiles = !!activeProjectPath && !!gitStatus?.is_git_repo;
+  const currentBranch = gitStatus?.branch ?? "";
 
   const fetchFiles = useCallback(async () => {
-    if (!canLoadGitFiles || !effectivePath) {
+    if (!canLoadGitFiles || !activeProjectPath) {
       setFiles([]);
       return;
     }
     try {
-      const result = await gitChangedFiles(effectivePath);
+      const result = await gitChangedFiles(activeProjectPath);
       setFiles(result);
     } catch (error) {
       setFiles([]);
       pushNotice({ tone: "error", title: "Couldn't load changed files", message: getErrorMessage(error) });
     }
-  }, [canLoadGitFiles, effectivePath, pushNotice]);
+  }, [canLoadGitFiles, activeProjectPath, pushNotice]);
 
   const statusKey = gitStatus
     ? `${gitStatus.staged}:${gitStatus.unstaged}:${gitStatus.untracked}`
     : "";
   useEffect(() => { fetchFiles(); }, [fetchFiles, statusKey]);
 
-  useEffect(() => {
-    setSelectedPath(null);
-    setSelectedArea(null);
-    setDiffContent("");
-  }, [worktreeBranch]);
 
   const refreshAfterChange = useCallback(async () => {
-    if (!effectivePath) return;
+    if (!activeProjectPath) return;
     await fetchFiles();
-    await refreshStatus(effectivePath);
-  }, [effectivePath, fetchFiles, refreshStatus]);
+    await refreshStatus(activeProjectPath);
+  }, [activeProjectPath, fetchFiles, refreshStatus]);
 
   const handleSelect = useCallback(
     async (file: ChangedFile) => {
-      if (!effectivePath) return;
+      if (!activeProjectPath) return;
       setSelectedPath(file.path);
       setSelectedArea(file.area);
       try {
-        const diff = await gitFileDiff(effectivePath, file.path, file.area === "staged");
+        const diff = await gitFileDiff(activeProjectPath, file.path, file.area === "staged");
         setDiffContent(diff);
       } catch (error) {
         setDiffContent("");
         pushNotice({ tone: "error", title: "Couldn't load diff", message: getErrorMessage(error) });
       }
     },
-    [effectivePath, pushNotice],
+    [activeProjectPath, pushNotice],
   );
 
   const handleStage = useCallback(
     async (file: ChangedFile) => {
-      if (!effectivePath) return;
+      if (!activeProjectPath) return;
       try {
-        await gitStageFile(effectivePath, file.path);
+        await gitStageFile(activeProjectPath, file.path);
         await refreshAfterChange();
       } catch (error) {
         pushNotice({ tone: "error", title: `Couldn't stage ${file.path}`, message: getErrorMessage(error) });
       }
     },
-    [effectivePath, refreshAfterChange, pushNotice],
+    [activeProjectPath, refreshAfterChange, pushNotice],
   );
 
   const handleUnstage = useCallback(
     async (file: ChangedFile) => {
-      if (!effectivePath) return;
+      if (!activeProjectPath) return;
       try {
-        await gitUnstageFile(effectivePath, file.path);
+        await gitUnstageFile(activeProjectPath, file.path);
         await refreshAfterChange();
       } catch (error) {
         pushNotice({ tone: "error", title: `Couldn't unstage ${file.path}`, message: getErrorMessage(error) });
       }
     },
-    [effectivePath, refreshAfterChange, pushNotice],
+    [activeProjectPath, refreshAfterChange, pushNotice],
   );
 
   const handleStageAll = useCallback(async () => {
-    if (!effectivePath) return;
+    if (!activeProjectPath) return;
     try {
-      await gitStageAll(effectivePath);
+      await gitStageAll(activeProjectPath);
       await refreshAfterChange();
     } catch (error) {
       pushNotice({ tone: "error", title: "Couldn't stage all", message: getErrorMessage(error) });
     }
-  }, [effectivePath, refreshAfterChange, pushNotice]);
+  }, [activeProjectPath, refreshAfterChange, pushNotice]);
 
   const handleUnstageAll = useCallback(async () => {
-    if (!effectivePath) return;
+    if (!activeProjectPath) return;
     // Unstage each staged file
     const staged = files.filter((f) => f.area === "staged");
     try {
-      for (const f of staged) await gitUnstageFile(effectivePath, f.path);
+      for (const f of staged) await gitUnstageFile(activeProjectPath, f.path);
       await refreshAfterChange();
     } catch (error) {
       pushNotice({ tone: "error", title: "Couldn't unstage all", message: getErrorMessage(error) });
     }
-  }, [effectivePath, files, refreshAfterChange, pushNotice]);
+  }, [activeProjectPath, files, refreshAfterChange, pushNotice]);
 
   const handleCommit = useCallback(async () => {
-    if (!effectivePath || !commitMsg.trim() || committing) return;
+    if (!activeProjectPath || !commitMsg.trim() || committing) return;
     setCommitting(true);
     try {
-      await gitCommit(effectivePath, commitMsg.trim());
+      await gitCommit(activeProjectPath, commitMsg.trim());
       setCommitMsg("");
       setSelectedPath(null);
       setSelectedArea(null);
@@ -158,22 +137,21 @@ export default function GitPanel() {
     } finally {
       setCommitting(false);
     }
-  }, [effectivePath, commitMsg, committing, refreshAfterChange, pushNotice]);
+  }, [activeProjectPath, commitMsg, committing, refreshAfterChange, pushNotice]);
 
-  const currentBranch = worktreeBranch ?? mainGitStatus?.branch ?? "";
   const handlePush = useCallback(async () => {
-    if (!effectivePath || !currentBranch || pushing) return;
+    if (!activeProjectPath || !currentBranch || pushing) return;
     setPushing(true);
     try {
-      await gitPushBranch(effectivePath, currentBranch);
-      await refreshStatus(effectivePath);
+      await gitPushBranch(activeProjectPath, currentBranch);
+      await refreshStatus(activeProjectPath);
       pushNotice({ tone: "success", title: "Pushed", message: `${currentBranch} → origin` });
     } catch (error) {
       pushNotice({ tone: "error", title: "Push failed", message: getErrorMessage(error) });
     } finally {
       setPushing(false);
     }
-  }, [effectivePath, currentBranch, pushing, refreshStatus, pushNotice]);
+  }, [activeProjectPath, currentBranch, pushing, refreshStatus, pushNotice]);
 
   const handleBranchChanged = useCallback(() => {
     fetchFiles();
@@ -190,7 +168,7 @@ export default function GitPanel() {
     );
   }
 
-  if (!mainGitStatus?.is_git_repo) {
+  if (!gitStatus?.is_git_repo) {
     return (
       <div className="absolute inset-0 flex items-center justify-center opacity-50">
         Not a git repository
@@ -198,7 +176,7 @@ export default function GitPanel() {
     );
   }
 
-  const activeStatus = gitStatus ?? mainGitStatus;
+  const activeStatus = gitStatus;
   const stagedCount = files.filter((f) => f.area === "staged").length;
   const canCommit = stagedCount > 0 && commitMsg.trim().length > 0 && !committing;
   const showPush = activeStatus.ahead > 0;
@@ -206,22 +184,13 @@ export default function GitPanel() {
   return (
     <div className="git-panel">
       <div className="git-panel__header">
-        {worktreeBranch ? (
-          <>
-            <GitFork size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
-            <span className="git-panel__worktree-label">{worktreeBranch}</span>
-          </>
-        ) : (
-          <>
-            <GitBranch size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
-            <BranchDropdown
-              repoPath={activeProjectPath}
-              currentBranch={mainGitStatus.branch}
-              isWorktree={false}
-              onBranchChanged={handleBranchChanged}
-            />
-          </>
-        )}
+        <GitBranch size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
+        <BranchDropdown
+          repoPath={activeProjectPath}
+          currentBranch={gitStatus.branch}
+          isWorktree={false}
+          onBranchChanged={handleBranchChanged}
+        />
         <span
           style={{
             width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
@@ -240,9 +209,9 @@ export default function GitPanel() {
             {pushing ? "Pushing…" : `Push ↑${activeStatus.ahead}`}
           </button>
         )}
-        {!worktreeBranch && !showPush && (mainGitStatus.behind > 0) && (
+        {!showPush && (gitStatus.behind > 0) && (
           <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 4, flexShrink: 0 }}>
-            ↓{mainGitStatus.behind}
+            ↓{gitStatus.behind}
           </span>
         )}
       </div>
