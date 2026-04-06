@@ -117,7 +117,7 @@ export default function SettingsPanel() {
   return (
     <div className="absolute inset-0 overflow-y-auto p-6">
       {/* ── Theme ──────────────────────────────────────────── */}
-      <h2 className="section-label !p-0 mb-4">Theme</h2>
+      <h2 className="section-label !p-0 mb-4">Dark</h2>
 
       <div className="flex flex-wrap gap-3">
         {DARK_THEMES.map((t) => {

@@ -218,7 +218,7 @@ select {
   padding: 4px;
   border-radius: var(--radius-md);
   background: var(--surface-raised);
-  border: 1px solid color-mix(in srgb, var(--overlay) 10%, transparent);
+  border: 1px solid var(--border-hover);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
@@ -322,7 +322,7 @@ select {
 /* Settings layout helpers */
 .settings-divider {
   border: none;
-  border-top: 1px solid color-mix(in srgb, var(--overlay) 6%, transparent);
+  border-top: 1px solid var(--glass-border);
   margin: 24px 0;
 }
 .settings-row {
@@ -426,7 +426,7 @@ select {
   font-family: inherit;
   line-height: 1;
   background: color-mix(in srgb, var(--overlay) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--overlay) 10%, transparent);
+  border: 1px solid var(--border-hover);
   color: var(--text-secondary);
 }
 
@@ -448,7 +448,7 @@ select {
   line-height: 1.4;
   color: var(--text-primary);
   background: var(--glass-panel-strong);
-  border: 1px solid color-mix(in srgb, var(--overlay) 10%, transparent);
+  border: 1px solid var(--border-hover);
   white-space: nowrap;
   pointer-events: none;
   z-index: 50;
@@ -506,7 +506,7 @@ select {
   gap: 10px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
-  border: 1px solid color-mix(in srgb, var(--overlay) 12%, transparent);
+  border: 1px solid var(--border-active);
   background: color-mix(in srgb, var(--surface-raised), transparent 10%);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(18px);
@@ -706,7 +706,7 @@ select {
   padding: 8px;
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--overlay) 3%, transparent);
-  border: 1px solid color-mix(in srgb, var(--overlay) 6%, transparent);
+  border: 1px solid var(--glass-border);
 }
 
 .command-form__input {
@@ -884,7 +884,7 @@ select {
 /* ── Sidebar usage section ─────────────────────────────── */
 
 .sidebar-usage {
-  border-top: 1px solid color-mix(in srgb, var(--overlay) 8%, transparent);
+  border-top: 1px solid var(--glass-border);
   padding-top: 4px;
   padding-bottom: 8px;
 }
@@ -1082,7 +1082,7 @@ select {
 
 .glass-button:hover {
   background: color-mix(in srgb, var(--overlay) 7%, transparent);
-  border-color: color-mix(in srgb, var(--overlay) 8%, transparent);
+  border-color: var(--border-hover);
 }
 
 .glass-button:active {
@@ -1107,7 +1107,7 @@ select {
 .usage-filter-tabs {
   display: flex;
   gap: 2px;
-  border-bottom: 1px solid color-mix(in srgb, var(--overlay) 6%, transparent);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .usage-filter-tab {
@@ -1214,7 +1214,7 @@ select {
   gap: 4px;
   padding: 10px 14px;
   border-radius: var(--radius-md);
-  border: 1px solid color-mix(in srgb, var(--overlay) 6%, transparent);
+  border: 1px solid var(--glass-border);
   background: color-mix(in srgb, var(--overlay) 2%, transparent);
 }
 
@@ -1663,7 +1663,7 @@ select {
   gap: 12px;
   overflow: hidden;
   padding-bottom: 8px;
-  border-bottom: 1px solid color-mix(in srgb, var(--overlay) 8%, transparent);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 /* ── Git Panel ─────────────────────────────────────────── */
@@ -1813,7 +1813,7 @@ select {
   padding: 6px 10px;
   border-radius: var(--radius-md);
   color: var(--text-secondary);
-  border: 1px solid color-mix(in srgb, var(--overlay) 8%, transparent);
+  border: 1px solid var(--border-hover);
   cursor: pointer;
 }
 
@@ -1840,7 +1840,7 @@ select {
   gap: 12px;
   padding: 10px 12px;
   border-radius: var(--radius-md);
-  border: 1px solid color-mix(in srgb, var(--overlay) 6%, transparent);
+  border: 1px solid var(--glass-border);
   background: color-mix(in srgb, var(--overlay) 2%, transparent);
   transition: background 160ms ease, border-color 160ms ease;
   flex-wrap: nowrap;
@@ -1851,7 +1851,7 @@ select {
 .commands-panel__row:hover,
 .commands-panel__row.is-new {
   background: color-mix(in srgb, var(--overlay) 4%, transparent);
-  border-color: color-mix(in srgb, var(--overlay) 6%, transparent);
+  border-color: var(--glass-border);
 }
 
 .commands-panel__row-line {
