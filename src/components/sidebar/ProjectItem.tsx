@@ -18,7 +18,7 @@ import type { ContextMenuItem } from "../shared/ContextMenu";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
 import { handleActionKey } from "../../lib/a11y";
-import { gitListWorktrees } from "../../lib/tauri";
+import { gitListWorktrees, revealInFinder } from "../../lib/tauri";
 
 interface ProjectItemProps {
   repo: RepoInfo;
@@ -120,11 +120,6 @@ export default function ProjectItem({
   };
 
   const menuItems: ContextMenuItem[] = [
-    ...(!worktreeParent ? [{
-      label: "Discover Worktrees",
-      icon: <Search size={14} />,
-      onClick: handleDiscoverWorktrees,
-    }] : []),
     {
       label: editorActionLabel,
       icon: <SquareArrowOutUpRight size={14} />,
@@ -134,7 +129,14 @@ export default function ProjectItem({
       label: "Open in Finder",
       icon: <FolderOpenIcon size={14} />,
       onClick: () => {
-        import("@tauri-apps/plugin-shell").then((mod) => mod.open(repo.path));
+        revealInFinder(repo.path)
+          .catch((error) => {
+            pushNotice({
+              tone: "error",
+              title: "Couldn't open in Finder",
+              message: getErrorMessage(error),
+            });
+          });
       },
     },
     {
@@ -158,6 +160,11 @@ export default function ProjectItem({
           });
       },
     },
+    ...(!worktreeParent ? [{
+      label: "Discover Worktrees",
+      icon: <Search size={14} />,
+      onClick: handleDiscoverWorktrees,
+    }] : []),
     {
       label: "Remove Project",
       icon: <Trash2 size={14} />,

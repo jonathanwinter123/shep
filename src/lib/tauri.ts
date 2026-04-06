@@ -77,6 +77,10 @@ export function openInEditor(
   });
 }
 
+export function revealInFinder(path: string): Promise<void> {
+  return invoke("reveal_in_finder", { path });
+}
+
 // ── PTY commands ────────────────────────────────────────────────────
 
 export function spawnPty(

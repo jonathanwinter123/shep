@@ -81,6 +81,7 @@ pub fn run() {
             commands::get_terminal_settings,
             commands::save_terminal_settings,
             commands::open_in_editor,
+            commands::reveal_in_finder,
             commands::spawn_pty,
             commands::write_pty,
             commands::resize_pty,

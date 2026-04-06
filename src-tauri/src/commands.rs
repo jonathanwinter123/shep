@@ -119,6 +119,24 @@ pub fn open_in_editor(
     open_path_in_editor(repo_path, &editor_id)
 }
 
+#[tauri::command]
+pub fn reveal_in_finder(path: &str) -> Result<(), String> {
+    if !Path::new(path).exists() {
+        return Err(format!("Path does not exist: {path}"));
+    }
+
+    let status = Command::new("open")
+        .arg(path)
+        .status()
+        .map_err(|e| format!("Failed to open Finder: {e}"))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("Finder exited with status: {status}"))
+    }
+}
+
 // ── PTY commands ────────────────────────────────────────────────────
 
 #[tauri::command]
