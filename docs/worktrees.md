@@ -4,51 +4,44 @@ Git worktrees let you have multiple branches checked out simultaneously in separ
 
 ## How it works
 
-When you create a worktree in Shep:
+Shep does not create worktrees for you right now. Instead:
 
-1. A new branch is created (e.g. `wt/20260404-13aj`)
-2. A separate working directory is set up at `{repo-parent}/.shep-worktrees/{repo-name}/{branch-slug}`
-3. Configured files are copied or symlinked into the worktree
-4. The worktree appears as a workspace in the sidebar
-5. AI assistants and terminals launched there run in the worktree directory
+1. You create a worktree with normal git commands
+2. You add that worktree to Shep, or discover it from the parent repo
+3. Shep treats the worktree as its own project entry
+4. AI assistants, terminals, commands, and git actions run in the worktree directory
 
 The worktree is completely isolated from your main checkout. Commits in the worktree go to the worktree's branch, not your current branch.
 
 ## Creating a worktree
 
-1. Click **AI Assistants** in the sidebar to open the session launcher
-2. Select an assistant
-3. Choose **Worktree** (or **YOLO**) mode
-4. Optionally edit the branch name
-5. Click **Start Session**
+Create worktrees with git in your terminal, for example:
 
-### Branch naming
+```bash
+git worktree add ../my-repo-feature feature/my-change
+```
 
-- **Worktree mode**: auto-generates `wt/YYYYMMDD-{id}` (e.g. `wt/20260404-13aj`)
-- **YOLO mode**: auto-generates `yolo/YYYYMMDD-{id}`
-- You can replace the auto-generated name with anything (e.g. `wt/add-auth`)
+You can use any naming and storage convention you want. Shep does not require a special folder layout.
 
-### Standard mode
+## Adding a worktree to Shep
 
-Standard mode launches on your current branch. Optionally check **Create new branch** to branch first.
+You have two options:
+
+1. Use **Add Project** and select the worktree directory directly.
+2. Right-click the main repo in the sidebar and choose **Discover Worktrees** to import worktrees that git already knows about.
 
 ## Working with worktrees
 
 ### Sidebar
 
-When worktrees exist, the sidebar shows workspace rows under your project:
-
-- Your main branch (e.g. `main`) with a branch icon
-- Each worktree with a folder-tree icon
-
-Click a workspace row to switch to it. The active workspace expands to show its AI Assistants, Terminals, Commands, and Git sections. Only one workspace is expanded at a time.
+Once added, a worktree appears as its own project row in the sidebar. Shep labels it with the parent repo name so it is easy to distinguish from the main checkout.
 
 ### Git panel
 
-Click **Git** in the sidebar to open the git panel. It automatically scopes to whichever workspace is active:
+Click **Git** in the sidebar to open the git panel for the active repo or worktree:
 
-- **Main workspace**: full branch dropdown (switch, create branches), staging, commit, push
-- **Worktree workspace**: branch name shown read-only (can't switch branches in a worktree), staging, commit, push
+- **Main repo**: full branch dropdown for switching or creating branches
+- **Worktree**: branch name shown read-only, plus staging, commit, and push for that worktree checkout
 
 ### Stage, commit, push
 
@@ -61,84 +54,20 @@ The git panel provides:
 
 ### Typical worktree workflow
 
-1. Create a worktree from the session launcher
-2. The AI assistant works in the worktree
-3. Review changes in the git panel
+1. Create a worktree with git
+2. Add or discover it in Shep
+3. Launch an assistant or terminal in the worktree
 4. Stage and commit
 5. Push the branch
 6. Create a PR on GitHub/GitLab (via `gh pr create`, the web UI, or ask the AI assistant)
 7. Merge the PR on the remote
 8. Clean up the worktree when done
 
-## Worktree configuration
+## Notes
 
-Worktree settings are defined per-project in `{repo}/.shep/workspace.yml` under the `worktree` key.
-
-### Example
-
-```yaml
-name: my-project
-worktree:
-  copy:
-    - .env
-    - .env.local
-    - config/local.json
-  symlink:
-    - node_modules
-    - .venv
-    - target
-  post_create:
-    - pnpm install
-```
-
-### Fields
-
-#### `copy` (list of paths)
-
-Files or directories to **copy** from the main repo into the new worktree. Use this for files that may differ between checkouts:
-
-- `.env` files (environment variables, secrets)
-- Local config files not tracked by git
-- Any file the worktree needs but isn't in the repo
-
-#### `symlink` (list of paths)
-
-Files or directories to **symlink** from the main repo into the worktree. The worktree shares the original files — changes in one are reflected in the other. Use this for large directories you don't want duplicated:
-
-- `node_modules` — avoids running `npm install` in every worktree
-- `.venv` — shares Python virtual environments
-- `target` — shares Rust build artifacts
-- Any large dependency or cache directory
-
-#### `post_create` (list of commands)
-
-Shell commands to run after the worktree is created. These run in the worktree directory. Use this for setup tasks that can't be handled by copy/symlink:
-
-- `pnpm install` — if you can't symlink node_modules (e.g. native modules)
-- `cp .env.example .env` — create env files from templates
-- Any project-specific initialization
-
-Note: AI assistants will typically handle dependency installation themselves, so `post_create` is often unnecessary if you're using symlinks for dependency directories.
-
-### Defaults
-
-All fields default to empty lists. If no worktree config is defined, worktrees are created as bare checkouts with no additional files.
-
-## Worktree storage
-
-Worktrees are stored at:
-
-```
-{repo-parent}/.shep-worktrees/{repo-name}/{branch-slug}
-```
-
-For example, if your repo is at `~/dev/my-app` and the branch is `wt/20260404-13aj`:
-
-```
-~/dev/.shep-worktrees/my-app/wt-20260404-13aj
-```
-
-Each project's worktrees are grouped in a subfolder named after the repo.
+- Shep does not currently create, configure, or remove worktrees.
+- Shep does not require special `workspace.yml` settings for worktrees.
+- If a repo is a worktree, Shep detects that automatically and prevents branch switching in the Git panel.
 
 ## Full configuration reference
 
@@ -187,13 +116,6 @@ commands:
     cwd: null
 
 assistants: []
-
-worktree:
-  copy:
-    - .env
-  symlink:
-    - node_modules
-  post_create: []
 ```
 
 The `.shep` directory is automatically gitignored.

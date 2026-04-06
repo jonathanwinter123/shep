@@ -39,7 +39,18 @@ export const useGitStore = create<GitStore>((set) => ({
         const path = repoPaths[i];
         const status = result.value;
         const old = prev[path];
-        if (!old || old.branch !== status.branch || old.dirty !== status.dirty || old.is_git_repo !== status.is_git_repo) {
+        if (
+          !old ||
+          old.is_git_repo !== status.is_git_repo ||
+          old.branch !== status.branch ||
+          old.dirty !== status.dirty ||
+          old.staged !== status.staged ||
+          old.unstaged !== status.unstaged ||
+          old.untracked !== status.untracked ||
+          old.ahead !== status.ahead ||
+          old.behind !== status.behind ||
+          old.worktree_parent !== status.worktree_parent
+        ) {
           next[path] = status;
           changed = true;
         }

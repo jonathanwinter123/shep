@@ -94,7 +94,7 @@ export default function ProjectList({
     return projectTabs.filter((t) => !t.assistantId);
   }, [projectTabs]);
 
-  const commandsBadge = String(commands.length);
+  const commandsBadge = commands.length > 0 ? String(commands.length) : null;
   const gitStatuses = useGitStore((s) => s.projectGitStatus);
   const existingPaths = useMemo(() => new Set(repos.map((r) => r.path)), [repos]);
 

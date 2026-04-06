@@ -2112,15 +2112,3 @@ select {
   background: rgba(248, 113, 113, 0.1);
   border-bottom: 1px solid var(--glass-border);
 }
-
-/* ── Git Panel worktree viewing header ────────────────── */
-
-.git-panel__worktree-label {
-  font-size: var(--text-body);
-  font-weight: 500;
-  color: var(--text-primary);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}

@@ -188,7 +188,7 @@ export default function GitPanel() {
         <BranchDropdown
           repoPath={activeProjectPath}
           currentBranch={gitStatus.branch}
-          isWorktree={false}
+          isWorktree={gitStatus.worktree_parent != null}
           onBranchChanged={handleBranchChanged}
         />
         <span

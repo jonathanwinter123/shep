@@ -116,15 +116,6 @@ export default function ProjectItem({
     for (const path of wtSelected) {
       onAddProject(path);
     }
-    const count = wtSelected.size;
-    const names = wtEntries
-      .filter((wt) => wtSelected.has(wt.path))
-      .map((wt) => wt.branch ?? wt.path);
-    pushNotice({
-      tone: "success",
-      title: `Added ${count} worktree${count > 1 ? "s" : ""}`,
-      message: names.join(", "),
-    });
     setWtPicker(null);
   };
 
