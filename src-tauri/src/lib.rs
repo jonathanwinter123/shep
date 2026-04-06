@@ -1,5 +1,6 @@
 mod commands;
 mod git;
+mod menu;
 mod pty;
 mod usage;
 mod watcher;
@@ -43,6 +44,8 @@ pub fn run() {
                 usage::run_background_ingest(&db);
                 let _ = handle.emit("usage-ingest-complete", ());
             });
+
+            menu::setup(app.handle())?;
 
             if cfg!(debug_assertions) {
                 app.handle().plugin(

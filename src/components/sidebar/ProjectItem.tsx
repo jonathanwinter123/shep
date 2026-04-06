@@ -183,11 +183,6 @@ export default function ProjectItem({
     : null;
 
   const menuItems: ContextMenuItem[] = [
-    ...(!worktreeParent ? [{
-      label: "Create Worktree",
-      icon: <Plus size={14} />,
-      onClick: handleOpenCreateWorktree,
-    }] : []),
     {
       label: editorActionLabel,
       icon: <SquareArrowOutUpRight size={14} />,
@@ -228,6 +223,11 @@ export default function ProjectItem({
           });
       },
     },
+    ...(!worktreeParent ? [{
+      label: "Create Worktree",
+      icon: <Plus size={14} />,
+      onClick: handleOpenCreateWorktree,
+    }] : []),
     ...(!worktreeParent ? [{
       label: "Discover Worktrees",
       icon: <Search size={14} />,

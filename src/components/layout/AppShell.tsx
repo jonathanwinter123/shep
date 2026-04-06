@@ -468,34 +468,44 @@ export default function AppShell() {
     return () => { unlisten.then((f) => f()); };
   }, []);
 
-  // Global keyboard shortcuts
+  // Handle native menu events (accelerators for Cmd+T, Cmd+Shift+T, Cmd+B, Cmd+E, Cmd+, etc.)
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+T — new terminal tab
-      if (e.metaKey && e.key === "t" && !e.shiftKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        handleNewShell();
+    const unlisten = listen<string>("menu-event", (event) => {
+      switch (event.payload) {
+        case "new_terminal":
+          handleNewShell();
+          break;
+        case "new_agent":
+          handleNewAssistant();
+          break;
+        case "toggle_sidebar":
+          useUIStore.getState().toggleSidebar();
+          break;
+        case "open_in_editor": {
+          const repoPath = useTerminalStore.getState().activeProjectPath;
+          if (repoPath) handleOpenInEditor(repoPath);
+          break;
+        }
+        case "settings":
+          useUIStore.getState().openSettings();
+          break;
+        case "check_updates":
+          void useUpdateStore.getState().checkForUpdate().then(() => {
+            const { status, availableVersion } = useUpdateStore.getState();
+            if (status === "available" && availableVersion) {
+              pushNotice(
+                { tone: "info", title: "Update available", message: `Version ${availableVersion} is ready to download` },
+                { durationMs: 8000 },
+              );
+            } else if (status === "idle") {
+              pushNotice({ tone: "success", title: "You're up to date", message: "No updates available" });
+            }
+          });
+          break;
       }
-      // Cmd+Shift+T — new agent session
-      if (e.metaKey && e.shiftKey && e.key.toLowerCase() === "t" && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        handleNewAssistant();
-      }
-      // Cmd+B — toggle sidebar
-      if (e.metaKey && e.key === "b" && !e.shiftKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        useUIStore.getState().toggleSidebar();
-      }
-      // Cmd+E — open in editor
-      if (e.metaKey && e.key === "e" && !e.shiftKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        const repoPath = useTerminalStore.getState().activeProjectPath;
-        if (repoPath) handleOpenInEditor(repoPath);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNewShell, handleNewAssistant, handleOpenInEditor]);
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, [handleNewShell, handleNewAssistant, handleOpenInEditor, pushNotice]);
 
   const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive || portsPanelActive;
 
