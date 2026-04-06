@@ -9,8 +9,6 @@ interface GitStore {
   refreshStatus: (repoPath: string) => Promise<void>;
   refreshAll: (repoPaths: string[]) => Promise<void>;
   refreshWorktrees: (repoPath: string) => Promise<void>;
-  /** Resolve a branch name to its worktree filesystem path */
-  getWorktreePath: (repoPath: string, branch: string) => string | null;
   /** Get all non-main worktree paths for a repo (for file watching) */
   getWorktreePaths: (repoPath: string) => string[];
   removeProject: (repoPath: string) => void;
@@ -75,13 +73,6 @@ export const useGitStore = create<GitStore>((set, get) => ({
     } catch {
       // Silently ignore
     }
-  },
-
-  getWorktreePath: (repoPath: string, branch: string): string | null => {
-    const entries = get().worktreesByRepo[repoPath];
-    if (!entries) return null;
-    const entry = entries.find((e) => e.branch === branch);
-    return entry?.path ?? null;
   },
 
   getWorktreePaths: (repoPath: string): string[] => {

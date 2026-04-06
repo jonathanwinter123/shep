@@ -149,14 +149,6 @@ export function gitListBranches(path: string): Promise<string[]> {
   return invoke("git_list_branches", { path });
 }
 
-export function gitCreateWorktree(
-  repoPath: string,
-  worktreePath: string,
-  branchName: string,
-): Promise<void> {
-  return invoke("git_create_worktree", { repoPath, worktreePath, branchName });
-}
-
 export function gitPushBranch(path: string, branch: string): Promise<void> {
   return invoke("git_push_branch", { path, branch });
 }
@@ -173,12 +165,6 @@ export function runShellCommand(command: string, cwd: string): Promise<number> {
   return invoke("run_shell_command", { command, cwd });
 }
 
-export function gitRemoveWorktree(
-  repoPath: string,
-  worktreePath: string,
-): Promise<void> {
-  return invoke("git_remove_worktree", { repoPath, worktreePath });
-}
 
 export function gitListWorktrees(path: string): Promise<WorktreeEntry[]> {
   return invoke("git_list_worktrees", { path });

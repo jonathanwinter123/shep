@@ -24,7 +24,7 @@ import { useGitWatcher } from "../../hooks/useGitWatcher";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
 import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit, refreshUsageData, gitListWorktrees } from "../../lib/tauri";
+import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit, refreshUsageData } from "../../lib/tauri";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { useUsageStore } from "../../stores/useUsageStore";
@@ -85,37 +85,6 @@ export default function AppShell() {
   );
   const tabs = activeProjectTerminals?.tabs ?? EMPTY_TABS;
   const activeTabId = activeProjectTerminals?.activeTabId ?? null;
-  // Discover git worktrees and register them as workspaces
-  const discoverWorkspaces = useCallback(
-    async (repoPath: string) => {
-      try {
-        const worktrees = await gitListWorktrees(repoPath);
-        const store = useTerminalStore.getState();
-        for (const wt of worktrees) {
-          if (wt.is_main || !wt.branch) continue;
-          store.addWorkspace(repoPath, wt.branch, wt.branch, wt.path);
-        }
-        // Remove workspaces for worktrees that no longer exist on disk
-        // Compare by branch name (workspace ID), not path — avoids
-        // mismatches between relative paths (../foo) and canonical paths
-        const ps = store.projectState[repoPath];
-        if (ps) {
-          const wtBranches = new Set(
-            worktrees.filter((w) => !w.is_main && w.branch).map((w) => w.branch),
-          );
-          for (const wsId of Object.keys(ps.workspaces)) {
-            if (wsId !== "main" && !wtBranches.has(wsId)) {
-              store.removeWorkspace(repoPath, wsId);
-            }
-          }
-        }
-      } catch {
-        // Skip if worktree listing fails (not a git repo, etc.)
-      }
-    },
-    [],
-  );
-
   // Derive allTabs via useMemo instead of a selector that returns a new array
   // every call — zustand v5 + useSyncExternalStore would infinite-loop otherwise.
   const projectState = useTerminalStore((s) => s.projectState);
@@ -231,16 +200,6 @@ export default function AppShell() {
     return () => { unlisten.then((f) => f()); };
   }, [fetchUsageSnapshots]);
 
-  // Re-discover workspaces when git changes (worktrees created/removed)
-  useEffect(() => {
-    const unlisten = listen<{ paths: string[] }>("git-fs-changed", () => {
-      const repoPath = useRepoStore.getState().activeRepoPath;
-      if (repoPath) void discoverWorkspaces(repoPath);
-    });
-    return () => { unlisten.then((f) => f()); };
-  }, [discoverWorkspaces]);
-
-
   const handleSelectRepo = useCallback(
     async (repoPath: string) => {
       if (repoPath === activeRepoPath) return;
@@ -253,8 +212,6 @@ export default function AppShell() {
         window.localStorage.setItem(LAST_REPO_STORAGE_KEY, repoPath);
         useTerminalStore.getState().switchProject(repoPath);
         useCommandStore.getState().switchProject(repoPath);
-        await discoverWorkspaces(repoPath);
-
         if (isFirstVisit) {
           useCommandStore.getState().loadCommands(repoPath, config.commands);
 
@@ -273,7 +230,7 @@ export default function AppShell() {
         });
       }
     },
-    [activeRepoPath, openRepo, startCommand, getTerminalDimensions, pushNotice, discoverWorkspaces],
+    [activeRepoPath, openRepo, startCommand, getTerminalDimensions, pushNotice],
   );
 
   const handleAddProject = useCallback(

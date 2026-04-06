@@ -365,15 +365,6 @@ export function usePty() {
         // Fetch current branch for display
         const branch = await gitCurrentBranch(cwd).catch(() => null);
 
-        // Switch to the worktree's workspace so the tab lands in the right place
-        if (worktreePath && branch) {
-          const store = useTerminalStore.getState();
-          const ps = store.projectState[activeRepoPath];
-          if (ps?.workspaces[branch]) {
-            store.switchWorkspace(activeRepoPath, branch);
-          }
-        }
-
         const ptyId = await spawnSession(
           command,
           {},

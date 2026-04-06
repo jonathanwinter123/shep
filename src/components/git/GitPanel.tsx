@@ -18,25 +18,19 @@ export default function GitPanel() {
   const refreshStatus = useGitStore((s) => s.refreshStatus);
   const pushNotice = useNoticeStore((s) => s.pushNotice);
 
-  // Active workspace branch name — null when on main workspace
-  const worktreeBranch = useTerminalStore((s) => {
+  // Derive worktree context from the active tab
+  const activeTab = useTerminalStore((s) => {
     const path = s.activeProjectPath;
     if (!path) return null;
     const ps = s.projectState[path];
     if (!ps) return null;
-    const wsId = ps.activeWorkspaceId;
-    return wsId === "main" ? null : wsId;
+    const ws = ps.workspaces[ps.activeWorkspaceId];
+    if (!ws) return null;
+    return ws.tabs.find((t) => t.id === ws.activeTabId) ?? null;
   });
 
-  // Resolve branch → filesystem path via git store's cached worktree list
-  const worktreePath = useGitStore((s) => {
-    if (!worktreeBranch || !activeProjectPath) return null;
-    const entries = s.worktreesByRepo[activeProjectPath];
-    if (!entries) return null;
-    return entries.find((e) => e.branch === worktreeBranch)?.path ?? null;
-  });
-
-  const effectivePath = worktreePath ?? activeProjectPath;
+  const worktreeBranch = activeTab?.worktreePath ? activeTab.branch : null;
+  const effectivePath = activeTab?.worktreePath ?? activeProjectPath;
 
   const mainGitStatus = useGitStore(
     (s) => activeProjectPath ? s.projectGitStatus[activeProjectPath] ?? null : null,
@@ -52,7 +46,7 @@ export default function GitPanel() {
   const [commitMsg, setCommitMsg] = useState("");
   const [committing, setCommitting] = useState(false);
   const [pushing, setPushing] = useState(false);
-  const canLoadGitFiles = !!effectivePath && !!mainGitStatus?.is_git_repo && (!worktreeBranch || !!worktreePath);
+  const canLoadGitFiles = !!effectivePath && !!mainGitStatus?.is_git_repo;
 
   const fetchFiles = useCallback(async () => {
     if (!canLoadGitFiles || !effectivePath) {
@@ -200,14 +194,6 @@ export default function GitPanel() {
     return (
       <div className="absolute inset-0 flex items-center justify-center opacity-50">
         Not a git repository
-      </div>
-    );
-  }
-
-  if (worktreeBranch && !worktreePath) {
-    return (
-      <div className="absolute inset-0 flex items-center justify-center opacity-50">
-        Loading worktree…
       </div>
     );
   }

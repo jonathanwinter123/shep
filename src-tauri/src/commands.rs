@@ -210,35 +210,8 @@ pub async fn git_list_branches(path: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-pub async fn git_create_worktree(
-    app: tauri::AppHandle,
-    repo_path: String,
-    worktree_path: String,
-    branch_name: String,
-) -> Result<(), String> {
-    git::create_worktree(&repo_path, &worktree_path, &branch_name)?;
-    let _ = app.emit("git-fs-changed", crate::watcher::FsChangedPayload {
-        paths: vec![repo_path],
-    });
-    Ok(())
-}
-
-#[tauri::command]
 pub async fn git_push_branch(path: String, branch: String) -> Result<(), String> {
     git::push_branch(&path, &branch)
-}
-
-#[tauri::command]
-pub async fn git_remove_worktree(
-    app: tauri::AppHandle,
-    repo_path: String,
-    worktree_path: String,
-) -> Result<(), String> {
-    git::remove_worktree(&repo_path, &worktree_path)?;
-    let _ = app.emit("git-fs-changed", crate::watcher::FsChangedPayload {
-        paths: vec![repo_path],
-    });
-    Ok(())
 }
 
 #[tauri::command]

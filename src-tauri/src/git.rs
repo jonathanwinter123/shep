@@ -155,47 +155,9 @@ pub fn list_branches(path: &str) -> Result<Vec<String>, String> {
     Ok(branches)
 }
 
-pub fn create_worktree(
-    repo_path: &str,
-    worktree_path: &str,
-    branch_name: &str,
-) -> Result<(), String> {
-    let output = Command::new("git")
-        .args([
-            "-C",
-            repo_path,
-            "worktree",
-            "add",
-            "-b",
-            branch_name,
-            worktree_path,
-        ])
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
-    }
-
-    Ok(())
-}
-
 pub fn push_branch(path: &str, branch: &str) -> Result<(), String> {
     let output = Command::new("git")
         .args(["-C", path, "push", "-u", "origin", branch])
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
-    }
-
-    Ok(())
-}
-
-pub fn remove_worktree(repo_path: &str, worktree_path: &str) -> Result<(), String> {
-    let output = Command::new("git")
-        .args(["-C", repo_path, "worktree", "remove", worktree_path])
         .output()
         .map_err(|e| e.to_string())?;
 
