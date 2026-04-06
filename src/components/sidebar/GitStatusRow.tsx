@@ -1,4 +1,4 @@
-import { GitCommitHorizontal } from "lucide-react";
+import { GitBranch } from "lucide-react";
 import { useGitStore } from "../../stores/useGitStore";
 import { useUIStore } from "../../stores/useUIStore";
 
@@ -21,7 +21,7 @@ export default function GitStatusRow({ repoPath }: GitStatusRowProps) {
       onClick={openGitPanel}
       className={`section-toggle ${gitPanelActive ? "!text-[var(--text-primary)] !bg-white/6" : ""}`}
     >
-      <GitCommitHorizontal size={14} className="shrink-0" style={{ color: "var(--section-icon-color)" }} />
+      <GitBranch size={14} className="shrink-0" style={{ color: "var(--section-icon-color)" }} />
       <span className="truncate" title={label}>{label}</span>
       {changeCount > 0 && (
         <span className="badge">{changeCount}</span>

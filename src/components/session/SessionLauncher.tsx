@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import type { CodingAssistant, SessionMode } from "../../lib/types";
 import { CODING_ASSISTANTS } from "../sidebar/constants";
 import { checkCommandExists } from "../../lib/tauri";
@@ -23,7 +23,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   const [selectedAssistant, setSelectedAssistant] = useState<CodingAssistant | null>(null);
   const [available, setAvailable] = useState<Record<string, boolean>>({});
   const [installPopover, setInstallPopover] = useState<string | null>(null);
-  const [yolo, setYolo] = useState(false);
+  const [mode, setMode] = useState<SessionMode>("standard");
   const [launching, setLaunching] = useState(false);
   const [selectedWorktreePath, setSelectedWorktreePath] = useState<string | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
@@ -61,18 +61,6 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   const isGit = gitStatus?.is_git_repo ?? false;
   const currentBranch = gitStatus?.branch ?? "";
 
-  // Worktree map for BranchDropdown (branch name → worktree path)
-  const worktrees = useGitStore(
-    (s) => activeRepoPath ? s.worktreesByRepo[activeRepoPath] ?? [] : [],
-  );
-  const worktreeMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const wt of worktrees) {
-      if (!wt.is_main && wt.branch) map.set(wt.branch, wt.path);
-    }
-    return map;
-  }, [worktrees]);
-
   const handleBranchChanged = () => {
     // Branch was switched via the dropdown — clear worktree selection
     setSelectedWorktreePath(null);
@@ -88,14 +76,13 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
     if (!selectedAssistant || !activeRepoPath || launching) return;
     setLaunching(true);
 
-    const mode: SessionMode = yolo ? "yolo" : "standard";
     const started = await onStartSession(selectedAssistant.id, mode, selectedWorktreePath);
     if (!started) {
       setLaunching(false);
     }
   };
 
-  const yoloUnavailable = yolo && selectedAssistant && !selectedAssistant.yoloFlag;
+  const supportsYolo = selectedAssistant?.yoloFlag != null;
 
   return (
     <div className="absolute inset-0 overflow-y-auto px-1 py-4">
@@ -166,31 +153,32 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
             currentBranch={selectedBranch ?? currentBranch}
             isWorktree={false}
             onBranchChanged={handleBranchChanged}
-            worktreeMap={worktreeMap}
             allowWorktreeSelect
             onSelectWorktree={handleSelectWorktree}
           />
         </div>
       )}
 
-      {/* YOLO toggle */}
+      {/* Mode picker */}
       {selectedAssistant && (
         <div className="mb-6">
-          <label className="flex items-center gap-2 cursor-pointer text-xs">
-            <input
-              type="checkbox"
-              checked={yolo}
-              onChange={(e) => setYolo(e.target.checked)}
-              style={{ accentColor: "var(--text-muted)" }}
-            />
-            <HandMetal size={14} style={{ opacity: 0.5 }} />
-            <span style={{ color: "var(--text-muted)" }}>Auto-accept mode</span>
-          </label>
-          {yoloUnavailable && (
-            <p className="text-xs opacity-40 mt-2">
-              {selectedAssistant.name} does not support auto-accept mode.
-            </p>
-          )}
+          <label className="section-label !p-0 mb-3 block text-xs opacity-50">Mode</label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className={`option-card ${mode === "standard" ? "selected" : ""}`}
+              onClick={() => setMode("standard")}
+            >
+              Standard
+            </button>
+            <button
+              className={`option-card ${mode === "yolo" ? "selected" : ""} ${!supportsYolo ? "opacity-40" : ""}`}
+              onClick={() => { if (supportsYolo) setMode("yolo"); }}
+              title={supportsYolo ? "Auto-accept mode" : `${selectedAssistant.name} does not support auto-accept`}
+            >
+              <HandMetal size={14} />
+              YOLO
+            </button>
+          </div>
         </div>
       )}
 
@@ -198,7 +186,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
       {selectedAssistant && (
         <button
           className="btn-primary"
-          disabled={launching || !!yoloUnavailable}
+          disabled={launching || (mode === "yolo" && !supportsYolo)}
           aria-busy={launching}
           onClick={handleStart}
         >

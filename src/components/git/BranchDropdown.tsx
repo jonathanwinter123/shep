@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronDown, Check, Plus, GitFork } from "lucide-react";
-import { gitListBranches, gitSwitchBranch, gitCreateBranch } from "../../lib/tauri";
+import { gitListBranches, gitSwitchBranch, gitCreateBranch, gitListWorktrees } from "../../lib/tauri";
 import { useGitStore } from "../../stores/useGitStore";
 
 interface BranchDropdownProps {
@@ -8,8 +8,6 @@ interface BranchDropdownProps {
   currentBranch: string;
   isWorktree: boolean;
   onBranchChanged: () => void;
-  /** Map of branch name → worktree path for branches checked out in worktrees */
-  worktreeMap?: Map<string, string>;
   /** When true, selecting a worktree branch calls onSelectWorktree instead of blocking */
   allowWorktreeSelect?: boolean;
   /** Called when a worktree branch is selected (only when allowWorktreeSelect is true) */
@@ -21,13 +19,13 @@ export default function BranchDropdown({
   currentBranch,
   isWorktree,
   onBranchChanged,
-  worktreeMap,
   allowWorktreeSelect,
   onSelectWorktree,
 }: BranchDropdownProps) {
   const refreshStatus = useGitStore((s) => s.refreshStatus);
   const [open, setOpen] = useState(false);
   const [branches, setBranches] = useState<string[]>([]);
+  const [worktreeMap, setWorktreeMap] = useState<Map<string, string>>(new Map());
   const [switching, setSwitching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -53,6 +51,15 @@ export default function BranchDropdown({
     gitListBranches(repoPath)
       .then(setBranches)
       .catch(() => setBranches([]));
+    gitListWorktrees(repoPath)
+      .then((wts) => {
+        const map = new Map<string, string>();
+        for (const wt of wts) {
+          if (!wt.is_main && wt.branch) map.set(wt.branch, wt.path);
+        }
+        setWorktreeMap(map);
+      })
+      .catch(() => setWorktreeMap(new Map()));
   }, [repoPath]);
 
   const handleSwitch = useCallback(
@@ -69,12 +76,26 @@ export default function BranchDropdown({
         onBranchChanged();
         setOpen(false);
       } catch (e) {
-        setError(String(e));
+        const msg = String(e);
+        // If switch failed because the branch is in a worktree, and we allow
+        // worktree selection, look up the path and select it automatically
+        if (allowWorktreeSelect && onSelectWorktree && msg.includes("already used by worktree")) {
+          try {
+            const wts = await gitListWorktrees(repoPath);
+            const wt = wts.find((w) => w.branch === branch);
+            if (wt) {
+              onSelectWorktree(branch, wt.path);
+              setOpen(false);
+              return;
+            }
+          } catch { /* fall through to show original error */ }
+        }
+        setError(msg);
       } finally {
         setSwitching(false);
       }
     },
-    [repoPath, currentBranch, refreshStatus, onBranchChanged],
+    [repoPath, currentBranch, refreshStatus, onBranchChanged, allowWorktreeSelect, onSelectWorktree],
   );
 
   const handleCreate = useCallback(async () => {

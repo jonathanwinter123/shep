@@ -61,6 +61,11 @@ export default function TerminalItem({
           <Terminal size={14} className="shrink-0" />
         )}
         <span className="min-w-0 truncate text-left">{tab.label}</span>
+        {tab.worktreePath && tab.branch && (
+          <span className="inline-flex items-center gap-0.5 shrink-0 text-[10px] opacity-50" title={`Worktree: ${tab.branch}`}>
+            <span className="max-w-[60px] truncate">{tab.branch}</span>
+          </span>
+        )}
         <span className={`sidebar-status-dot ${dotClass(activity)}`} />
       </div>
       {menu && (

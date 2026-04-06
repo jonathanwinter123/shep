@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { GitBranch, GitFork, Upload } from "lucide-react";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -44,18 +44,6 @@ export default function GitPanel() {
   const gitStatus = useGitStore(
     (s) => effectivePath ? s.projectGitStatus[effectivePath] ?? null : null,
   );
-
-  const worktreeEntries = useGitStore(
-    (s) => activeProjectPath ? s.worktreesByRepo[activeProjectPath] : undefined,
-  );
-  const worktreeMap = useMemo(() => {
-    if (!worktreeEntries || worktreeEntries.length <= 1) return undefined;
-    const map = new Map<string, string>();
-    for (const e of worktreeEntries) {
-      if (!e.is_main && e.branch) map.set(e.branch, e.path);
-    }
-    return map.size > 0 ? map : undefined;
-  }, [worktreeEntries]);
 
   const [files, setFiles] = useState<ChangedFile[]>([]);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -245,7 +233,6 @@ export default function GitPanel() {
               currentBranch={mainGitStatus.branch}
               isWorktree={false}
               onBranchChanged={handleBranchChanged}
-              worktreeMap={worktreeMap}
             />
           </>
         )}

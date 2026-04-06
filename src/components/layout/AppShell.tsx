@@ -355,16 +355,6 @@ export default function AppShell() {
     if (tab) store.clearTabBell(tab.ptyId);
   }, [setActiveTab, activeRepoPath]);
 
-  const handleSwitchWorkspace = useCallback(
-    (repoPath: string, workspaceId: string) => {
-      const store = useTerminalStore.getState();
-      const ps = store.projectState[repoPath];
-      if (!ps || ps.activeWorkspaceId === workspaceId) return;
-      store.switchWorkspace(repoPath, workspaceId);
-    },
-    [],
-  );
-
   const handleNewAssistant = useCallback(() => {
     useUIStore.getState().openLauncher();
   }, []);
@@ -532,7 +522,7 @@ export default function AppShell() {
         handleNewShell();
       }
       // Cmd+Shift+T — new agent session
-      if (e.metaKey && e.key === "T" && e.shiftKey && !e.ctrlKey && !e.altKey) {
+      if (e.metaKey && e.shiftKey && e.key.toLowerCase() === "t" && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         handleNewAssistant();
       }
@@ -541,10 +531,16 @@ export default function AppShell() {
         e.preventDefault();
         useUIStore.getState().toggleSidebar();
       }
+      // Cmd+E — open in editor
+      if (e.metaKey && e.key === "e" && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        const repoPath = useTerminalStore.getState().activeProjectPath;
+        if (repoPath) handleOpenInEditor(repoPath);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNewShell, handleNewAssistant]);
+  }, [handleNewShell, handleNewAssistant, handleOpenInEditor]);
 
   const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive || portsPanelActive;
 
@@ -594,7 +590,6 @@ export default function AppShell() {
             onSelectTab={handleSelectSidebarTab}
             onCloseTab={closeTab}
             onNewShell={handleNewShell}
-            onSwitchWorkspace={handleSwitchWorkspace}
           />
         )}
 

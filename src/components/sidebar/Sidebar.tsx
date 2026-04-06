@@ -20,7 +20,6 @@ interface SidebarProps {
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
-  onSwitchWorkspace: (repoPath: string, workspaceId: string) => void;
 }
 
 export default function Sidebar({
@@ -36,7 +35,6 @@ export default function Sidebar({
   onSelectTab,
   onCloseTab,
   onNewShell,
-  onSwitchWorkspace,
 }: SidebarProps) {
   const projectState = useTerminalStore((s) => s.projectState);
   const projectCommands = useCommandStore((s) => s.projectCommands);
@@ -100,7 +98,6 @@ export default function Sidebar({
           onSelectTab={onSelectTab}
           onCloseTab={onCloseTab}
           onNewShell={onNewShell}
-          onSwitchWorkspace={onSwitchWorkspace}
         />
       </div>
       <SidebarUsage />

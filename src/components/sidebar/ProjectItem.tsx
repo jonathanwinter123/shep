@@ -21,7 +21,6 @@ interface ProjectItemProps {
   isActive: boolean;
   isExpanded: boolean;
   activity?: { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean };
-  activeWorkspaceId: string;
   onClick: () => void;
   onRemove: () => void;
   onOpenInEditor: () => void;
@@ -32,7 +31,6 @@ export default function ProjectItem({
   isActive,
   isExpanded,
   activity,
-  activeWorkspaceId,
   onClick,
   onRemove,
   onOpenInEditor,
@@ -112,8 +110,6 @@ export default function ProjectItem({
     },
   ];
 
-  const inWorktree = activeWorkspaceId !== "main";
-
   return (
     <>
       <div
@@ -128,14 +124,7 @@ export default function ProjectItem({
         aria-label={`${repo.name}${repo.valid ? "" : " unavailable"}`}
       >
         {isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
-        <span className="truncate font-medium flex items-center gap-1.5">
-          {repo.name}
-          {!isExpanded && inWorktree && (
-            <span style={{ opacity: 0.5, fontSize: "0.9em", fontWeight: "normal" }}>
-              {activeWorkspaceId}
-            </span>
-          )}
-        </span>
+        <span className="truncate font-medium">{repo.name}</span>
         <span className="flex-1" />
         {!isExpanded && hasActivity && (
           <span className="sidebar-status-dot" style={{ background: dotColor }} />
