@@ -146,14 +146,17 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
 
       {/* Start Button */}
       {selectedAssistant && (
-        <button
-          className="btn-primary"
-          disabled={launching || (mode === "yolo" && !supportsYolo)}
-          aria-busy={launching}
-          onClick={handleStart}
-        >
-          {launching ? "Starting..." : "Start Session"}
-        </button>
+        <div>
+          <label className="section-label !p-0 mb-3 block text-xs opacity-50">Start</label>
+          <button
+            className="btn-cta"
+            disabled={launching || (mode === "yolo" && !supportsYolo)}
+            aria-busy={launching}
+            onClick={handleStart}
+          >
+            {launching ? "Starting..." : "Start Session"}
+          </button>
+        </div>
       )}
     </div>
   );

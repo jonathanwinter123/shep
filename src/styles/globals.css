@@ -485,6 +485,38 @@ select {
   transform: none;
 }
 
+/* Accent CTA — use sparingly for high-intent actions */
+.btn-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
+  font-weight: 500;
+  border: 1px solid var(--border-active);
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.btn-cta:hover {
+  background: color-mix(in srgb, var(--overlay) 12%, transparent);
+}
+.btn-cta:focus-visible {
+  outline: 2px solid rgba(122, 162, 247, 0.75);
+  outline-offset: 2px;
+}
+.btn-cta:active {
+  transform: translateY(1px);
+}
+.btn-cta:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+
 .notice-center {
   position: fixed;
   top: 18px;
