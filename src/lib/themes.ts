@@ -247,7 +247,7 @@ const gotham: ShepTheme = {
 /* ── Catppuccin Mocha ──────────────────────────────────── */
 const catppuccin: ShepTheme = {
   id: "catppuccin",
-  name: "Catppuccin",
+  name: "Catppuccin Mocha",
   isTransparent: false,
 
   bgRadial1: "rgba(137, 180, 250, 0.08)",
@@ -439,53 +439,53 @@ const clear: ShepTheme = {
   termBrightWhite: "#d8e0f0",
 };
 
-/* ── Pandas Dark ──────────────────────────────────────── */
-const pandas: ShepTheme = {
-  id: "pandas",
-  name: "Pandas",
+/* ── Carbonfox Dark ───────────────────────────────────── */
+const carbonfox: ShepTheme = {
+  id: "carbonfox",
+  name: "Carbonfox",
   isTransparent: false,
 
-  bgRadial1: "rgba(69, 169, 249, 0.08)",
-  bgRadial2: "rgba(255, 117, 181, 0.06)",
-  bgRadial3: "rgba(176, 132, 235, 0.05)",
+  bgRadial1: "rgba(120, 169, 255, 0.08)",
+  bgRadial2: "rgba(190, 149, 255, 0.06)",
+  bgRadial3: "rgba(51, 177, 255, 0.05)",
 
-  bgLinearFrom: "#212223",
-  bgLinearMid: "#292a2b",
-  bgLinearTo: "#212223",
+  bgLinearFrom: "#0e0e0e",
+  bgLinearMid: "#161616",
+  bgLinearTo: "#0e0e0e",
 
-  frameTint: "#292a2b",
-  panelTint: "rgba(41, 42, 43, 0.60)",
-  glassBorder: "rgba(204, 204, 204, 0.12)",
-  glassPanelStrong: "rgba(41, 42, 43, 0.78)",
-  glassBorderStrong: "rgba(204, 204, 204, 0.18)",
+  frameTint: "#161616",
+  panelTint: "rgba(22, 22, 22, 0.60)",
+  glassBorder: "rgba(242, 244, 248, 0.12)",
+  glassPanelStrong: "rgba(22, 22, 22, 0.78)",
+  glassBorderStrong: "rgba(242, 244, 248, 0.18)",
 
-  statusRunning: "#45a9f9",
-  statusStopped: "#757575",
-  statusCrashed: "#ff2c6d",
-  statusAttention: "#ffb86c",
+  statusRunning: "#78a9ff",
+  statusStopped: "#484848",
+  statusCrashed: "#ee5396",
+  statusAttention: "#08bdba",
 
-  appBg: "#292a2b",
-  appFg: "#cccccc",
+  appBg: "#161616",
+  appFg: "#f2f4f8",
 
-  termForeground: "#cccccc",
-  termCursor: "#cccccc",
-  termSelection: "#5f4e3b",
-  termBlack: "#000000",
-  termRed: "#ff2c6d",
-  termGreen: "#19f9d8",
-  termYellow: "#ffb86c",
-  termBlue: "#45a9f9",
-  termMagenta: "#ff75b5",
-  termCyan: "#b084eb",
-  termWhite: "#cdcdcd",
-  termBrightBlack: "#757575",
-  termBrightRed: "#ff2c6d",
-  termBrightGreen: "#19f9d8",
-  termBrightYellow: "#ffcc95",
-  termBrightBlue: "#6fc1ff",
-  termBrightMagenta: "#ff9ac1",
-  termBrightCyan: "#bcaafe",
-  termBrightWhite: "#e6e6e6",
+  termForeground: "#f2f4f8",
+  termCursor: "#f2f4f8",
+  termSelection: "#2a2a2a",
+  termBlack: "#282828",
+  termRed: "#ee5396",
+  termGreen: "#25be6a",
+  termYellow: "#08bdba",
+  termBlue: "#78a9ff",
+  termMagenta: "#be95ff",
+  termCyan: "#33b1ff",
+  termWhite: "#dfdfe0",
+  termBrightBlack: "#484848",
+  termBrightRed: "#f16da6",
+  termBrightGreen: "#46c880",
+  termBrightYellow: "#2dc7c4",
+  termBrightBlue: "#8cb6ff",
+  termBrightMagenta: "#c8a5ff",
+  termBrightCyan: "#52bdff",
+  termBrightWhite: "#e4e4e5",
 };
 
 /* ── Jellybeans Dark ──────────────────────────────────── */
@@ -537,53 +537,53 @@ const jellybeans: ShepTheme = {
   termBrightWhite: "#ffffff",
 };
 
-/* ── Everforest Dark ──────────────────────────────────── */
-const everforestDark: ShepTheme = {
-  id: "everforest-dark",
-  name: "Everforest Dark",
+/* ── Nightfox Dark ────────────────────────────────────── */
+const nightfoxDark: ShepTheme = {
+  id: "nightfox-dark",
+  name: "Nightfox Dark",
   isTransparent: false,
 
-  bgRadial1: "rgba(127, 187, 179, 0.08)",
-  bgRadial2: "rgba(214, 153, 182, 0.06)",
-  bgRadial3: "rgba(131, 192, 146, 0.05)",
+  bgRadial1: "rgba(113, 156, 214, 0.08)",
+  bgRadial2: "rgba(157, 121, 214, 0.06)",
+  bgRadial3: "rgba(99, 205, 207, 0.05)",
 
-  bgLinearFrom: "#252d32",
-  bgLinearMid: "#2d353b",
-  bgLinearTo: "#252d32",
+  bgLinearFrom: "#111a25",
+  bgLinearMid: "#192330",
+  bgLinearTo: "#111a25",
 
-  frameTint: "#2d353b",
-  panelTint: "rgba(45, 53, 59, 0.60)",
-  glassBorder: "rgba(211, 198, 170, 0.12)",
-  glassPanelStrong: "rgba(45, 53, 59, 0.78)",
-  glassBorderStrong: "rgba(211, 198, 170, 0.18)",
+  frameTint: "#192330",
+  panelTint: "rgba(25, 35, 48, 0.60)",
+  glassBorder: "rgba(205, 206, 207, 0.12)",
+  glassPanelStrong: "rgba(25, 35, 48, 0.78)",
+  glassBorderStrong: "rgba(205, 206, 207, 0.18)",
 
-  statusRunning: "#7fbbb3",
-  statusStopped: "#859289",
-  statusCrashed: "#e67e80",
-  statusAttention: "#dbbc7f",
+  statusRunning: "#719cd6",
+  statusStopped: "#575860",
+  statusCrashed: "#c94f6d",
+  statusAttention: "#dbc074",
 
-  appBg: "#2d353b",
-  appFg: "#d3c6aa",
+  appBg: "#192330",
+  appFg: "#cdcecf",
 
-  termForeground: "#d3c6aa",
-  termCursor: "#d3c6aa",
-  termSelection: "#414b51",
-  termBlack: "#343f44",
-  termRed: "#e67e80",
-  termGreen: "#a7c080",
-  termYellow: "#dbbc7f",
-  termBlue: "#7fbbb3",
-  termMagenta: "#d699b6",
-  termCyan: "#83c092",
-  termWhite: "#d3c6aa",
-  termBrightBlack: "#859289",
-  termBrightRed: "#e67e80",
-  termBrightGreen: "#a7c080",
-  termBrightYellow: "#dbbc7f",
-  termBrightBlue: "#7fbbb3",
-  termBrightMagenta: "#d699b6",
-  termBrightCyan: "#83c092",
-  termBrightWhite: "#d3c6aa",
+  termForeground: "#cdcecf",
+  termCursor: "#cdcecf",
+  termSelection: "#2b3b51",
+  termBlack: "#393b44",
+  termRed: "#c94f6d",
+  termGreen: "#81b29a",
+  termYellow: "#dbc074",
+  termBlue: "#719cd6",
+  termMagenta: "#9d79d6",
+  termCyan: "#63cdcf",
+  termWhite: "#dfdfe0",
+  termBrightBlack: "#575860",
+  termBrightRed: "#d16983",
+  termBrightGreen: "#8ebaa4",
+  termBrightYellow: "#e0c989",
+  termBrightBlue: "#86abdc",
+  termBrightMagenta: "#baa1e2",
+  termBrightCyan: "#7ad5d6",
+  termBrightWhite: "#e4e4e5",
 };
 
 /* ── Posterpole Dark ──────────────────────────────────── */
@@ -733,64 +733,15 @@ const githubDark: ShepTheme = {
   termBrightWhite: "#ffffff",
 };
 
-/* ── Noctis Light ─────────────────────────────────────── */
-const noctisLight: ShepTheme = {
-  id: "noctis-light",
-  name: "Noctis Light",
+/* ── Solarized Light ──────────────────────────────────── */
+const solarized: ShepTheme = {
+  id: "solarized",
+  name: "Solarized",
   isTransparent: false,
 
-  bgRadial1: "rgba(0, 148, 240, 0.08)",
-  bgRadial2: "rgba(255, 87, 146, 0.05)",
-  bgRadial3: "rgba(0, 189, 214, 0.05)",
-
-  bgLinearFrom: "#ece4d1",
-  bgLinearMid: "#f6edda",
-  bgLinearTo: "#ece4d1",
-
-  frameTint: "#f6edda",
-  panelTint: "rgba(246, 237, 218, 0.60)",
-  glassBorder: "rgba(0, 86, 97, 0.25)",
-  glassPanelStrong: "rgba(246, 237, 218, 0.78)",
-  glassBorderStrong: "rgba(0, 86, 97, 0.35)",
-
-  statusRunning: "#0094f0",
-  statusStopped: "#8ca6a6",
-  statusCrashed: "#e34e1c",
-  statusAttention: "#f49725",
-
-  appBg: "#f6edda",
-  appFg: "#005661",
-
-  termForeground: "#005661",
-  termCursor: "#005661",
-  termSelection: "#d4e8e2",
-  termBlack: "#003b42",
-  termRed: "#e34e1c",
-  termGreen: "#00b368",
-  termYellow: "#f49725",
-  termBlue: "#0094f0",
-  termMagenta: "#ff5792",
-  termCyan: "#00bdd6",
-  termWhite: "#8ca6a6",
-  termBrightBlack: "#004d57",
-  termBrightRed: "#ff4000",
-  termBrightGreen: "#00d17a",
-  termBrightYellow: "#ff8c00",
-  termBrightBlue: "#0fa3ff",
-  termBrightMagenta: "#ff6b9f",
-  termBrightCyan: "#00cbe6",
-  termBrightWhite: "#bbc3c4",
-};
-
-/* ── Everforest Light ─────────────────────────────────── */
-const everforestLight: ShepTheme = {
-  id: "everforest-light",
-  name: "Everforest Light",
-  isTransparent: false,
-
-  bgRadial1: "rgba(58, 148, 197, 0.08)",
-  bgRadial2: "rgba(223, 105, 186, 0.05)",
-  bgRadial3: "rgba(53, 167, 124, 0.05)",
+  bgRadial1: "rgba(38, 139, 210, 0.08)",
+  bgRadial2: "rgba(211, 54, 130, 0.05)",
+  bgRadial3: "rgba(42, 161, 152, 0.05)",
 
   bgLinearFrom: "#f3edd9",
   bgLinearMid: "#fdf6e3",
@@ -798,37 +749,86 @@ const everforestLight: ShepTheme = {
 
   frameTint: "#fdf6e3",
   panelTint: "rgba(253, 246, 227, 0.60)",
-  glassBorder: "rgba(92, 106, 114, 0.25)",
+  glassBorder: "rgba(101, 123, 131, 0.25)",
   glassPanelStrong: "rgba(253, 246, 227, 0.78)",
-  glassBorderStrong: "rgba(92, 106, 114, 0.35)",
+  glassBorderStrong: "rgba(101, 123, 131, 0.35)",
 
-  statusRunning: "#3a94c5",
-  statusStopped: "#939f91",
-  statusCrashed: "#f85552",
-  statusAttention: "#dfa000",
+  statusRunning: "#268bd2",
+  statusStopped: "#586e75",
+  statusCrashed: "#dc322f",
+  statusAttention: "#b58900",
 
   appBg: "#fdf6e3",
-  appFg: "#5c6a72",
+  appFg: "#657b83",
 
-  termForeground: "#5c6a72",
-  termCursor: "#5c6a72",
-  termSelection: "#efe9d5",
-  termBlack: "#5c6a72",
-  termRed: "#f85552",
-  termGreen: "#8da101",
-  termYellow: "#dfa000",
-  termBlue: "#3a94c5",
-  termMagenta: "#df69ba",
-  termCyan: "#35a77c",
-  termWhite: "#939f91",
-  termBrightBlack: "#5c6a72",
-  termBrightRed: "#f85552",
-  termBrightGreen: "#8da101",
-  termBrightYellow: "#dfa000",
-  termBrightBlue: "#3a94c5",
-  termBrightMagenta: "#df69ba",
-  termBrightCyan: "#35a77c",
-  termBrightWhite: "#f4f0d9",
+  termForeground: "#657b83",
+  termCursor: "#657b83",
+  termSelection: "#eee8d5",
+  termBlack: "#073642",
+  termRed: "#dc322f",
+  termGreen: "#859900",
+  termYellow: "#b58900",
+  termBlue: "#268bd2",
+  termMagenta: "#d33682",
+  termCyan: "#2aa198",
+  termWhite: "#eee8d5",
+  termBrightBlack: "#002b36",
+  termBrightRed: "#cb4b16",
+  termBrightGreen: "#586e75",
+  termBrightYellow: "#657b83",
+  termBrightBlue: "#839496",
+  termBrightMagenta: "#6c71c4",
+  termBrightCyan: "#93a1a1",
+  termBrightWhite: "#fdf6e3",
+};
+
+/* ── Tokyo Day ────────────────────────────────────────── */
+const tokyoDay: ShepTheme = {
+  id: "tokyo-day",
+  name: "Tokyo Day",
+  isTransparent: false,
+
+  bgRadial1: "rgba(46, 125, 233, 0.08)",
+  bgRadial2: "rgba(152, 84, 241, 0.05)",
+  bgRadial3: "rgba(0, 113, 151, 0.05)",
+
+  bgLinearFrom: "#d8d9de",
+  bgLinearMid: "#e1e2e7",
+  bgLinearTo: "#d8d9de",
+
+  frameTint: "#e1e2e7",
+  panelTint: "rgba(225, 226, 231, 0.60)",
+  glassBorder: "rgba(55, 96, 191, 0.25)",
+  glassPanelStrong: "rgba(225, 226, 231, 0.78)",
+  glassBorderStrong: "rgba(55, 96, 191, 0.35)",
+
+  statusRunning: "#2e7de9",
+  statusStopped: "#a1a6c5",
+  statusCrashed: "#f52a65",
+  statusAttention: "#8c6c3e",
+
+  appBg: "#e1e2e7",
+  appFg: "#3760bf",
+
+  termForeground: "#3760bf",
+  termCursor: "#3760bf",
+  termSelection: "#b7c1e3",
+  termBlack: "#b4b5b9",
+  termRed: "#f52a65",
+  termGreen: "#587539",
+  termYellow: "#8c6c3e",
+  termBlue: "#2e7de9",
+  termMagenta: "#9854f1",
+  termCyan: "#007197",
+  termWhite: "#6172b0",
+  termBrightBlack: "#a1a6c5",
+  termBrightRed: "#f52a65",
+  termBrightGreen: "#587539",
+  termBrightYellow: "#8c6c3e",
+  termBrightBlue: "#2e7de9",
+  termBrightMagenta: "#9854f1",
+  termBrightCyan: "#007197",
+  termBrightWhite: "#3760bf",
 };
 
 /* ── GitHub Light ─────────────────────────────────────── */
@@ -883,7 +883,7 @@ const githubLight: ShepTheme = {
 /* ── Catppuccin Latte ─────────────────────────────────── */
 const catppuccinLatte: ShepTheme = {
   id: "catppuccin-latte",
-  name: "Catppuccin Light",
+  name: "Catppuccin Latte",
   isTransparent: false,
 
   bgRadial1: "rgba(30, 102, 245, 0.08)",
@@ -932,7 +932,7 @@ const catppuccinLatte: ShepTheme = {
 /* ── Nightfox Light ───────────────────────────────────── */
 const nightfoxLight: ShepTheme = {
   id: "nightfox-light",
-  name: "Nightfox Light",
+  name: "Dayfox",
   isTransparent: false,
 
   bgRadial1: "rgba(40, 72, 169, 0.08)",
@@ -980,19 +980,19 @@ const nightfoxLight: ShepTheme = {
 
 export const THEMES: Record<string, ShepTheme> = {
   catppuccin,
+  "nightfox-dark": nightfoxDark,
   "tokyo-night": tokyoNight,
   dracula,
-  pandas,
+  carbonfox,
   jellybeans,
-  "everforest-dark": everforestDark,
   posterpole,
   miasma,
   "github-dark": githubDark,
   clear,
   "catppuccin-latte": catppuccinLatte,
-  "everforest-light": everforestLight,
   "nightfox-light": nightfoxLight,
-  "noctis-light": noctisLight,
+  "tokyo-day": tokyoDay,
+  solarized,
   "github-light": githubLight,
 };
 

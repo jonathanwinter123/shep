@@ -100,12 +100,9 @@ body.theme-clear {
   background-attachment: fixed !important;
 }
 
-/* Opaque themes: derive body bg automatically from --frame-tint */
+/* Opaque themes: body is a subtle edge color behind the frame */
 body:not(.theme-clear) {
   background:
-    radial-gradient(circle at 12% 18%, var(--bg-radial-1), transparent 26%),
-    radial-gradient(circle at 85% 16%, var(--bg-radial-2), transparent 22%),
-    radial-gradient(circle at 50% 100%, var(--bg-radial-3), transparent 28%),
     linear-gradient(145deg,
       color-mix(in srgb, var(--frame-tint), black var(--bg-mix-edge)) 0%,
       color-mix(in srgb, var(--frame-tint), black var(--bg-mix-mid)) 45%,
@@ -117,7 +114,7 @@ body:not(.theme-clear) {
   --surface-raised: color-mix(in srgb, var(--frame-tint), var(--overlay) 8%);
 }
 
-/* Opaque themes: strip glass overlays so --frame-tint is exact */
+/* Opaque themes: frame is flat, matching terminal background */
 body:not(.theme-clear) .app-shell__frame {
   background: var(--frame-tint);
   backdrop-filter: none;
