@@ -2,6 +2,7 @@ import type { ITheme } from "@xterm/xterm";
 import { hexLuminance } from "../../lib/themes";
 import type { ShepTheme } from "../../lib/themes";
 import type { TerminalSettings } from "../../lib/types";
+import { resizePty } from "../../lib/tauri";
 import { terminalCache } from "./TerminalView";
 
 // Utility to make hex colors partially transparent
@@ -61,11 +62,26 @@ export function applyThemeToTerminals(theme: ShepTheme): void {
 }
 
 export function applyTerminalSettings(settings: TerminalSettings): void {
-  for (const [, entry] of terminalCache) {
+  for (const [ptyId, entry] of terminalCache) {
+    const fontMetricsChanged =
+      entry.term.options.fontFamily !== settings.fontFamily ||
+      entry.term.options.fontSize !== settings.fontSize;
+
     entry.term.options.cursorStyle = settings.cursorStyle;
     entry.term.options.cursorBlink = settings.cursorBlink;
     entry.term.options.scrollback = settings.scrollback;
     entry.term.options.fontFamily = settings.fontFamily;
     entry.term.options.fontSize = settings.fontSize;
+
+    const el = entry.term.element;
+    if (!fontMetricsChanged || !el || el.offsetParent === null) continue;
+
+    entry.fitAddon.fit();
+    entry.term.refresh(0, entry.term.rows - 1);
+    resizePty(ptyId, entry.term.cols, entry.term.rows).catch((error) => {
+      if (import.meta.env.DEV) {
+        console.error("Failed to resize PTY after terminal settings change:", error);
+      }
+    });
   }
 }

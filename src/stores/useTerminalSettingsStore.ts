@@ -3,7 +3,7 @@ import type { TerminalSettings } from "../lib/types";
 import { getTerminalSettings, saveTerminalSettings } from "../lib/tauri";
 import { applyTerminalSettings } from "../components/terminal/terminalTheme";
 
-import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from "../lib/terminalConfig";
+import { normalizeTerminalFontFamily, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from "../lib/terminalConfig";
 
 const DEFAULT_SETTINGS: TerminalSettings = {
   cursorStyle: "block",
@@ -31,8 +31,17 @@ export const useTerminalSettingsStore = create<TerminalSettingsStore>((set, get)
   loadSettings: async () => {
     try {
       const settings = await getTerminalSettings();
-      set({ settings, hasLoaded: true, error: null });
-      applyTerminalSettings(settings);
+      const normalizedSettings = {
+        ...settings,
+        fontFamily: normalizeTerminalFontFamily(settings.fontFamily),
+      };
+      set({ settings: normalizedSettings, hasLoaded: true, error: null });
+      applyTerminalSettings(normalizedSettings);
+      if (normalizedSettings.fontFamily !== settings.fontFamily) {
+        saveTerminalSettings(normalizedSettings).catch((error) => {
+          set({ error: String(error) });
+        });
+      }
     } catch (error) {
       set({ settings: DEFAULT_SETTINGS, hasLoaded: true, error: String(error) });
     }
@@ -40,7 +49,13 @@ export const useTerminalSettingsStore = create<TerminalSettingsStore>((set, get)
 
   updateSettings: async (partial) => {
     const prev = get().settings;
-    const next = { ...prev, ...partial };
+    const next = {
+      ...prev,
+      ...partial,
+      ...(partial.fontFamily !== undefined
+        ? { fontFamily: normalizeTerminalFontFamily(partial.fontFamily) }
+        : {}),
+    };
     // Optimistic update
     set({ settings: next, isSaving: true, error: null });
     applyTerminalSettings(next);
