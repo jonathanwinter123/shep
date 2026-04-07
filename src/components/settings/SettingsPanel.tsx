@@ -117,10 +117,11 @@ export default function SettingsPanel() {
   return (
     <div className="absolute inset-0 overflow-y-auto p-6">
       {/* ── Theme ──────────────────────────────────────────── */}
-      <h2 className="section-label !p-0 mb-4">Dark</h2>
+      {/* ── Theme ──────────────────────────────────────────── */}
+      <h2 className="section-label !p-0 mb-4">Theme</h2>
 
       <div className="flex flex-wrap gap-3">
-        {DARK_THEMES.map((t) => {
+        {[...DARK_THEMES, ...LIGHT_THEMES, ...TRANSPARENT_THEMES].map((t) => {
           const active = t.id === themeId;
           return (
             <button
@@ -141,68 +142,6 @@ export default function SettingsPanel() {
           );
         })}
       </div>
-
-      {LIGHT_THEMES.length > 0 && (
-        <>
-          <hr className="settings-divider" />
-
-          <h2 className="section-label !p-0 mb-4">Light</h2>
-
-          <div className="flex flex-wrap gap-3">
-            {LIGHT_THEMES.map((t) => {
-              const active = t.id === themeId;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setTheme(t.id)}
-                  className={`${optionClass} ${active ? "selected" : ""}`}
-                >
-                  <div
-                    className="shrink-0 rounded-full"
-                    style={{
-                      width: 24,
-                      height: 24,
-                      background: `linear-gradient(135deg, ${t.bgRadial1} 0%, ${t.bgLinearMid} 50%, ${t.bgRadial3} 100%)`,
-                    }}
-                  />
-                  <span>{t.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      {TRANSPARENT_THEMES.length > 0 && (
-        <>
-          <hr className="settings-divider" />
-
-          <h2 className="section-label !p-0 mb-4">Transparent</h2>
-
-          <div className="flex flex-wrap gap-3">
-            {TRANSPARENT_THEMES.map((t) => {
-              const active = t.id === themeId;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setTheme(t.id)}
-                  className={`${optionClass} ${active ? "selected" : ""}`}
-                >
-                  <div
-                    className="shrink-0 rounded-full"
-                    style={{
-                      width: 24,
-                      height: 24,
-                      background: `linear-gradient(135deg, ${t.bgRadial1} 0%, ${t.bgLinearMid} 50%, ${t.bgRadial3} 100%)`,
-                    }}
-                  />
-                  <span>{t.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
 
       <p className="text-xs text-[var(--text-muted)] mt-4">
         Note: CLI tools may need to be relaunched after switching themes. Use /theme to select light or dark if not updating.
