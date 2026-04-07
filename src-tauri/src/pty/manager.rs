@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::ipc::Channel;
 
-use super::session::{PtyOutput, PtySession};
+use super::session::{PtyColorTheme, PtyOutput, PtySession};
 
 pub struct PtyManager {
     sessions: Mutex<HashMap<u32, PtySession>>,
@@ -39,9 +39,10 @@ impl PtyManager {
         env: HashMap<String, String>,
         cols: u16,
         rows: u16,
+        color_theme: PtyColorTheme,
         channel: Channel<PtyOutput>,
     ) -> Result<u32, String> {
-        let session = PtySession::spawn(command, cwd, env, cols, rows, channel)?;
+        let session = PtySession::spawn(command, cwd, env, cols, rows, color_theme, channel)?;
 
         let mut next_id = self.next_id.lock().unwrap();
         let id = *next_id;
@@ -57,6 +58,14 @@ impl PtyManager {
             .get_mut(&pty_id)
             .ok_or_else(|| format!("PTY {pty_id} not found"))?;
         session.write(data)
+    }
+
+    pub fn set_color_theme(&self, color_theme: PtyColorTheme) -> Result<(), String> {
+        let sessions = self.sessions.lock().unwrap();
+        for session in sessions.values() {
+            session.set_color_theme(color_theme.clone())?;
+        }
+        Ok(())
     }
 
     pub fn resize(&self, pty_id: u32, cols: u16, rows: u16) -> Result<(), String> {

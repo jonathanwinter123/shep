@@ -3,6 +3,7 @@ import type {
   RepoInfo,
   RegisteredRepo,
   WorkspaceConfig,
+  PtyColorTheme,
   PtyOutput,
   GitStatus,
   ChangedFile,
@@ -94,6 +95,7 @@ export function spawnPty(
   env: Record<string, string>,
   cols: number,
   rows: number,
+  colorTheme: PtyColorTheme,
   onMessage: (msg: PtyOutput) => void,
 ): Promise<number> {
   const channel = new Channel<PtyOutput>();
@@ -104,12 +106,17 @@ export function spawnPty(
     env,
     cols,
     rows,
+    colorTheme,
     onData: channel,
   });
 }
 
 export function writePty(ptyId: number, data: string): Promise<void> {
   return invoke("write_pty", { ptyId, data });
+}
+
+export function updatePtyColorTheme(colorTheme: PtyColorTheme): Promise<void> {
+  return invoke("update_pty_color_theme", { colorTheme });
 }
 
 export function resizePty(

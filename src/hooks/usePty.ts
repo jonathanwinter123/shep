@@ -1,8 +1,9 @@
 import { useCallback } from "react";
-import { spawnPty, killPty, getDefaultShell, writePty } from "../lib/tauri";
+import { spawnPty, killPty, getDefaultShell } from "../lib/tauri";
 import { useThemeStore } from "../stores/useThemeStore";
 import { hexLuminance } from "../lib/themes";
 import type { PtyOutput, CommandConfig, SessionMode } from "../lib/types";
+import { toPtyColorTheme } from "../lib/ptyColorTheme";
 import { useCommandStore } from "../stores/useCommandStore";
 import { useTerminalStore, nextTabId } from "../stores/useTerminalStore";
 import { useRepoStore } from "../stores/useRepoStore";
@@ -62,25 +63,7 @@ export function unregisterTerminal(ptyId: number) {
   writeBatchScheduled.delete(ptyId);
 }
 
-// Respond to OSC 11 background color queries immediately — before xterm
-// processes the data — so CLI tools (Claude Code, Gemini) that query during
-// startup get a response within their detection timeout.
-const OSC_11_QUERY = "\x1b]11;?\x1b\\";
-const OSC_11_QUERY_BEL = "\x1b]11;?\x07";
-
-function handleOsc11Query(ptyId: number, data: string): void {
-  if (data.includes(OSC_11_QUERY) || data.includes(OSC_11_QUERY_BEL)) {
-    const hex = useThemeStore.getState().theme.appBg;
-    const r = hex.slice(1, 3);
-    const g = hex.slice(3, 5);
-    const b = hex.slice(5, 7);
-    const response = `\x1b]11;rgb:${r}${r}/${g}${g}/${b}${b}\x1b\\`;
-    writePty(ptyId, response).catch(() => {});
-  }
-}
-
 function writeToPty(ptyId: number, data: string) {
-  handleOsc11Query(ptyId, data);
   const term = terminalInstances.get(ptyId);
   if (term) {
     // Accumulate data and flush once per animation frame so xterm processes
@@ -194,14 +177,22 @@ export function usePty() {
       const colorfgbg = lum > 0.3 ? "0;15" : "15;0";
       const fullEnv = { COLORFGBG: colorfgbg, ...env };
 
-      const ptyId = await spawnPty(command, repoPath, fullEnv, cols, rows, (msg) => {
-        if (resolvedPtyId === null) {
-          bufferedMessages.push(msg);
-          return;
-        }
+      const ptyId = await spawnPty(
+        command,
+        repoPath,
+        fullEnv,
+        cols,
+        rows,
+        toPtyColorTheme(theme),
+        (msg) => {
+          if (resolvedPtyId === null) {
+            bufferedMessages.push(msg);
+            return;
+          }
 
-        handlePtyMessage(resolvedPtyId, commandName, repoPath, msg);
-      });
+          handlePtyMessage(resolvedPtyId, commandName, repoPath, msg);
+        },
+      );
 
       resolvedPtyId = ptyId;
       initActivity(ptyId);

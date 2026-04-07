@@ -9,7 +9,7 @@ import { useKeybindingStore } from "../../stores/useKeybindingStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUpdateStore } from "../../stores/useUpdateStore";
-import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { FONT_OPTIONS, FONT_SIZE_OPTIONS } from "../../lib/terminalConfig";
 import type { CursorStyle, UsageProvider } from "../../lib/types";
 import { getErrorMessage } from "../../lib/errors";
@@ -166,7 +166,7 @@ export default function SettingsPanel() {
                 alt=""
                 width={20}
                 height={20}
-                className="shrink-0"
+                className={`shrink-0 ${option.logoClassName ?? ""}`}
               />
               <span>{option.label}</span>
             </button>
@@ -314,7 +314,7 @@ export default function SettingsPanel() {
               onClick={() => void setProviderEnabled(provider, !active)}
               className={`${optionClass} ${active ? "selected" : ""}`}
             >
-              {logo && <img src={logo} alt="" width={20} height={20} className="shrink-0" />}
+              {logo && <img src={logo} alt="" width={20} height={20} className={`shrink-0 ${getAssistantLogoClass(provider) ?? ""}`} />}
               <span>{label}</span>
             </button>
           );

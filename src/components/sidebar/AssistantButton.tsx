@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import type { TerminalTab, TabActivity } from "../../lib/types";
-import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { handleActionKey } from "../../lib/a11y";
 import { X } from "lucide-react";
@@ -58,7 +58,7 @@ export default function AssistantButton({
         aria-pressed={isActive}
         aria-label={`Open assistant tab ${tab.label}`}
       >
-        {logoUrl && <img src={logoUrl} alt="" width={14} height={14} />}
+        {logoUrl && <img src={logoUrl} alt="" width={14} height={14} className={tab.assistantId ? getAssistantLogoClass(tab.assistantId) : undefined} />}
         <span className="truncate text-left">{tab.label}</span>
         <span className={`sidebar-status-dot ${dotClass(activity)}`} />
       </div>

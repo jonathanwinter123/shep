@@ -5,7 +5,7 @@ import { useUIStore } from "../../stores/useUIStore";
 import { useShallow } from "zustand/shallow";
 import { GitBranch, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined, Radio } from "lucide-react";
 import GearIcon from "../sidebar/icons/GearIcon";
-import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
 import DevMemory from "./DevMemory";
 
@@ -234,7 +234,7 @@ export default function TabBar({
               aria-label={`Open tab ${tab.label}`}
             >
               {logoUrl ? (
-                <img src={logoUrl} alt="" width={12} height={12} />
+                <img src={logoUrl} alt="" width={12} height={12} className={tab.assistantId ? getAssistantLogoClass(tab.assistantId) : undefined} />
               ) : null}
               {editingTabId === tab.id ? (
                 <input

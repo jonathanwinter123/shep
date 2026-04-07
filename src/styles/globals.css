@@ -91,6 +91,18 @@ body,
   --status-attention: #e0af68;
 }
 
+.logo-unavailable {
+  filter: grayscale(1);
+}
+
+html[data-theme-tone="light"] .themed-mono-logo {
+  filter: invert(1);
+}
+
+html[data-theme-tone="light"] .themed-mono-logo.logo-unavailable {
+  filter: invert(1) grayscale(1);
+}
+
 body.theme-clear {
   background:
     radial-gradient(circle at 12% 18%, var(--bg-radial-1), transparent 26%),

@@ -4,7 +4,7 @@ import { CODING_ASSISTANTS } from "../sidebar/constants";
 import { checkCommandExists } from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { HandMetal } from "lucide-react";
-import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { ASSISTANT_INSTALL_URLS } from "../sidebar/constants";
 
 interface SessionLauncherProps {
@@ -71,8 +71,11 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         <div className="flex flex-wrap gap-2">
           {CODING_ASSISTANTS.map((assistant) => {
             const logoUrl = assistantLogoSrc[assistant.id];
-            const isSelected = selectedAssistant?.id === assistant.id;
             const isAvailable = available[assistant.id] !== false;
+            const logoClassName = [getAssistantLogoClass(assistant.id), !isAvailable ? "logo-unavailable" : null]
+              .filter(Boolean)
+              .join(" ");
+            const isSelected = selectedAssistant?.id === assistant.id;
             const installUrl = ASSISTANT_INSTALL_URLS[assistant.id];
             const showPopover = installPopover === assistant.id;
             return (
@@ -88,7 +91,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
                     }
                   }}
                 >
-                  {logoUrl && <img src={logoUrl} alt="" width={18} height={18} style={!isAvailable ? { filter: "grayscale(1)" } : undefined} />}
+                  {logoUrl && <img src={logoUrl} alt="" width={18} height={18} className={logoClassName || undefined} />}
                   <span>{assistant.name}</span>
                 </button>
                 {showPopover && installUrl && (

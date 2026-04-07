@@ -152,6 +152,12 @@ export type PtyOutput =
   | { event: "data"; data: string }
   | { event: "exit"; data: { code: number } };
 
+export interface PtyColorTheme {
+  foreground: string;
+  background: string;
+  palette: string[];
+}
+
 // ── Usage ──────────────────────────────────────────────────────────
 
 export type UsageProvider = "codex" | "claude" | "gemini";

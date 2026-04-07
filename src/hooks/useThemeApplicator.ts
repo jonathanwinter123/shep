@@ -4,6 +4,8 @@ import { useThemeStore } from "../stores/useThemeStore";
 import { applyThemeToTerminals } from "../components/terminal/terminalTheme";
 import { hexLuminance } from "../lib/themes";
 import type { ShepTheme } from "../lib/themes";
+import { toPtyColorTheme } from "../lib/ptyColorTheme";
+import { updatePtyColorTheme } from "../lib/tauri";
 
 const CSS_VAR_MAP: [keyof ShepTheme, string][] = [
   ["appBg", "--app-bg"],
@@ -43,8 +45,10 @@ export function useThemeApplicator(): void {
       "color-scheme",
       isLight ? "light" : "dark",
     );
+    document.documentElement.dataset.themeTone = isLight ? "light" : "dark";
 
     applyThemeToTerminals(theme);
+    updatePtyColorTheme(toPtyColorTheme(theme)).catch(() => {});
 
     const win = getCurrentWindow();
     if (theme.isTransparent) {

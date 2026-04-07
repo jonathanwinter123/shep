@@ -7,7 +7,7 @@ use tauri::{Emitter, State};
 use crate::git;
 use crate::git::{ChangedFile, CreatedWorktree, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
-use crate::pty::session::PtyOutput;
+use crate::pty::session::{PtyColorTheme, PtyOutput};
 use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
 use crate::watcher::GitWatcher;
 use crate::workspace::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig};
@@ -164,10 +164,11 @@ pub fn spawn_pty(
     env: HashMap<String, String>,
     cols: u16,
     rows: u16,
+    color_theme: PtyColorTheme,
     on_data: Channel<PtyOutput>,
     pty_manager: State<'_, PtyManager>,
 ) -> Result<u32, String> {
-    pty_manager.spawn(command, cwd, env, cols, rows, on_data)
+    pty_manager.spawn(command, cwd, env, cols, rows, color_theme, on_data)
 }
 
 #[tauri::command]
@@ -177,6 +178,14 @@ pub fn write_pty(
     pty_manager: State<'_, PtyManager>,
 ) -> Result<(), String> {
     pty_manager.write(pty_id, data.as_bytes())
+}
+
+#[tauri::command]
+pub fn update_pty_color_theme(
+    color_theme: PtyColorTheme,
+    pty_manager: State<'_, PtyManager>,
+) -> Result<(), String> {
+    pty_manager.set_color_theme(color_theme)
 }
 
 #[tauri::command]
