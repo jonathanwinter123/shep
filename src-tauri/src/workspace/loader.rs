@@ -225,11 +225,7 @@ pub fn migrate_old_projects() -> Result<(), String> {
 
         // Convert tasks -> commands
         let commands: Vec<CommandConfig> = if let Some(tasks) = old_config.get("tasks") {
-            if let Ok(task_configs) = serde_yaml::from_value::<Vec<CommandConfig>>(tasks.clone()) {
-                task_configs
-            } else {
-                Vec::new()
-            }
+            serde_yaml::from_value::<Vec<CommandConfig>>(tasks.clone()).unwrap_or_default()
         } else {
             Vec::new()
         };
@@ -302,4 +298,3 @@ fn load_or_default_workspace(repo_path: &str) -> Result<WorkspaceConfig, String>
         Ok(config)
     }
 }
-

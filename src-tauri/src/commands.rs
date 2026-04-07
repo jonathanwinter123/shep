@@ -158,6 +158,7 @@ pub fn open_url(url: &str) -> Result<(), String> {
 // ── PTY commands ────────────────────────────────────────────────────
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_pty(
     command: &str,
     cwd: &str,

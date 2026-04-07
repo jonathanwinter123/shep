@@ -1,6 +1,6 @@
 use std::process::Command;
 
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, Clone, Default)]
 pub struct GitStatus {
     pub is_git_repo: bool,
     pub branch: String,
@@ -12,22 +12,6 @@ pub struct GitStatus {
     pub behind: u32,
     /// If this is a worktree, the name of the parent repo (derived from its path)
     pub worktree_parent: Option<String>,
-}
-
-impl Default for GitStatus {
-    fn default() -> Self {
-        Self {
-            is_git_repo: false,
-            branch: String::new(),
-            dirty: false,
-            staged: 0,
-            unstaged: 0,
-            untracked: 0,
-            ahead: 0,
-            behind: 0,
-            worktree_parent: None,
-        }
-    }
 }
 
 pub fn status(path: &str) -> GitStatus {
@@ -61,7 +45,7 @@ pub fn status(path: &str) -> GitStatus {
             }
         } else if line.starts_with("1 ") || line.starts_with("2 ") {
             // Changed entry: XY columns at index 2..4
-            let xy: Vec<u8> = line.as_bytes().get(2..4).unwrap_or(&[b'.', b'.']).to_vec();
+            let xy: Vec<u8> = line.as_bytes().get(2..4).unwrap_or(b"..").to_vec();
             if xy[0] != b'.' {
                 staged += 1;
             }

@@ -32,6 +32,7 @@ impl PtyManager {
         self.shutting_down.load(Ordering::SeqCst)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn(
         &self,
         command: &str,

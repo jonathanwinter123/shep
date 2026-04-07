@@ -196,7 +196,7 @@ fn should_watch_path(path: &Path) -> bool {
                 return false;
             }
             let next = components[i + 1];
-            return GIT_PASSTHROUGH.iter().any(|allowed| next == *allowed);
+            return GIT_PASSTHROUGH.contains(&next);
         }
     }
 
