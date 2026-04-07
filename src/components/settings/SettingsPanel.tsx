@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getIdentifier, getName, getTauriVersion, getVersion } from "@tauri-apps/api/app";
 import { EDITOR_OPTIONS } from "../../lib/editors";
-import { DARK_THEMES, LIGHT_THEMES } from "../../lib/themes";
+import { DARK_THEMES, LIGHT_THEMES, TRANSPARENT_THEMES } from "../../lib/themes";
 import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useThemeStore } from "../../stores/useThemeStore";
@@ -150,6 +150,37 @@ export default function SettingsPanel() {
 
           <div className="flex flex-wrap gap-3">
             {LIGHT_THEMES.map((t) => {
+              const active = t.id === themeId;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTheme(t.id)}
+                  className={`${optionClass} ${active ? "selected" : ""}`}
+                >
+                  <div
+                    className="shrink-0 rounded-full"
+                    style={{
+                      width: 24,
+                      height: 24,
+                      background: `linear-gradient(135deg, ${t.bgRadial1} 0%, ${t.bgLinearMid} 50%, ${t.bgRadial3} 100%)`,
+                    }}
+                  />
+                  <span>{t.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {TRANSPARENT_THEMES.length > 0 && (
+        <>
+          <hr className="settings-divider" />
+
+          <h2 className="section-label !p-0 mb-4">Transparent</h2>
+
+          <div className="flex flex-wrap gap-3">
+            {TRANSPARENT_THEMES.map((t) => {
               const active = t.id === themeId;
               return (
                 <button
