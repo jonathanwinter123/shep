@@ -281,15 +281,17 @@ fn query_top_models(conn: &Connection, provider: &str, pricing: &HashMap<String,
 }
 
 fn query_top_models_since(conn: &Connection, provider: &str, since: i64, pricing: &HashMap<String, ModelPricing>) -> Vec<UsageNamedTokens> {
-    let mut stmt = conn
+    let mut stmt = match conn
         .prepare(
             "SELECT COALESCE(model, 'unknown'), SUM(tokens_total), SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts)
              FROM usage_messages WHERE provider = ?1 AND timestamp >= ?2
              GROUP BY model ORDER BY 2 DESC LIMIT 5",
-        )
-        .unwrap();
+        ) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
 
-    stmt.query_map(params![provider, since], |row| {
+    let rows = match stmt.query_map(params![provider, since], |row| {
         let name: String = row.get(0)?;
         let tokens = row.get::<_, i64>(1)? as u64;
         let input: i64 = row.get(2)?;
@@ -298,9 +300,11 @@ fn query_top_models_since(conn: &Connection, provider: &str, since: i64, pricing
         let cache_write: i64 = row.get(5)?;
         let thoughts: i64 = row.get(6)?;
         Ok((name, tokens, input, output, cache_read, cache_write, thoughts))
-    })
-    .unwrap()
-    .filter_map(|r| r.ok())
+    }) {
+        Ok(rows) => rows,
+        Err(_) => return Vec::new(),
+    };
+    rows.filter_map(|r| r.ok())
     .map(|(name, tokens, input, output, cache_read, cache_write, thoughts)| {
         let cost = find_pricing(&name, pricing)
             .map(|p| calculate_cost(p, input, output, cache_read, cache_write, thoughts));
@@ -314,16 +318,18 @@ fn query_top_tasks(conn: &Connection, provider: &str, pricing: &HashMap<String, 
 }
 
 fn query_top_tasks_since(conn: &Connection, provider: &str, since: i64, pricing: &HashMap<String, ModelPricing>) -> Vec<UsageTask> {
-    let mut stmt = conn
+    let mut stmt = match conn
         .prepare(
             "SELECT session_id, COALESCE(project, ''), SUM(tokens_total), MAX(model), MAX(timestamp),
                     SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts)
              FROM usage_messages WHERE provider = ?1 AND timestamp >= ?2
              GROUP BY session_id ORDER BY 3 DESC LIMIT 5",
-        )
-        .unwrap();
+        ) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
 
-    stmt.query_map(params![provider, since], |row| {
+    let rows = match stmt.query_map(params![provider, since], |row| {
         let session_id: String = row.get(0)?;
         let project: String = row.get(1)?;
         let tokens: i64 = row.get(2)?;
@@ -335,9 +341,11 @@ fn query_top_tasks_since(conn: &Connection, provider: &str, since: i64, pricing:
         let cache_write: i64 = row.get(8)?;
         let thoughts: i64 = row.get(9)?;
         Ok((session_id, project, tokens, model, updated_at, input, output, cache_read, cache_write, thoughts))
-    })
-    .unwrap()
-    .filter_map(|r| r.ok())
+    }) {
+        Ok(rows) => rows,
+        Err(_) => return Vec::new(),
+    };
+    rows.filter_map(|r| r.ok())
     .map(|(session_id, project, tokens, model, updated_at, input, output, cache_read, cache_write, thoughts)| {
         let cost = model.as_deref()
             .and_then(|m| find_pricing(m, pricing))
@@ -360,16 +368,18 @@ fn query_top_projects(conn: &Connection, provider: &str, pricing: &HashMap<Strin
 }
 
 fn query_top_projects_since(conn: &Connection, provider: &str, since: i64, pricing: &HashMap<String, ModelPricing>) -> Vec<UsageProject> {
-    let mut stmt = conn
+    let mut stmt = match conn
         .prepare(
             "SELECT COALESCE(project, 'unknown'), SUM(tokens_total), COUNT(DISTINCT session_id),
                     SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts)
              FROM usage_messages WHERE provider = ?1 AND timestamp >= ?2
              GROUP BY project ORDER BY 2 DESC LIMIT 5",
-        )
-        .unwrap();
+        ) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
 
-    stmt.query_map(params![provider, since], |row| {
+    let rows = match stmt.query_map(params![provider, since], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, i64>(1)?,
@@ -380,9 +390,11 @@ fn query_top_projects_since(conn: &Connection, provider: &str, since: i64, prici
             row.get::<_, i64>(6)?,
             row.get::<_, i64>(7)?,
         ))
-    })
-    .unwrap()
-    .filter_map(|r| r.ok())
+    }) {
+        Ok(rows) => rows,
+        Err(_) => return Vec::new(),
+    };
+    rows.filter_map(|r| r.ok())
     .map(|(name, tokens, sessions, _input, _output, _cache_read, _cache_write, _thoughts)| {
         let cost = windowed_cost_for_project(conn, provider, since, &name, pricing);
         UsageProject {
@@ -468,26 +480,28 @@ fn query_provider_summaries(
     pricing: &HashMap<String, ModelPricing>,
     trend: &[UsageTrendBucket],
 ) -> Vec<UsageOverviewProvider> {
-    let mut stmt = conn
+    let mut stmt = match conn
         .prepare(
             "SELECT provider, SUM(tokens_total), SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts)
              FROM usage_messages
              WHERE timestamp >= ?1
              GROUP BY provider
              ORDER BY 2 DESC",
-        )
-        .unwrap();
+        ) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
 
-    let raw: Vec<(String, u64, Option<f64>)> = stmt
+    let raw: Vec<(String, u64, Option<f64>)> = match stmt
         .query_map(params![since], |row| {
             let provider: String = row.get(0)?;
             let tokens = row.get::<_, i64>(1)? as u64;
             let cost = windowed_cost_for_provider(conn, &provider, since, pricing);
             Ok((provider, tokens, cost))
-        })
-        .unwrap()
-        .filter_map(|r| r.ok())
-        .collect();
+        }) {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(_) => return Vec::new(),
+    };
 
     let total_tokens: u64 = raw.iter().map(|(_, tokens, _)| *tokens).sum();
 
@@ -536,7 +550,7 @@ fn query_top_models_all(
     bucket_count: i64,
     mode: BucketMode,
 ) -> Vec<UsageBreakdownItem> {
-    let mut stmt = conn
+    let mut stmt = match conn
         .prepare(
             "SELECT provider, COALESCE(model, 'unknown'), SUM(tokens_total), SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts)
              FROM usage_messages
@@ -544,10 +558,12 @@ fn query_top_models_all(
              GROUP BY provider, model
              ORDER BY 3 DESC
              LIMIT 6",
-        )
-        .unwrap();
+        ) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
 
-    stmt.query_map(params![since], |row| {
+    let rows = match stmt.query_map(params![since], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,
@@ -558,9 +574,11 @@ fn query_top_models_all(
             row.get::<_, i64>(6)?,
             row.get::<_, i64>(7)?,
         ))
-    })
-    .unwrap()
-    .filter_map(|r| r.ok())
+    }) {
+        Ok(rows) => rows,
+        Err(_) => return Vec::new(),
+    };
+    rows.filter_map(|r| r.ok())
     .map(|(provider, label, tokens, input, output, cache_read, cache_write, thoughts)| {
         let cost = find_pricing(&label, pricing)
             .map(|p| calculate_cost(p, input, output, cache_read, cache_write, thoughts));
@@ -584,7 +602,7 @@ fn query_top_projects_all(
     bucket_count: i64,
     mode: BucketMode,
 ) -> Vec<UsageBreakdownItem> {
-    let mut stmt = conn
+    let mut stmt = match conn
         .prepare(
             "SELECT provider, COALESCE(project, 'unknown'), SUM(tokens_total), COUNT(DISTINCT session_id)
              FROM usage_messages
@@ -592,19 +610,23 @@ fn query_top_projects_all(
              GROUP BY provider, project
              ORDER BY 3 DESC
              LIMIT 6",
-        )
-        .unwrap();
+        ) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
 
-    stmt.query_map(params![since], |row| {
+    let rows = match stmt.query_map(params![since], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,
             row.get::<_, i64>(2)?,
             row.get::<_, i64>(3)?,
         ))
-    })
-    .unwrap()
-    .filter_map(|r| r.ok())
+    }) {
+        Ok(rows) => rows,
+        Err(_) => return Vec::new(),
+    };
+    rows.filter_map(|r| r.ok())
     .map(|(provider, label, tokens, sessions)| {
         let cost = windowed_cost_for_project(conn, &provider, since, &label, pricing);
         let trend = query_named_trend(conn, since, bucket_count, mode, "project", &provider, &label);
@@ -750,7 +772,7 @@ fn query_trend_hourly(
 ) -> Vec<UsageTrendBucket> {
     let hour_start = align_to_local_hour(conn, since);
     let mut bucket_map: BTreeMap<i64, BTreeMap<String, (u64, f64, bool)>> = BTreeMap::new();
-    let mut stmt = conn
+    let mut stmt = match conn
         .prepare(
             "SELECT provider,
                     CAST((strftime('%s', strftime('%Y-%m-%d %H:00:00', timestamp, 'unixepoch', 'localtime')) - ?1) / 3600 AS INTEGER) as bucket_idx,
@@ -764,10 +786,12 @@ fn query_trend_hourly(
              FROM usage_messages
              WHERE timestamp >= ?2
              GROUP BY provider, bucket_idx, model",
-        )
-        .unwrap();
+        ) {
+        Ok(s) => s,
+        Err(_) => return build_trend_buckets(bucket_count, hour_start, 3600, bucket_map),
+    };
 
-    let rows = stmt.query_map(params![hour_start, since], |row| {
+    let rows = match stmt.query_map(params![hour_start, since], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, i64>(1)?,
@@ -779,7 +803,10 @@ fn query_trend_hourly(
             row.get::<_, i64>(7)?,
             row.get::<_, i64>(8)?,
         ))
-    }).unwrap();
+    }) {
+        Ok(rows) => rows,
+        Err(_) => return build_trend_buckets(bucket_count, hour_start, 3600, bucket_map),
+    };
 
     for row in rows.flatten() {
         let (provider, bucket_idx, model, tokens, input, output, cache_read, cache_write, thoughts) = row;
@@ -807,7 +834,7 @@ fn query_trend_daily(
     let day_start = cutoff_local_date(conn, since);
     let cutoff_date = day_start.clone();
     let mut bucket_map: BTreeMap<i64, BTreeMap<String, (u64, f64, bool)>> = BTreeMap::new();
-    let mut stmt = conn
+    let mut stmt = match conn
         .prepare(
             "SELECT provider,
                     CAST(julianday(bucket_day) - julianday(?1) AS INTEGER) as bucket_idx,
@@ -830,10 +857,15 @@ fn query_trend_daily(
                 WHERE date >= ?1
              )
              GROUP BY provider, bucket_idx, model",
-        )
-        .unwrap();
+        ) {
+        Ok(s) => s,
+        Err(_) => {
+            let start_epoch = day_start_epoch(conn, &day_start);
+            return build_trend_buckets(bucket_count, start_epoch, 86_400, bucket_map);
+        }
+    };
 
-    let rows = stmt.query_map(params![cutoff_date, since], |row| {
+    let rows = match stmt.query_map(params![cutoff_date, since], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, i64>(1)?,
@@ -845,7 +877,13 @@ fn query_trend_daily(
             row.get::<_, i64>(7)?,
             row.get::<_, i64>(8)?,
         ))
-    }).unwrap();
+    }) {
+        Ok(rows) => rows,
+        Err(_) => {
+            let start_epoch = day_start_epoch(conn, &day_start);
+            return build_trend_buckets(bucket_count, start_epoch, 86_400, bucket_map);
+        }
+    };
 
     for row in rows.flatten() {
         let (provider, bucket_idx, model, tokens, input, output, cache_read, cache_write, thoughts) = row;

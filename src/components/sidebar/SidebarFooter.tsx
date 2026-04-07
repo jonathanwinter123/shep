@@ -1,24 +1,16 @@
-import { CodeXml, ChartNoAxesCombined } from "lucide-react";
+import { ChartNoAxesCombined, Radio } from "lucide-react";
 import { useUIStore } from "../../stores/useUIStore";
 import GearIcon from "./icons/GearIcon";
 
-interface SidebarFooterProps {
-  activeRepoPath: string | null;
-  onOpenInEditor: (repoPath: string) => void;
-}
-
-export default function SidebarFooter({
-  activeRepoPath,
-  onOpenInEditor,
-}: SidebarFooterProps) {
+export default function SidebarFooter() {
   const settingsTabOpen = useUIStore((s) => s.settingsTabOpen);
   const usageTabOpen = useUIStore((s) => s.usageTabOpen);
-  const { toggleSettings, toggleUsagePanel } = useUIStore.getState();
-  const editorDisabled = !activeRepoPath;
+  const portsPanelOpen = useUIStore((s) => s.portsPanelOpen);
+  const { toggleSettings, toggleUsagePanel, togglePortsPanel } = useUIStore.getState();
   const footerButtonClass = "tab !flex-1 !shrink !justify-center !gap-0.5 !px-2 !py-1.5 flex-col min-w-0";
 
   return (
-    <div className="border-t border-white/8 px-2 pt-2 pb-1.5">
+    <div className="border-t border-[var(--glass-border)] px-2 pt-2 pb-1.5">
       <div className="flex items-stretch gap-1">
         <button
           onClick={toggleSettings}
@@ -37,20 +29,12 @@ export default function SidebarFooter({
           <span className="text-[10px]">Usage</span>
         </button>
         <button
-          onClick={() => {
-            if (activeRepoPath) {
-              onOpenInEditor(activeRepoPath);
-            }
-          }}
-          disabled={editorDisabled}
-          className={`${footerButtonClass} ${
-            editorDisabled ? "opacity-40 cursor-default hover:!bg-transparent hover:!text-[var(--text-secondary)]" : ""
-          }`}
-          title="IDE"
-          aria-label={editorDisabled ? "Open project in IDE unavailable" : "Open active project in IDE"}
+          onClick={togglePortsPanel}
+          className={`${footerButtonClass} ${portsPanelOpen ? "active" : ""}`}
+          aria-label="Open ports"
         >
-          <CodeXml size={20} />
-          <span className="text-[10px]">IDE</span>
+          <Radio size={18} />
+          <span className="text-[10px]">Ports</span>
         </button>
       </div>
     </div>

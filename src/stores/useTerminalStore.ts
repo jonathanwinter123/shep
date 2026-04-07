@@ -25,15 +25,11 @@ interface TerminalStore {
   setTabBell: (ptyId: number) => void;
   clearTabBell: (ptyId: number) => void;
   removeActivity: (ptyId: number) => void;
+  getAllProjectTabs: (repoPath: string) => TerminalTab[];
 }
 
 function emptyState(): ProjectTerminalState {
   return { tabs: [], activeTabId: null };
-}
-
-function getActiveState(state: TerminalStore): ProjectTerminalState {
-  if (!state.activeProjectPath) return emptyState();
-  return state.projectState[state.activeProjectPath] ?? emptyState();
 }
 
 let tabCounter = 0;
@@ -61,12 +57,14 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
   removeProject: (repoPath: string) => {
     set((state) => {
       const projectState = { ...state.projectState };
-      const removedTabs = projectState[repoPath]?.tabs ?? [];
+      const project = projectState[repoPath];
       delete projectState[repoPath];
 
       const tabActivity = { ...state.tabActivity };
-      for (const tab of removedTabs) {
-        delete tabActivity[tab.ptyId];
+      if (project) {
+        for (const tab of project.tabs) {
+          delete tabActivity[tab.ptyId];
+        }
       }
 
       return {
@@ -83,12 +81,12 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     set((state) => {
       const path = state.activeProjectPath;
       if (!path) return state;
-      const current = state.projectState[path] ?? emptyState();
+      const ps = state.projectState[path] ?? emptyState();
       return {
         projectState: {
           ...state.projectState,
           [path]: {
-            tabs: [...current.tabs, tab],
+            tabs: [...ps.tabs, tab],
             activeTabId: tab.id,
           },
         },
@@ -100,14 +98,13 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     set((state) => {
       const path = state.activeProjectPath;
       if (!path) return state;
-      const current = state.projectState[path] ?? emptyState();
-      const tabs = current.tabs.filter((t) => t.id !== id);
+      const ps = state.projectState[path];
+      if (!ps) return state;
+      const tabs = ps.tabs.filter((t) => t.id !== id);
       const activeTabId =
-        current.activeTabId === id
-          ? tabs.length > 0
-            ? tabs[tabs.length - 1].id
-            : null
-          : current.activeTabId;
+        ps.activeTabId === id
+          ? tabs.length > 0 ? tabs[tabs.length - 1].id : null
+          : ps.activeTabId;
       return {
         projectState: {
           ...state.projectState,
@@ -121,11 +118,12 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     set((state) => {
       const path = state.activeProjectPath;
       if (!path) return state;
-      const current = state.projectState[path] ?? emptyState();
+      const ps = state.projectState[path];
+      if (!ps || !ps.tabs.some((t) => t.id === id)) return state;
       return {
         projectState: {
           ...state.projectState,
-          [path]: { ...current, activeTabId: id },
+          [path]: { ...ps, activeTabId: id },
         },
       };
     });
@@ -135,14 +133,15 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     set((state) => {
       const path = state.activeProjectPath;
       if (!path) return state;
-      const current = state.projectState[path] ?? emptyState();
-      const tabs = current.tabs.map((t) =>
-        t.id === id ? { ...t, ...patch } : t,
-      );
+      const ps = state.projectState[path];
+      if (!ps) return state;
       return {
         projectState: {
           ...state.projectState,
-          [path]: { ...current, tabs },
+          [path]: {
+            ...ps,
+            tabs: ps.tabs.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+          },
         },
       };
     });
@@ -152,34 +151,39 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     set((state) => {
       const path = state.activeProjectPath;
       if (!path) return state;
-      const current = state.projectState[path] ?? emptyState();
-      const fromIndex = current.tabs.findIndex((t) => t.id === tabId);
+      const ps = state.projectState[path];
+      if (!ps) return state;
+      const fromIndex = ps.tabs.findIndex((t) => t.id === tabId);
       if (fromIndex === -1) return state;
 
-      const boundedIndex = Math.max(0, Math.min(toIndex, current.tabs.length));
+      const boundedIndex = Math.max(0, Math.min(toIndex, ps.tabs.length));
       const targetIndex = boundedIndex > fromIndex ? boundedIndex - 1 : boundedIndex;
       if (fromIndex === targetIndex) return state;
 
-      const tabs = [...current.tabs];
+      const tabs = [...ps.tabs];
       const [moved] = tabs.splice(fromIndex, 1);
       tabs.splice(targetIndex, 0, moved);
       return {
         projectState: {
           ...state.projectState,
-          [path]: { ...current, tabs },
+          [path]: { ...ps, tabs },
         },
       };
     });
   },
 
   findTabByCommand: (commandName: string) => {
-    const active = getActiveState(get());
-    return active.tabs.find((t) => t.commandName === commandName);
+    const state = get();
+    if (!state.activeProjectPath) return undefined;
+    const ps = state.projectState[state.activeProjectPath];
+    return ps?.tabs.find((t) => t.commandName === commandName);
   },
 
   findTabByPtyId: (ptyId: number) => {
-    const active = getActiveState(get());
-    return active.tabs.find((t) => t.ptyId === ptyId);
+    const state = get();
+    if (!state.activeProjectPath) return undefined;
+    const ps = state.projectState[state.activeProjectPath];
+    return ps?.tabs.find((t) => t.ptyId === ptyId);
   },
 
   initActivity: (ptyId: number) => {
@@ -228,5 +232,10 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
       const { [ptyId]: _, ...rest } = state.tabActivity;
       return { tabActivity: rest };
     });
+  },
+
+  getAllProjectTabs: (repoPath: string) => {
+    const ps = get().projectState[repoPath];
+    return ps?.tabs ?? [];
   },
 }));

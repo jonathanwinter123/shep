@@ -37,7 +37,7 @@ export default function DevMemory() {
 
   return (
     <div
-      className="flex items-center gap-2 shrink-0 text-[10px] pl-3 border-l border-white/8 opacity-50 select-none font-mono"
+      className="flex items-center gap-2 shrink-0 text-[10px] pl-3 border-l border-[var(--glass-border)] opacity-50 select-none font-mono"
       title={`Shep: ${formatMB(app)} MB\nCLI tools: ${formatMB(children)} MB`}
     >
       <span>shep {formatMB(app)}M</span>

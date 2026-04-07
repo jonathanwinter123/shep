@@ -1,6 +1,6 @@
 use std::process::Command;
 
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, Clone, Default)]
 pub struct GitStatus {
     pub is_git_repo: bool,
     pub branch: String,
@@ -10,21 +10,8 @@ pub struct GitStatus {
     pub untracked: u32,
     pub ahead: u32,
     pub behind: u32,
-}
-
-impl Default for GitStatus {
-    fn default() -> Self {
-        Self {
-            is_git_repo: false,
-            branch: String::new(),
-            dirty: false,
-            staged: 0,
-            unstaged: 0,
-            untracked: 0,
-            ahead: 0,
-            behind: 0,
-        }
-    }
+    /// If this is a worktree, the name of the parent repo (derived from its path)
+    pub worktree_parent: Option<String>,
 }
 
 pub fn status(path: &str) -> GitStatus {
@@ -58,7 +45,7 @@ pub fn status(path: &str) -> GitStatus {
             }
         } else if line.starts_with("1 ") || line.starts_with("2 ") {
             // Changed entry: XY columns at index 2..4
-            let xy: Vec<u8> = line.as_bytes().get(2..4).unwrap_or(&[b'.', b'.']).to_vec();
+            let xy: Vec<u8> = line.as_bytes().get(2..4).unwrap_or(b"..").to_vec();
             if xy[0] != b'.' {
                 staged += 1;
             }
@@ -76,6 +63,31 @@ pub fn status(path: &str) -> GitStatus {
 
     let dirty = staged > 0 || unstaged > 0 || untracked > 0;
 
+    // Detect if this is a worktree by checking if .git is a file (not a directory)
+    let git_path = std::path::Path::new(path).join(".git");
+    let worktree_parent = if git_path.is_file() {
+        // This is a worktree — resolve the main repo path via git-common-dir
+        Command::new("git")
+            .args(["-C", path, "rev-parse", "--git-common-dir"])
+            .output()
+            .ok()
+            .and_then(|o| {
+                if o.status.success() {
+                    let common = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                    // common is something like /path/to/main-repo/.git
+                    // Get the parent directory name
+                    std::path::Path::new(&common)
+                        .parent()
+                        .and_then(|p| p.file_name())
+                        .map(|n| n.to_string_lossy().to_string())
+                } else {
+                    None
+                }
+            })
+    } else {
+        None
+    };
+
     GitStatus {
         is_git_repo: true,
         branch,
@@ -85,6 +97,7 @@ pub fn status(path: &str) -> GitStatus {
         untracked,
         ahead,
         behind,
+        worktree_parent,
     }
 }
 
@@ -155,34 +168,9 @@ pub fn list_branches(path: &str) -> Result<Vec<String>, String> {
     Ok(branches)
 }
 
-pub fn create_worktree(
-    repo_path: &str,
-    worktree_path: &str,
-    branch_name: &str,
-) -> Result<(), String> {
+pub fn push_branch(path: &str, branch: &str) -> Result<(), String> {
     let output = Command::new("git")
-        .args([
-            "-C",
-            repo_path,
-            "worktree",
-            "add",
-            "-b",
-            branch_name,
-            worktree_path,
-        ])
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
-    }
-
-    Ok(())
-}
-
-pub fn remove_worktree(repo_path: &str, worktree_path: &str) -> Result<(), String> {
-    let output = Command::new("git")
-        .args(["-C", repo_path, "worktree", "remove", worktree_path])
+        .args(["-C", path, "push", "-u", "origin", branch])
         .output()
         .map_err(|e| e.to_string())?;
 
@@ -200,6 +188,12 @@ pub struct WorktreeEntry {
     pub path: String,
     pub branch: Option<String>,
     pub is_main: bool,
+}
+
+#[derive(serde::Serialize, Clone)]
+pub struct CreatedWorktree {
+    pub path: String,
+    pub branch: String,
 }
 
 pub fn list_worktrees(path: &str) -> Result<Vec<WorktreeEntry>, String> {
@@ -247,6 +241,86 @@ pub fn list_worktrees(path: &str) -> Result<Vec<WorktreeEntry>, String> {
     Ok(entries)
 }
 
+pub fn create_worktree(path: &str, branch_name: &str) -> Result<CreatedWorktree, String> {
+    let branch_name = branch_name.trim();
+    if branch_name.is_empty() {
+        return Err("Branch name is required".to_string());
+    }
+
+    let repo_path = std::path::Path::new(path)
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve repo path: {e}"))?;
+
+    if repo_path.join(".git").is_file() {
+        return Err("Create worktree is only available from the main repo checkout".to_string());
+    }
+
+    let validate = Command::new("git")
+        .args(["-C", path, "check-ref-format", "--branch", branch_name])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !validate.status.success() {
+        let stderr = String::from_utf8_lossy(&validate.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            format!("Invalid branch name: {branch_name}")
+        } else {
+            stderr
+        });
+    }
+
+    let repo_name = repo_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Could not determine repo name".to_string())?;
+    let repo_parent = repo_path
+        .parent()
+        .ok_or_else(|| "Could not determine repo parent".to_string())?;
+
+    let branch_slug = branch_name
+        .chars()
+        .map(|c| match c {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' => c,
+            _ => '-',
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    let branch_slug = if branch_slug.is_empty() {
+        "worktree".to_string()
+    } else {
+        branch_slug
+    };
+
+    let worktree_path = repo_parent
+        .join(".shep-worktrees")
+        .join(repo_name)
+        .join(branch_slug);
+
+    if worktree_path.exists() {
+        return Err(format!("Worktree path already exists: {}", worktree_path.display()));
+    }
+
+    if let Some(parent) = worktree_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create worktree directory: {e}"))?;
+    }
+
+    let worktree_path_string = worktree_path.to_string_lossy().to_string();
+    let output = Command::new("git")
+        .args(["-C", path, "worktree", "add", "-b", branch_name, &worktree_path_string])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+
+    Ok(CreatedWorktree {
+        path: worktree_path_string,
+        branch: branch_name.to_string(),
+    })
+}
+
 // ── Changed files (porcelain v2 parsing) ────────────────────────────
 
 #[derive(serde::Serialize, Clone)]
@@ -286,6 +360,7 @@ pub fn changed_files(path: &str) -> Result<Vec<ChangedFile>, String> {
             let parts: Vec<&str> = entry.splitn(9, ' ').collect();
             if parts.len() >= 9 {
                 let xy = parts[1].as_bytes();
+                if xy.len() < 2 { i += 1; continue; }
                 let file_path = parts[8].to_string();
 
                 if xy[0] != b'.' {
@@ -311,6 +386,7 @@ pub fn changed_files(path: &str) -> Result<Vec<ChangedFile>, String> {
             let parts: Vec<&str> = entry.splitn(10, ' ').collect();
             if parts.len() >= 10 {
                 let xy = parts[1].as_bytes();
+                if xy.len() < 2 { i += 1; continue; }
                 let file_path = parts[9].to_string();
                 // The original path follows as the next NUL-delimited field
                 let old_path = entries.get(i + 1).map(|s| s.to_string());
@@ -348,8 +424,8 @@ pub fn changed_files(path: &str) -> Result<Vec<ChangedFile>, String> {
                 });
             }
             i += 1;
-        } else if entry.starts_with("? ") {
-            let file_path = entry[2..].to_string();
+        } else if let Some(rest) = entry.strip_prefix("? ") {
+            let file_path = rest.to_string();
             files.push(ChangedFile {
                 path: file_path,
                 status: "?".to_string(),
@@ -421,6 +497,32 @@ pub fn stage_file(path: &str, file_path: &str) -> Result<(), String> {
 
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(())
+}
+
+pub fn stage_all(path: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["-C", path, "add", "-A"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(())
+}
+
+pub fn commit(path: &str, message: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["-C", path, "commit", "-m", message])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
 
     Ok(())

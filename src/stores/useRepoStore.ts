@@ -26,7 +26,16 @@ export const useRepoStore = create<RepoStore>((set, get) => ({
 
   fetchRepos: async () => {
     const repos = await listRepos();
-    set({ repos });
+    set((state) => {
+      const activeStillExists = state.activeRepoPath
+        ? repos.some((repo) => repo.path === state.activeRepoPath)
+        : true;
+
+      return {
+        repos,
+        ...(activeStillExists ? {} : { activeRepoPath: null, activeConfig: null }),
+      };
+    });
   },
 
   openRepo: async (repoPath: string) => {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronDown, Check, Plus, GitFork } from "lucide-react";
-import { gitListBranches, gitSwitchBranch, gitCreateBranch } from "../../lib/tauri";
+import { gitListBranches, gitSwitchBranch, gitCreateBranch, gitListWorktrees } from "../../lib/tauri";
 import { useGitStore } from "../../stores/useGitStore";
 
 interface BranchDropdownProps {
@@ -8,10 +8,6 @@ interface BranchDropdownProps {
   currentBranch: string;
   isWorktree: boolean;
   onBranchChanged: () => void;
-  /** Map of branch name → worktree path for branches checked out in worktrees */
-  worktreeMap?: Map<string, string>;
-  /** Called when user clicks a worktree branch to view it */
-  onViewWorktree?: (path: string) => void;
 }
 
 export default function BranchDropdown({
@@ -19,12 +15,11 @@ export default function BranchDropdown({
   currentBranch,
   isWorktree,
   onBranchChanged,
-  worktreeMap,
-  onViewWorktree,
 }: BranchDropdownProps) {
   const refreshStatus = useGitStore((s) => s.refreshStatus);
   const [open, setOpen] = useState(false);
   const [branches, setBranches] = useState<string[]>([]);
+  const [worktreeMap, setWorktreeMap] = useState<Map<string, string>>(new Map());
   const [switching, setSwitching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -50,6 +45,15 @@ export default function BranchDropdown({
     gitListBranches(repoPath)
       .then(setBranches)
       .catch(() => setBranches([]));
+    gitListWorktrees(repoPath)
+      .then((wts) => {
+        const map = new Map<string, string>();
+        for (const wt of wts) {
+          if (!wt.is_main && wt.branch) map.set(wt.branch, wt.path);
+        }
+        setWorktreeMap(map);
+      })
+      .catch(() => setWorktreeMap(new Map()));
   }, [repoPath]);
 
   const handleSwitch = useCallback(
@@ -95,16 +99,11 @@ export default function BranchDropdown({
 
   const handleClick = useCallback(
     (branch: string) => {
-      const wtPath = worktreeMap?.get(branch);
-      if (wtPath && onViewWorktree) {
-        // Worktree branch — view it instead of switching
-        onViewWorktree(wtPath);
-        setOpen(false);
-      } else {
-        handleSwitch(branch);
-      }
+      // Can't switch to a branch checked out in a worktree
+      if (worktreeMap.has(branch)) return;
+      handleSwitch(branch);
     },
-    [worktreeMap, onViewWorktree, handleSwitch],
+    [worktreeMap, handleSwitch],
   );
 
   // Worktree sessions: branch is locked, show read-only
@@ -180,6 +179,10 @@ export default function BranchDropdown({
                   className="branch-dropdown__input"
                   type="text"
                   autoFocus
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   placeholder="new-branch-name"
                   value={newBranchName}
                   onChange={(e) => setNewBranchName(e.target.value)}

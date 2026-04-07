@@ -11,16 +11,16 @@ Shep gives each repo a dedicated workspace for terminals, AI coding agents, comm
 ## Why Shep
 
 - Keep project terminals grouped by repo instead of spread across shell windows.
-- Launch AI coding agents from the app with standard, worktree, and autonomous modes.
+- Launch AI coding agents from the app with standard and auto-accept modes.
 - Start common tasks quickly with saved commands and autostart behavior.
 - See which sessions are running, stopped, or need attention without hunting for them.
-- Use git worktrees to isolate agent runs from your main branch.
+- Discover existing git worktrees and work in them from the same UI.
 
 ## What It Does
 
 - **Project workspaces** for repos, tasks, agents, and terminal tabs
 - **Assistant launcher** for Codex CLI, Claude Code, and Gemini CLI
-- **Git-aware sessions** with worktree-backed agent launches
+- **Git-aware project views** including discovered worktrees
 - **Autostart tasks** for dev servers, watchers, and recurring commands
 - **Status indicators** so crashed or noisy sessions are easy to spot
 - **Usage tracking** for AI coding assistant costs across providers
@@ -62,23 +62,24 @@ Open Shep and add a local repository from the sidebar.
 
 ### 2. Configure tasks
 
-Shep stores project configuration under `~/.shep/projects/<project-name>/workspace.yml`.
+Shep stores project configuration under `<repo>/.shep/workspace.yml`.
 
 Example:
 
 ```yaml
 name: my-app
-cwd: /Users/you/projects/my-app
-tasks:
+commands:
   - name: dev server
     command: npm run dev
     autostart: true
+    env: {}
+    cwd: null
   - name: tests
     command: npm test -- --watch
     autostart: false
-  - name: codex
-    command: codex
-    autostart: false
+    env: {}
+    cwd: null
+assistants: []
 ```
 
 ### 3. Open workspaces and sessions
@@ -93,13 +94,14 @@ Use the sidebar and tab bar to:
 
 ## Assistant Modes
 
-Shep supports three session modes for supported coding agents:
+Shep supports two session modes for supported coding agents:
 
 | Mode | Purpose |
 | --- | --- |
 | `Standard` | Runs the agent in the current repo directory |
-| `Worktree` | Creates an isolated git worktree for the session |
-| `YOLO` | Uses a worktree and the agent's more autonomous mode when available |
+| `YOLO` | Runs the agent in the current repo directory with auto-accept when supported |
+
+Worktrees are managed outside Shep. If you create one with git, you can add or discover it in Shep and use the same terminals, assistants, commands, and git UI there.
 
 Supported today:
 

@@ -7,7 +7,7 @@ import type {
   UsageOverview,
   UsageTrendBucket,
 } from "../../lib/types";
-import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
 import { formatCost, formatPercent, formatReset, formatTokenCount, getProviderLabel, computePace, paceLabel } from "./usageHelpers";
 import type { UsageProvider, ProviderUsageSnapshot, UsageWindowSnapshot } from "../../lib/types";
@@ -445,7 +445,7 @@ function ProviderLimits({
             <div key={provider} className="usage-limit">
               <div className="usage-limit__header">
                 <span className="usage-limit__provider">
-                  {logoSrc ? <img src={logoSrc} alt="" className="usage-list__icon" /> : null}
+                  {logoSrc ? <img src={logoSrc} alt="" className={`usage-list__icon ${getAssistantLogoClass(provider) ?? ""}`} /> : null}
                   {getProviderLabel(provider)}
                 </span>
                 <span className="usage-limit__pct">{formatPercent(pct)} used</span>
@@ -530,7 +530,7 @@ function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snaps
               <div key={provider.provider} className="usage-list__row">
                 <div className="usage-list__info">
                   <span className="usage-list__label usage-list__label--provider">
-                    {logoSrc ? <img src={logoSrc} alt="" className="usage-list__icon" /> : null}
+                    {logoSrc ? <img src={logoSrc} alt="" className={`usage-list__icon ${getAssistantLogoClass(provider.provider) ?? ""}`} /> : null}
                     {getProviderLabel(provider.provider)}
                   </span>
                   <span className="usage-list__meta">{formatPercent(provider.sharePercent)} of total</span>

@@ -3,10 +3,12 @@ import type {
   RepoInfo,
   RegisteredRepo,
   WorkspaceConfig,
+  PtyColorTheme,
   PtyOutput,
   GitStatus,
   ChangedFile,
   WorktreeEntry,
+  CreatedWorktree,
   EditorSettings,
   KeybindingSettings,
   TerminalSettings,
@@ -15,6 +17,7 @@ import type {
   LocalUsageDetails,
   UsageSettings,
   UsageOverview,
+  PortInfo,
 } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -76,6 +79,14 @@ export function openInEditor(
   });
 }
 
+export function revealInFinder(path: string): Promise<void> {
+  return invoke("reveal_in_finder", { path });
+}
+
+export function openUrl(url: string): Promise<void> {
+  return invoke("open_url", { url });
+}
+
 // ── PTY commands ────────────────────────────────────────────────────
 
 export function spawnPty(
@@ -84,6 +95,7 @@ export function spawnPty(
   env: Record<string, string>,
   cols: number,
   rows: number,
+  colorTheme: PtyColorTheme,
   onMessage: (msg: PtyOutput) => void,
 ): Promise<number> {
   const channel = new Channel<PtyOutput>();
@@ -94,12 +106,17 @@ export function spawnPty(
     env,
     cols,
     rows,
+    colorTheme,
     onData: channel,
   });
 }
 
 export function writePty(ptyId: number, data: string): Promise<void> {
   return invoke("write_pty", { ptyId, data });
+}
+
+export function updatePtyColorTheme(colorTheme: PtyColorTheme): Promise<void> {
+  return invoke("update_pty_color_theme", { colorTheme });
 }
 
 export function resizePty(
@@ -148,23 +165,16 @@ export function gitListBranches(path: string): Promise<string[]> {
   return invoke("git_list_branches", { path });
 }
 
-export function gitCreateWorktree(
-  repoPath: string,
-  worktreePath: string,
-  branchName: string,
-): Promise<void> {
-  return invoke("git_create_worktree", { repoPath, worktreePath, branchName });
-}
-
-export function gitRemoveWorktree(
-  repoPath: string,
-  worktreePath: string,
-): Promise<void> {
-  return invoke("git_remove_worktree", { repoPath, worktreePath });
+export function gitPushBranch(path: string, branch: string): Promise<void> {
+  return invoke("git_push_branch", { path, branch });
 }
 
 export function gitListWorktrees(path: string): Promise<WorktreeEntry[]> {
   return invoke("git_list_worktrees", { path });
+}
+
+export function gitCreateWorktree(path: string, branchName: string): Promise<CreatedWorktree> {
+  return invoke("git_create_worktree", { path, branchName });
 }
 
 export function gitStatus(path: string): Promise<GitStatus> {
@@ -181,6 +191,14 @@ export function gitFileDiff(path: string, filePath: string, staged: boolean): Pr
 
 export function gitStageFile(path: string, filePath: string): Promise<void> {
   return invoke("git_stage_file", { path, filePath });
+}
+
+export function gitStageAll(path: string): Promise<void> {
+  return invoke("git_stage_all", { path });
+}
+
+export function gitCommit(path: string, message: string): Promise<void> {
+  return invoke("git_commit", { path, message });
 }
 
 export function gitUnstageFile(path: string, filePath: string): Promise<void> {
@@ -248,4 +266,14 @@ export interface MemoryStats {
 
 export function getMemoryStats(): Promise<MemoryStats> {
   return invoke("get_memory_stats");
+}
+
+// ── Port commands ─────────────────────────────────────────────────
+
+export function listListeningPorts(): Promise<PortInfo[]> {
+  return invoke("list_listening_ports");
+}
+
+export function killPort(pid: number): Promise<void> {
+  return invoke("kill_port", { pid });
 }

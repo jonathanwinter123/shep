@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getIdentifier, getName, getTauriVersion, getVersion } from "@tauri-apps/api/app";
 import { EDITOR_OPTIONS } from "../../lib/editors";
-import { THEME_LIST } from "../../lib/themes";
+import { DARK_THEMES, LIGHT_THEMES, TRANSPARENT_THEMES } from "../../lib/themes";
 import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useThemeStore } from "../../stores/useThemeStore";
@@ -9,8 +9,13 @@ import { useKeybindingStore } from "../../stores/useKeybindingStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUpdateStore } from "../../stores/useUpdateStore";
-import { assistantLogoSrc } from "../../lib/assistantLogos";
-import { FONT_OPTIONS, FONT_SIZE_OPTIONS } from "../../lib/terminalConfig";
+import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
+import {
+  displayTerminalFontFamily,
+  FONT_OPTIONS,
+  FONT_SIZE_OPTIONS,
+  normalizeTerminalFontFamily,
+} from "../../lib/terminalConfig";
 import type { CursorStyle, UsageProvider } from "../../lib/types";
 import { getErrorMessage } from "../../lib/errors";
 
@@ -38,6 +43,9 @@ export default function SettingsPanel() {
   const optionClass = "option-card w-44 justify-start";
   const [appMeta, setAppMeta] = useState<AppMeta | null>(null);
   const [appMetaError, setAppMetaError] = useState<string | null>(null);
+  const [customFontInput, setCustomFontInput] = useState(() =>
+    displayTerminalFontFamily(useTerminalSettingsStore.getState().settings.fontFamily)
+  );
   const themeId = useThemeStore((s) => s.themeId);
   const setTheme = useThemeStore((s) => s.setTheme);
   const settings = useEditorStore((s) => s.settings);
@@ -86,6 +94,10 @@ export default function SettingsPanel() {
   }, [hasLoaded, loadSettings, kbHasLoaded, loadKbSettings, termHasLoaded, loadTermSettings, usageHasLoaded, loadUsageSettings]);
 
   useEffect(() => {
+    setCustomFontInput(displayTerminalFontFamily(termSettings.fontFamily));
+  }, [termSettings.fontFamily]);
+
+  useEffect(() => {
     let cancelled = false;
 
     (async () => {
@@ -117,10 +129,11 @@ export default function SettingsPanel() {
   return (
     <div className="absolute inset-0 overflow-y-auto p-6">
       {/* ── Theme ──────────────────────────────────────────── */}
+      {/* ── Theme ──────────────────────────────────────────── */}
       <h2 className="section-label !p-0 mb-4">Theme</h2>
 
       <div className="flex flex-wrap gap-3">
-        {THEME_LIST.map((t) => {
+        {[...DARK_THEMES, ...LIGHT_THEMES, ...TRANSPARENT_THEMES].map((t) => {
           const active = t.id === themeId;
           return (
             <button
@@ -134,10 +147,6 @@ export default function SettingsPanel() {
                   width: 24,
                   height: 24,
                   background: `linear-gradient(135deg, ${t.bgRadial1} 0%, ${t.bgLinearMid} 50%, ${t.bgRadial3} 100%)`,
-                  outline: active
-                    ? "2px solid rgba(255,255,255,0.7)"
-                    : "2px solid transparent",
-                  outlineOffset: 2,
                 }}
               />
               <span>{t.name}</span>
@@ -145,6 +154,10 @@ export default function SettingsPanel() {
           );
         })}
       </div>
+
+      <p className="text-xs text-[var(--text-muted)] mt-4">
+        Note: CLI tools may need to be relaunched after switching themes. Use /theme to select light or dark if not updating.
+      </p>
 
       <hr className="settings-divider" />
 
@@ -165,7 +178,7 @@ export default function SettingsPanel() {
                 alt=""
                 width={20}
                 height={20}
-                className="shrink-0"
+                className={`shrink-0 ${option.logoClassName ?? ""}`}
               />
               <span>{option.label}</span>
             </button>
@@ -173,7 +186,7 @@ export default function SettingsPanel() {
         })}
       </div>
 
-      {isSaving && <div className="mt-2 text-xs text-white/40">Saving...</div>}
+      {isSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving...</div>}
       {error && <div className="mt-2 text-sm text-red-300">{error}</div>}
 
       <hr className="settings-divider" />
@@ -201,7 +214,7 @@ export default function SettingsPanel() {
         })}
       </div>
 
-      {kbIsSaving && <div className="mt-2 text-xs text-white/40">Saving keybindings...</div>}
+      {kbIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving keybindings...</div>}
       {kbError && <div className="mt-2 text-sm text-red-300">{kbError}</div>}
 
       <hr className="settings-divider" />
@@ -240,7 +253,10 @@ export default function SettingsPanel() {
           {FONT_OPTIONS.map((font) => (
             <button
               key={font.id}
-              onClick={() => void updateTermSettings({ fontFamily: font.id })}
+              onClick={() => {
+                setCustomFontInput("");
+                void updateTermSettings({ fontFamily: font.id });
+              }}
               className={`option-card option-card--compact ${termSettings.fontFamily === font.id ? "selected" : ""}`}
             >
               <span>{font.label}</span>
@@ -249,11 +265,19 @@ export default function SettingsPanel() {
           <input
             type="text"
             placeholder="Custom font name..."
-            className="option-card option-card--compact w-48 bg-transparent text-sm"
-            value={FONT_OPTIONS.some((f) => f.id === termSettings.fontFamily) ? "" : termSettings.fontFamily}
+            className={`option-card option-card--compact w-48 bg-transparent text-sm ${!FONT_OPTIONS.some((f) => f.id === termSettings.fontFamily) && customFontInput ? "selected" : ""}`}
+            value={customFontInput}
             onChange={(e) => {
-              if (e.target.value) {
-                void updateTermSettings({ fontFamily: e.target.value });
+              setCustomFontInput(e.target.value);
+            }}
+            onBlur={() => {
+              if (customFontInput.trim()) {
+                void updateTermSettings({ fontFamily: normalizeTerminalFontFamily(customFontInput) });
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.currentTarget.blur();
               }
             }}
           />
@@ -293,7 +317,7 @@ export default function SettingsPanel() {
         </div>
       </div>
 
-      {termIsSaving && <div className="mt-2 text-xs text-white/40">Saving terminal settings...</div>}
+      {termIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving terminal settings...</div>}
       {termError && <div className="mt-2 text-sm text-red-300">{termError}</div>}
 
       <hr className="settings-divider" />
@@ -313,17 +337,17 @@ export default function SettingsPanel() {
               onClick={() => void setProviderEnabled(provider, !active)}
               className={`${optionClass} ${active ? "selected" : ""}`}
             >
-              {logo && <img src={logo} alt="" width={20} height={20} className="shrink-0" />}
+              {logo && <img src={logo} alt="" width={20} height={20} className={`shrink-0 ${getAssistantLogoClass(provider) ?? ""}`} />}
               <span>{label}</span>
             </button>
           );
         })}
       </div>
 
-      {usageIsSaving && <div className="mt-2 text-xs text-white/40">Saving...</div>}
+      {usageIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving...</div>}
       {usageError && <div className="mt-2 text-sm text-red-300">{usageError}</div>}
 
-      <p className="text-xs text-white/30 mt-6">
+      <p className="text-xs text-[var(--text-muted)] mt-6">
         Settings are saved to ~/.shep/config.yml
       </p>
 
@@ -342,8 +366,8 @@ export default function SettingsPanel() {
             <div className="settings-meta-row">
               <span className="settings-meta-row__label">Release notes</span>
               <button
-                className="text-sm underline text-white/60 hover:text-white/80 bg-transparent border-0 cursor-pointer p-0"
-                onClick={() => import("@tauri-apps/plugin-shell").then((mod) => mod.open(releaseNotesUrl))}
+                className="text-sm underline text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-transparent border-0 cursor-pointer p-0"
+                onClick={() => import("../../lib/tauri").then((mod) => mod.openUrl(releaseNotesUrl))}
               >
                 View on GitHub
               </button>
@@ -363,13 +387,13 @@ export default function SettingsPanel() {
           <div className="update-progress-track mb-2">
             <div className="update-progress-fill" style={{ width: `${downloadProgress}%` }} />
           </div>
-          <div className="text-xs text-white/40">Downloading... {downloadProgress}%</div>
+          <div className="text-xs text-[var(--text-muted)]">Downloading... {downloadProgress}%</div>
         </div>
       )}
 
       {updateStatus === "ready" && (
         <div className="mb-4">
-          <div className="text-sm text-white/60 mb-2">Update downloaded and ready to install.</div>
+          <div className="text-sm text-[var(--text-secondary)] mb-2">Update downloaded and ready to install.</div>
           <button className="btn-primary" onClick={() => void restartApp()}>
             Restart Now
           </button>
@@ -391,7 +415,7 @@ export default function SettingsPanel() {
       )}
 
       {updateStatus === "idle" && hasChecked && (
-        <div className="text-xs text-white/40 mt-2">You're on the latest version.</div>
+        <div className="text-xs text-[var(--text-muted)] mt-2">You're on the latest version.</div>
       )}
 
       <hr className="settings-divider" />
@@ -420,10 +444,10 @@ export default function SettingsPanel() {
       ) : appMetaError ? (
         <div className="mt-2 text-sm text-red-300">{appMetaError}</div>
       ) : (
-        <div className="mt-2 text-xs text-white/40">Loading app info...</div>
+        <div className="mt-2 text-xs text-[var(--text-muted)]">Loading app info...</div>
       )}
 
-      <p className="text-xs text-white/40 mt-4 max-w-lg leading-5">
+      <p className="text-xs text-[var(--text-muted)] mt-4 max-w-lg leading-5">
         For tester reports, include the app version, what you were doing, and whether the issue happened in a packaged build or dev mode.
       </p>
     </div>

@@ -1,5 +1,6 @@
 mod commands;
 mod git;
+mod menu;
 mod pty;
 mod usage;
 mod watcher;
@@ -22,7 +23,10 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(PtyManager::new())
         .manage(WorkspaceManager::new())
-        .manage(UsageDb::open().expect("Failed to initialize usage database"))
+        .manage(UsageDb::open().unwrap_or_else(|e| {
+            eprintln!("Usage database failed to open ({e}), using in-memory fallback");
+            UsageDb::open_in_memory()
+        }))
         .setup(|app| {
             // Run migration from old project-based config
             let workspace = app.state::<WorkspaceManager>();
@@ -40,6 +44,8 @@ pub fn run() {
                 usage::run_background_ingest(&db);
                 let _ = handle.emit("usage-ingest-complete", ());
             });
+
+            menu::setup(app.handle())?;
 
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -78,8 +84,10 @@ pub fn run() {
             commands::get_terminal_settings,
             commands::save_terminal_settings,
             commands::open_in_editor,
+            commands::reveal_in_finder,
             commands::spawn_pty,
             commands::write_pty,
+            commands::update_pty_color_theme,
             commands::resize_pty,
             commands::kill_pty,
             commands::get_pty_session_count,
@@ -91,13 +99,15 @@ pub fn run() {
             commands::git_init,
             commands::git_current_branch,
             commands::git_list_branches,
-            commands::git_create_worktree,
-            commands::git_remove_worktree,
+            commands::git_push_branch,
             commands::git_list_worktrees,
+            commands::git_create_worktree,
             commands::git_status,
             commands::git_changed_files,
             commands::git_file_diff,
             commands::git_stage_file,
+            commands::git_stage_all,
+            commands::git_commit,
             commands::git_unstage_file,
             commands::git_switch_branch,
             commands::git_create_branch,
@@ -112,6 +122,9 @@ pub fn run() {
             commands::get_memory_stats,
             commands::watch_repo,
             commands::unwatch_repo,
+            commands::list_listening_ports,
+            commands::kill_port,
+            commands::open_url,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

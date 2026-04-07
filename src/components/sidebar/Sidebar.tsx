@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { RepoInfo, TerminalTab, CommandState } from "../../lib/types";
+import type { RepoInfo, CommandState } from "../../lib/types";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import SectionHeader from "./SectionHeader";
@@ -10,7 +10,6 @@ import SidebarUsage from "./SidebarUsage";
 interface SidebarProps {
   repos: RepoInfo[];
   activeRepoPath: string | null;
-  tabs: TerminalTab[];
   activeTabId: string | null;
   commands: CommandState[];
   onSelectRepo: (repoPath: string) => void;
@@ -26,7 +25,6 @@ interface SidebarProps {
 export default function Sidebar({
   repos,
   activeRepoPath,
-  tabs,
   activeTabId,
   commands,
   onSelectRepo,
@@ -58,7 +56,8 @@ export default function Sidebar({
     const tabActivity = useTerminalStore.getState().tabActivity;
     const activity: Record<string, { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean }> = {};
     for (const repo of repos) {
-      const repoTabs = projectState[repo.path]?.tabs ?? [];
+      const ps = projectState[repo.path];
+      const repoTabs = ps?.tabs ?? [];
       const cmds = projectCommands[repo.path] ?? [];
       let hasAttention = false;
       let hasCrash = false;
@@ -80,13 +79,12 @@ export default function Sidebar({
   }, [repos, projectState, projectCommands, activityKey]);
 
   return (
-    <div className="w-72 shrink-0 flex flex-col h-full pr-4 mr-4 border-r border-white/8" onContextMenu={(e) => e.preventDefault()}>
+    <div className="w-72 shrink-0 flex flex-col h-full pr-4 mr-4 border-r border-[var(--glass-border)]" onContextMenu={(e) => e.preventDefault()}>
       <div className="flex-1 overflow-y-auto min-h-0">
         <SectionHeader label="Projects" />
         <ProjectList
           repos={repos}
           activeRepoPath={activeRepoPath}
-          tabs={tabs}
           activeTabId={activeTabId}
           commands={commands}
           projectActivity={projectActivity}
@@ -101,10 +99,7 @@ export default function Sidebar({
         />
       </div>
       <SidebarUsage />
-      <SidebarFooter
-        activeRepoPath={activeRepoPath}
-        onOpenInEditor={onOpenInEditor}
-      />
+      <SidebarFooter />
     </div>
   );
 }

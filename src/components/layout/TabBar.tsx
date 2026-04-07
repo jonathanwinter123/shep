@@ -2,13 +2,13 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useUIStore } from "../../stores/useUIStore";
-import { useGitStore } from "../../stores/useGitStore";
 import { useShallow } from "zustand/shallow";
-import { GitBranch, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined } from "lucide-react";
+import { GitBranch, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined, Radio } from "lucide-react";
 import GearIcon from "../sidebar/icons/GearIcon";
-import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
 import DevMemory from "./DevMemory";
+
 
 function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () => void; onNewShell: () => void }) {
   const [open, setOpen] = useState(false);
@@ -160,6 +160,7 @@ export default function TabBar({
     launcherOpen, launcherActive,
     commandsPanelOpen, commandsPanelActive,
     usageTabOpen, usagePanelActive,
+    portsPanelOpen, portsPanelActive,
   } = useUIStore(useShallow((s) => ({
     settingsTabOpen: s.settingsTabOpen,
     settingsActive: s.settingsActive,
@@ -171,25 +172,21 @@ export default function TabBar({
     commandsPanelActive: s.commandsPanelActive,
     usageTabOpen: s.usageTabOpen,
     usagePanelActive: s.usagePanelActive,
+    portsPanelOpen: s.portsPanelOpen,
+    portsPanelActive: s.portsPanelActive,
   })));
 
   // Actions are stable — grab via getState() to avoid subscribing
   const {
     activateSettings, closeSettingsTab,
-    activateGitPanel, closeGitPanel, openGitPanel,
+    activateGitPanel, closeGitPanel,
     activateLauncher, closeLauncher,
     activateCommandsPanel, closeCommandsPanel,
     activateUsagePanel, closeUsageTab,
+    activatePortsPanel, closePortsPanel,
   } = useUIStore.getState();
 
-  // Git status — only subscribe to the active tab's repo, not all repos
-  const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
-  const activeTabCwd = activeTab?.worktreePath ?? activeTab?.repoPath ?? null;
-  const gitStatus = useGitStore((s) =>
-    activeTabCwd ? s.projectGitStatus[activeTabCwd] ?? null : null,
-  );
-
-  const anyOverlay = settingsActive || launcherActive || gitPanelActive || commandsPanelActive || usagePanelActive;
+  const anyOverlay = settingsActive || launcherActive || gitPanelActive || commandsPanelActive || usagePanelActive || portsPanelActive;
 
   const handleSelectTab = (tabId: string) => {
     useUIStore.getState().deactivateSettings();
@@ -197,6 +194,7 @@ export default function TabBar({
     useUIStore.getState().deactivateGitPanel();
     useUIStore.getState().deactivateCommandsPanel();
     useUIStore.getState().deactivateUsagePanel();
+    useUIStore.getState().deactivatePortsPanel();
     setActiveTab(tabId);
     const tab = tabs.find((t) => t.id === tabId);
     if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
@@ -236,7 +234,7 @@ export default function TabBar({
               aria-label={`Open tab ${tab.label}`}
             >
               {logoUrl ? (
-                <img src={logoUrl} alt="" width={12} height={12} />
+                <img src={logoUrl} alt="" width={12} height={12} className={tab.assistantId ? getAssistantLogoClass(tab.assistantId) : undefined} />
               ) : null}
               {editingTabId === tab.id ? (
                 <input
@@ -263,15 +261,17 @@ export default function TabBar({
                   onPointerDown={(e) => e.stopPropagation()}
                 />
               ) : (
-                <span
-                  className="truncate max-w-32"
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    setEditingTabId(tab.id);
-                  }}
-                >
-                  {tab.label}
-                </span>
+                <>
+                  <span
+                    className="truncate max-w-32"
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      setEditingTabId(tab.id);
+                    }}
+                  >
+                    {tab.label}
+                  </span>
+                </>
               )}
               <button
                 className="icon-btn ml-0.5"
@@ -387,6 +387,31 @@ export default function TabBar({
           </div>
         )}
 
+        {portsPanelOpen && (
+          <div
+            className={`tab ${portsPanelActive ? "active" : ""}`}
+            onClick={activatePortsPanel}
+            onKeyDown={(event) => handleActionKey(event, activatePortsPanel)}
+            role="tab"
+            tabIndex={0}
+            aria-selected={portsPanelActive}
+            aria-label="Open ports panel"
+          >
+            <Radio size={12} />
+            <span>Ports</span>
+            <button
+              className="icon-btn ml-0.5"
+              aria-label="Close ports panel"
+              onClick={(e) => {
+                e.stopPropagation();
+                closePortsPanel();
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {settingsTabOpen && (
           <div
             className={`tab ${settingsActive ? "active" : ""}`}
@@ -417,28 +442,6 @@ export default function TabBar({
 
       {import.meta.env.DEV && <DevMemory />}
 
-      {gitStatus?.is_git_repo && (
-        <div
-          className="flex items-center gap-1.5 shrink-0 text-xs pl-3 border-l border-white/8 cursor-pointer hover:opacity-80 transition-opacity"
-          onClick={openGitPanel}
-          onKeyDown={(event) => handleActionKey(event, openGitPanel)}
-          title="Open Git panel"
-          role="button"
-          tabIndex={0}
-          aria-label={`Open Git panel for branch ${gitStatus.branch}`}
-        >
-          <GitBranch size={12} />
-          <span className="truncate max-w-32">{gitStatus.branch}</span>
-          <span
-            className="w-1.5 h-1.5 rounded-full shrink-0"
-            style={{
-              backgroundColor: gitStatus.dirty
-                ? "rgb(251, 191, 36)"
-                : "rgb(74, 222, 128)",
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUIStore } from "../../stores/useUIStore";
 import type { UsageProvider } from "../../lib/types";
-import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { formatPercent, formatTokenCount, formatCost, computePace } from "../usage/usageHelpers";
 
 const ALL_PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini"];
@@ -103,7 +103,7 @@ export default function SidebarUsage() {
               onClick={toggleUsagePanel}
             >
               {logoSrc ? (
-                <img src={logoSrc} alt={provider} className="sidebar-usage__icon" />
+                <img src={logoSrc} alt={provider} className={`sidebar-usage__icon ${getAssistantLogoClass(provider) ?? ""}`} />
               ) : (
                 <span className="sidebar-usage__name">{provider}</span>
               )}

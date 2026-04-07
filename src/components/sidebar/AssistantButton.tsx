@@ -1,7 +1,11 @@
+import { useState, useCallback } from "react";
 import type { TerminalTab, TabActivity } from "../../lib/types";
-import { assistantLogoSrc } from "../../lib/assistantLogos";
+import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { handleActionKey } from "../../lib/a11y";
+import { X } from "lucide-react";
+import ContextMenu from "../shared/ContextMenu";
+import type { ContextMenuItem } from "../shared/ContextMenu";
 
 interface AssistantButtonProps {
   tab: TerminalTab;
@@ -25,31 +29,42 @@ export default function AssistantButton({
 }: AssistantButtonProps) {
   const logoUrl = tab.assistantId ? assistantLogoSrc[tab.assistantId] : null;
   const activity: TabActivity | undefined = useTerminalStore((s) => s.tabActivity[tab.ptyId]);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const menuItems: ContextMenuItem[] = [
+    {
+      label: "Close",
+      icon: <X size={14} />,
+      danger: true,
+      onClick: onClose,
+    },
+  ];
 
   return (
-    <div
-      className={`list-item sidebar-closable w-full ${isActive ? "active" : ""}`}
-      onClick={onClick}
-      onKeyDown={(event) => handleActionKey(event, onClick)}
-      title={tab.label}
-      role="button"
-      tabIndex={0}
-      aria-pressed={isActive}
-      aria-label={`Open assistant tab ${tab.label}`}
-    >
-      {logoUrl && <img src={logoUrl} alt="" width={14} height={14} />}
-      <span className="truncate text-left">{tab.label}</span>
-      <span className={`sidebar-status-dot ${dotClass(activity)}`} />
-      <button
-        className="icon-btn sidebar-close-btn"
-        aria-label={`Close assistant tab ${tab.label}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
+    <>
+      <div
+        className={`list-item w-full ${isActive ? "active" : ""}`}
+        onClick={onClick}
+        onContextMenu={handleContextMenu}
+        onKeyDown={(event) => handleActionKey(event, onClick)}
+        title={tab.label}
+        role="button"
+        tabIndex={0}
+        aria-pressed={isActive}
+        aria-label={`Open assistant tab ${tab.label}`}
       >
-        ×
-      </button>
-    </div>
+        {logoUrl && <img src={logoUrl} alt="" width={14} height={14} className={tab.assistantId ? getAssistantLogoClass(tab.assistantId) : undefined} />}
+        <span className="truncate text-left">{tab.label}</span>
+        <span className={`sidebar-status-dot ${dotClass(activity)}`} />
+      </div>
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />
+      )}
+    </>
   );
 }

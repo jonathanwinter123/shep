@@ -19,7 +19,9 @@ export default class TerminalErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("TerminalView crashed:", error, info.componentStack);
+    if (import.meta.env.DEV) {
+      console.error("TerminalView crashed:", error, info.componentStack);
+    }
   }
 
   render() {

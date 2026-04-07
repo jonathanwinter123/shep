@@ -1,18 +1,19 @@
-import { useMemo, useState } from "react";
-import type { RepoInfo, TerminalTab, CommandState } from "../../lib/types";
+import { useMemo, useRef, useState } from "react";
+import type { RepoInfo, CommandState } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Sparkles, SquareTerminal } from "lucide-react";
+import { useTerminalStore } from "../../stores/useTerminalStore";
+import { useGitStore } from "../../stores/useGitStore";
 import ProjectItem from "./ProjectItem";
 import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
-import GitStatusRow from "./GitStatusRow";
 import CommandsRow from "./CommandsRow";
+import GitStatusRow from "./GitStatusRow";
 
 interface ProjectListProps {
   repos: RepoInfo[];
   activeRepoPath: string | null;
-  tabs: TerminalTab[];
   activeTabId: string | null;
   commands: CommandState[];
   projectActivity: Record<string, { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean }>;
@@ -29,7 +30,6 @@ interface ProjectListProps {
 export default function ProjectList({
   repos,
   activeRepoPath,
-  tabs,
   activeTabId,
   commands,
   projectActivity,
@@ -47,9 +47,9 @@ export default function ProjectList({
   );
 
   // Auto-expand a newly selected project
-  const prevActiveRef = useState({ path: activeRepoPath })[0];
-  if (activeRepoPath && activeRepoPath !== prevActiveRef.path) {
-    prevActiveRef.path = activeRepoPath;
+  const prevActiveRef = useRef(activeRepoPath);
+  if (activeRepoPath && activeRepoPath !== prevActiveRef.current) {
+    prevActiveRef.current = activeRepoPath;
     if (!expandedPaths.has(activeRepoPath)) {
       setExpandedPaths((prev) => new Set(prev).add(activeRepoPath));
     }
@@ -57,7 +57,6 @@ export default function ProjectList({
 
   const handleProjectClick = (repoPath: string) => {
     if (repoPath === activeRepoPath) {
-      // Toggle collapse/expand for the active project
       setExpandedPaths((prev) => {
         const next = new Set(prev);
         if (next.has(repoPath)) next.delete(repoPath);
@@ -80,23 +79,47 @@ export default function ProjectList({
     }
   };
 
-  const assistantTabs = useMemo(
-    () => tabs.filter((t) => t.assistantId !== null),
-    [tabs],
+  // Get tabs for the active project (stable ref from store)
+  const projectTabs = useTerminalStore(
+    (s) => activeRepoPath ? s.projectState[activeRepoPath]?.tabs ?? null : null,
   );
 
-  const shellTabs = useMemo(
-    () => tabs.filter((t) => !t.assistantId),
-    [tabs],
-  );
+  const assistantTabs = useMemo(() => {
+    if (!projectTabs) return [];
+    return projectTabs.filter((t) => t.assistantId !== null);
+  }, [projectTabs]);
 
-  const commandsBadge = String(commands.length);
+  const shellTabs = useMemo(() => {
+    if (!projectTabs) return [];
+    return projectTabs.filter((t) => !t.assistantId);
+  }, [projectTabs]);
+
+  const commandsBadge = commands.length > 0 ? String(commands.length) : null;
+  const gitStatuses = useGitStore((s) => s.projectGitStatus);
+  const existingPaths = useMemo(() => new Set(repos.map((r) => r.path)), [repos]);
+  const sortedRepos = useMemo(() => {
+    return [...repos].sort((a, b) => {
+      const aWorktreeParent = gitStatuses[a.path]?.worktree_parent ?? null;
+      const bWorktreeParent = gitStatuses[b.path]?.worktree_parent ?? null;
+
+      const aGroup = aWorktreeParent ?? a.name;
+      const bGroup = bWorktreeParent ?? b.name;
+      const groupCompare = aGroup.localeCompare(bGroup);
+      if (groupCompare !== 0) return groupCompare;
+
+      if (aWorktreeParent == null && bWorktreeParent != null) return -1;
+      if (aWorktreeParent != null && bWorktreeParent == null) return 1;
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [repos, gitStatuses]);
 
   return (
     <div className="flex flex-col gap-0.5 px-2 pb-2">
-      {[...repos].sort((a, b) => a.name.localeCompare(b.name)).map((repo) => {
+      {sortedRepos.map((repo) => {
         const isActive = repo.path === activeRepoPath;
         const isExpanded = isActive && expandedPaths.has(repo.path);
+        const worktreeParent = gitStatuses[repo.path]?.worktree_parent ?? null;
         return (
           <div key={repo.path}>
             <ProjectItem
@@ -104,9 +127,12 @@ export default function ProjectList({
               isActive={isActive}
               isExpanded={isExpanded}
               activity={projectActivity[repo.path]}
+              worktreeParent={worktreeParent}
+              existingPaths={existingPaths}
               onOpenInEditor={() => onOpenInEditor(repo.path)}
               onRemove={() => onRemoveProject(repo.path)}
               onClick={() => handleProjectClick(repo.path)}
+              onAddProject={onAddProject}
             />
             {isExpanded && (
               <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">

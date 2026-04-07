@@ -1,6 +1,8 @@
 import type { ITheme } from "@xterm/xterm";
+import { hexLuminance } from "../../lib/themes";
 import type { ShepTheme } from "../../lib/themes";
 import type { TerminalSettings } from "../../lib/types";
+import { resizePty } from "../../lib/tauri";
 import { terminalCache } from "./TerminalView";
 
 // Utility to make hex colors partially transparent
@@ -14,13 +16,18 @@ function withAlpha(hex: string, alpha: number): string {
   return hex;
 }
 
+function isLightTheme(theme: ShepTheme): boolean {
+  return hexLuminance(theme.appBg) > 0.3;
+}
+
 export function createTerminalTheme(theme: ShepTheme): ITheme {
+  const light = isLightTheme(theme);
   return {
     background: "transparent",
     foreground: theme.termForeground,
     cursor: theme.termCursor,
     selectionBackground: theme.termSelection,
-    black: withAlpha(theme.termBlack, 0.4),
+    black: light ? theme.termBlack : withAlpha(theme.termBlack, 0.4),
     red: theme.termRed,
     green: theme.termGreen,
     yellow: theme.termYellow,
@@ -28,7 +35,7 @@ export function createTerminalTheme(theme: ShepTheme): ITheme {
     magenta: theme.termMagenta,
     cyan: theme.termCyan,
     white: theme.termWhite,
-    brightBlack: withAlpha(theme.termBrightBlack, 0.4),
+    brightBlack: light ? theme.termBrightBlack : withAlpha(theme.termBrightBlack, 0.4),
     brightRed: theme.termBrightRed,
     brightGreen: theme.termBrightGreen,
     brightYellow: theme.termBrightYellow,
@@ -55,11 +62,26 @@ export function applyThemeToTerminals(theme: ShepTheme): void {
 }
 
 export function applyTerminalSettings(settings: TerminalSettings): void {
-  for (const [, entry] of terminalCache) {
+  for (const [ptyId, entry] of terminalCache) {
+    const fontMetricsChanged =
+      entry.term.options.fontFamily !== settings.fontFamily ||
+      entry.term.options.fontSize !== settings.fontSize;
+
     entry.term.options.cursorStyle = settings.cursorStyle;
     entry.term.options.cursorBlink = settings.cursorBlink;
     entry.term.options.scrollback = settings.scrollback;
     entry.term.options.fontFamily = settings.fontFamily;
     entry.term.options.fontSize = settings.fontSize;
+
+    const el = entry.term.element;
+    if (!fontMetricsChanged || !el || el.offsetParent === null) continue;
+
+    entry.fitAddon.fit();
+    entry.term.refresh(0, entry.term.rows - 1);
+    resizePty(ptyId, entry.term.cols, entry.term.rows).catch((error) => {
+      if (import.meta.env.DEV) {
+        console.error("Failed to resize PTY after terminal settings change:", error);
+      }
+    });
   }
 }

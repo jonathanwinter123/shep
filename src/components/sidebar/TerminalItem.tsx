@@ -1,7 +1,10 @@
+import { useState, useCallback } from "react";
 import type { TerminalTab, TabActivity } from "../../lib/types";
-import { Terminal } from "lucide-react";
+import { Terminal, X } from "lucide-react";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { handleActionKey } from "../../lib/a11y";
+import ContextMenu from "../shared/ContextMenu";
+import type { ContextMenuItem } from "../shared/ContextMenu";
 
 interface TerminalItemProps {
   tab: TerminalTab;
@@ -24,30 +27,41 @@ export default function TerminalItem({
   onClose,
 }: TerminalItemProps) {
   const activity: TabActivity | undefined = useTerminalStore((s) => s.tabActivity[tab.ptyId]);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const menuItems: ContextMenuItem[] = [
+    {
+      label: "Close",
+      icon: <X size={14} />,
+      danger: true,
+      onClick: onClose,
+    },
+  ];
 
   return (
-    <div
-      className={`list-item sidebar-closable ${isActive ? "active" : ""}`}
-      onClick={onClick}
-      onKeyDown={(event) => handleActionKey(event, onClick)}
-      role="button"
-      tabIndex={0}
-      aria-pressed={isActive}
-      aria-label={`Open terminal tab ${tab.label}`}
-    >
-      <Terminal size={14} className="shrink-0" />
-      <span className="min-w-0 truncate text-left">{tab.label}</span>
-      <span className={`sidebar-status-dot ${dotClass(activity)}`} />
-      <button
-        className="icon-btn sidebar-close-btn"
-        aria-label={`Close terminal tab ${tab.label}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
+    <>
+      <div
+        className={`list-item ${isActive ? "active" : ""}`}
+        onClick={onClick}
+        onContextMenu={handleContextMenu}
+        onKeyDown={(event) => handleActionKey(event, onClick)}
+        role="button"
+        tabIndex={0}
+        aria-pressed={isActive}
+        aria-label={`Open terminal tab ${tab.label}`}
       >
-        ×
-      </button>
-    </div>
+        <Terminal size={14} className="shrink-0" />
+        <span className="min-w-0 truncate text-left">{tab.label}</span>
+        <span className={`sidebar-status-dot ${dotClass(activity)}`} />
+      </div>
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />
+      )}
+    </>
   );
 }

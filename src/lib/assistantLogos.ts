@@ -9,3 +9,9 @@ export const assistantLogoSrc: Record<string, string> = {
   gemini: geminiSrc,
   opencode: opencodeSrc,
 };
+
+const MONO_ASSISTANT_LOGOS = new Set(["codex"]);
+
+export function getAssistantLogoClass(assistantId: string): string | undefined {
+  return MONO_ASSISTANT_LOGOS.has(assistantId) ? "themed-mono-logo" : undefined;
+}

@@ -14,7 +14,9 @@ export default function CommandsRow({ badge }: CommandsRowProps) {
       onClick={toggleCommandsPanel}
       className={`section-toggle ${commandsPanelActive ? "!text-[var(--text-primary)] !bg-white/6" : ""}`}
     >
-      <Terminal size={14} className="shrink-0" />
+      <span className="shrink-0 w-[14px] flex items-center justify-center" style={{ color: "var(--section-icon-color)" }}>
+        <Terminal size={14} />
+      </span>
       <span className="truncate">Commands</span>
       {badge && (
         <span className="badge">{badge}</span>

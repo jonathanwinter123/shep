@@ -3,7 +3,6 @@
 export interface RepoInfo {
   path: string;
   name: string;
-  valid: boolean;
 }
 
 export interface CommandConfig {
@@ -61,7 +60,7 @@ export interface CommandState {
   cwd: string | null;
 }
 
-export type SessionMode = "standard" | "worktree" | "yolo";
+export type SessionMode = "standard" | "yolo";
 
 export interface TerminalTab {
   id: string;
@@ -71,8 +70,6 @@ export interface TerminalTab {
   commandName: string | null; // null = blank shell or assistant
   assistantId: string | null; // null = not an assistant tab
   sessionMode: SessionMode | null; // null = not an assistant tab
-  worktreePath: string | null; // set for YOLO worktree sessions
-  branch: string | null; // git branch at launch (refreshable)
 }
 
 // ── Tab activity tracking ────────────────────────────────────────────
@@ -111,6 +108,7 @@ export interface GitStatus {
   untracked: number;
   ahead: number;
   behind: number;
+  worktree_parent: string | null;
 }
 
 // ── Git worktree ─────────────────────────────────────────────────────
@@ -119,6 +117,11 @@ export interface WorktreeEntry {
   path: string;
   branch: string | null;
   is_main: boolean;
+}
+
+export interface CreatedWorktree {
+  path: string;
+  branch: string;
 }
 
 // ── Git changed files ────────────────────────────────────────────────
@@ -130,11 +133,30 @@ export interface ChangedFile {
   old_path: string | null;
 }
 
+// ── Port info ───────────────────────────────────────────────────────
+
+export interface PortInfo {
+  port: number;
+  pid: number;
+  process: string;
+  cwd: string;
+  project: string;
+  framework: string;
+  uptime: string;
+  memory_kb: number;
+}
+
 // ── PTY output ──────────────────────────────────────────────────────
 
 export type PtyOutput =
   | { event: "data"; data: string }
   | { event: "exit"; data: { code: number } };
+
+export interface PtyColorTheme {
+  foreground: string;
+  background: string;
+  palette: string[];
+}
 
 // ── Usage ──────────────────────────────────────────────────────────
 

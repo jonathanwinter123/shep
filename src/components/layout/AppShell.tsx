@@ -10,6 +10,7 @@ import CommandsPanel from "../commands/CommandsPanel";
 import SessionLauncher from "../session/SessionLauncher";
 import NoticeCenter from "../shared/NoticeCenter";
 import UsagePanel from "../usage/UsagePanel";
+import PortsPanel from "../ports/PortsPanel";
 import { PanelLeft, PanelLeftOpen } from "lucide-react";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
@@ -84,28 +85,20 @@ export default function AppShell() {
   );
   const tabs = activeProjectTerminals?.tabs ?? EMPTY_TABS;
   const activeTabId = activeProjectTerminals?.activeTabId ?? null;
-
   // Derive allTabs via useMemo instead of a selector that returns a new array
   // every call — zustand v5 + useSyncExternalStore would infinite-loop otherwise.
   const projectState = useTerminalStore((s) => s.projectState);
 
-  // Git status polling: project roots + all active worktree paths
-  const gitPollPaths = useMemo(() => {
-    const paths = repos.filter((r) => r.valid).map((r) => r.path);
-    for (const state of Object.values(projectState)) {
-      for (const tab of state.tabs) {
-        if (tab.worktreePath && !paths.includes(tab.worktreePath)) {
-          paths.push(tab.worktreePath);
-        }
-      }
-    }
-    return paths;
-  }, [repos, projectState]);
-  useGitWatcher(gitPollPaths);
+  // Git watching: main repo paths only — worktree paths are discovered automatically
+  const gitRepoPaths = useMemo(
+    () => repos.map((r) => r.path),
+    [repos],
+  );
+  useGitWatcher(gitRepoPaths);
   const allTabs = useMemo(() => {
     const all: TerminalTab[] = [];
-    for (const project of Object.values(projectState)) {
-      all.push(...project.tabs);
+    for (const ps of Object.values(projectState)) {
+      all.push(...ps.tabs);
     }
 
     // Keep terminal DOM order stable even when the visible tab order changes.
@@ -150,13 +143,14 @@ export default function AppShell() {
   );
 
   const {
-    settingsActive, gitPanelActive, commandsPanelActive, launcherActive, usagePanelActive, sidebarVisible,
+    settingsActive, gitPanelActive, commandsPanelActive, launcherActive, usagePanelActive, portsPanelActive, sidebarVisible,
   } = useUIStore(useShallow((s) => ({
     settingsActive: s.settingsActive,
     gitPanelActive: s.gitPanelActive,
     commandsPanelActive: s.commandsPanelActive,
     launcherActive: s.launcherActive,
     usagePanelActive: s.usagePanelActive,
+    portsPanelActive: s.portsPanelActive,
     sidebarVisible: s.sidebarVisible,
   })));
   const { loadSettings: loadEditorSettings } = useEditorStore.getState();
@@ -216,7 +210,6 @@ export default function AppShell() {
         window.localStorage.setItem(LAST_REPO_STORAGE_KEY, repoPath);
         useTerminalStore.getState().switchProject(repoPath);
         useCommandStore.getState().switchProject(repoPath);
-
         if (isFirstVisit) {
           useCommandStore.getState().loadCommands(repoPath, config.commands);
 
@@ -243,7 +236,8 @@ export default function AppShell() {
       try {
         const config = await addRepo(repoPath);
         // addRepo sets activeRepoPath in the repo store, get the canonical path
-        const canonicalPath = useRepoStore.getState().activeRepoPath!;
+        const canonicalPath = useRepoStore.getState().activeRepoPath;
+        if (!canonicalPath) return;
         restoreAttemptedRef.current = true;
         window.localStorage.setItem(LAST_REPO_STORAGE_KEY, canonicalPath);
         useTerminalStore.getState().switchProject(canonicalPath);
@@ -309,19 +303,22 @@ export default function AppShell() {
     useUIStore.getState().deactivateCommandsPanel();
     useUIStore.getState().deactivateLauncher();
     useUIStore.getState().deactivateUsagePanel();
-    setActiveTab(tabId);
-    const tab = tabs.find((t) => t.id === tabId);
-    if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
-  }, [setActiveTab, tabs]);
+    useUIStore.getState().deactivatePortsPanel();
+    setActiveTab(tabId); // auto-switches workspace if tab is in a different one
+    const store = useTerminalStore.getState();
+    const allTabs = activeRepoPath ? store.getAllProjectTabs(activeRepoPath) : [];
+    const tab = allTabs.find((t) => t.id === tabId);
+    if (tab) store.clearTabBell(tab.ptyId);
+  }, [setActiveTab, activeRepoPath]);
 
   const handleNewAssistant = useCallback(() => {
     useUIStore.getState().openLauncher();
   }, []);
 
   const handleStartSession = useCallback(
-    async (assistantId: string, mode: SessionMode, worktreePath: string | null) => {
+    async (assistantId: string, mode: SessionMode) => {
       const { cols, rows } = getTerminalDimensions();
-      const ptyId = await launchAssistant(assistantId, cols, rows, mode, worktreePath);
+      const ptyId = await launchAssistant(assistantId, cols, rows, mode);
       if (ptyId) {
         // Close the launcher tab and deactivate all overlays so the new
         // terminal tab is immediately visible. closeLauncher() alone would
@@ -333,6 +330,7 @@ export default function AppShell() {
         ui.deactivateGitPanel();
         ui.deactivateCommandsPanel();
         ui.deactivateUsagePanel();
+        ui.deactivatePortsPanel();
         useUIStore.setState({ launcherOpen: false });
         return true;
       }
@@ -347,6 +345,7 @@ export default function AppShell() {
     useUIStore.getState().deactivateGitPanel();
     useUIStore.getState().deactivateCommandsPanel();
     useUIStore.getState().deactivateUsagePanel();
+    useUIStore.getState().deactivatePortsPanel();
     const { cols, rows } = getTerminalDimensions();
     spawnBlankShell(cols, rows);
   }, [spawnBlankShell, getTerminalDimensions]);
@@ -440,8 +439,8 @@ export default function AppShell() {
 
     const storedRepoPath = window.localStorage.getItem(LAST_REPO_STORAGE_KEY);
     const initialRepo =
-      repos.find((repo) => repo.valid && repo.path === storedRepoPath) ??
-      repos.find((repo) => repo.valid);
+      repos.find((repo) => repo.path === storedRepoPath) ??
+      repos[0];
 
     if (initialRepo) {
       void handleSelectRepo(initialRepo.path);
@@ -470,30 +469,46 @@ export default function AppShell() {
     return () => { unlisten.then((f) => f()); };
   }, []);
 
-  // Global keyboard shortcuts
+  // Handle native menu events (accelerators for Cmd+T, Cmd+Shift+T, Cmd+B, Cmd+E, Cmd+, etc.)
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+T — new terminal tab
-      if (e.metaKey && e.key === "t" && !e.shiftKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        handleNewShell();
+    const unlisten = listen<string>("menu-event", (event) => {
+      switch (event.payload) {
+        case "new_terminal":
+          handleNewShell();
+          break;
+        case "new_agent":
+          handleNewAssistant();
+          break;
+        case "toggle_sidebar":
+          useUIStore.getState().toggleSidebar();
+          break;
+        case "open_in_editor": {
+          const repoPath = useTerminalStore.getState().activeProjectPath;
+          if (repoPath) handleOpenInEditor(repoPath);
+          break;
+        }
+        case "settings":
+          useUIStore.getState().openSettings();
+          break;
+        case "check_updates":
+          void useUpdateStore.getState().checkForUpdate().then(() => {
+            const { status, availableVersion } = useUpdateStore.getState();
+            if (status === "available" && availableVersion) {
+              pushNotice(
+                { tone: "info", title: "Update available", message: `Version ${availableVersion} is ready to download` },
+                { durationMs: 8000 },
+              );
+            } else if (status === "idle") {
+              pushNotice({ tone: "success", title: "You're up to date", message: "No updates available" });
+            }
+          });
+          break;
       }
-      // Cmd+Shift+T — new agent session
-      if (e.metaKey && e.key === "T" && e.shiftKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        handleNewAssistant();
-      }
-      // Cmd+B — toggle sidebar
-      if (e.metaKey && e.key === "b" && !e.shiftKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        useUIStore.getState().toggleSidebar();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNewShell, handleNewAssistant]);
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, [handleNewShell, handleNewAssistant, handleOpenInEditor, pushNotice]);
 
-  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive;
+  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive || portsPanelActive;
 
   return (
     <div className="app-shell">
@@ -531,7 +546,6 @@ export default function AppShell() {
           <Sidebar
             repos={repos}
             activeRepoPath={activeRepoPath}
-            tabs={tabs}
             activeTabId={showOverlay ? null : activeTabId}
             commands={commands}
             onSelectRepo={handleSelectRepo}
@@ -569,6 +583,7 @@ export default function AppShell() {
             )}
             {launcherActive && <SessionLauncher onStartSession={handleStartSession} />}
             {usagePanelActive && <UsagePanel />}
+            {portsPanelActive && <PortsPanel />}
 
             {!showOverlay && tabs.length === 0 && (
               <div className="terminal-empty">

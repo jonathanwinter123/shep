@@ -1,6 +1,9 @@
 import { useCallback } from "react";
-import { spawnPty, killPty, gitRemoveWorktree, gitCurrentBranch, getDefaultShell } from "../lib/tauri";
+import { spawnPty, killPty, getDefaultShell } from "../lib/tauri";
+import { useThemeStore } from "../stores/useThemeStore";
+import { hexLuminance } from "../lib/themes";
 import type { PtyOutput, CommandConfig, SessionMode } from "../lib/types";
+import { toPtyColorTheme } from "../lib/ptyColorTheme";
 import { useCommandStore } from "../stores/useCommandStore";
 import { useTerminalStore, nextTabId } from "../stores/useTerminalStore";
 import { useRepoStore } from "../stores/useRepoStore";
@@ -167,14 +170,29 @@ export function usePty() {
       let resolvedPtyId: number | null = null;
       const bufferedMessages: PtyOutput[] = [];
 
-      const ptyId = await spawnPty(command, repoPath, env, cols, rows, (msg) => {
-        if (resolvedPtyId === null) {
-          bufferedMessages.push(msg);
-          return;
-        }
+      // Signal terminal background brightness to CLI tools via COLORFGBG.
+      // Claude Code uses this to resolve "auto" theme when OSC 11 is unavailable.
+      const theme = useThemeStore.getState().theme;
+      const lum = hexLuminance(theme.appBg);
+      const colorfgbg = lum > 0.3 ? "0;15" : "15;0";
+      const fullEnv = { COLORFGBG: colorfgbg, ...env };
 
-        handlePtyMessage(resolvedPtyId, commandName, repoPath, msg);
-      });
+      const ptyId = await spawnPty(
+        command,
+        repoPath,
+        fullEnv,
+        cols,
+        rows,
+        toPtyColorTheme(theme),
+        (msg) => {
+          if (resolvedPtyId === null) {
+            bufferedMessages.push(msg);
+            return;
+          }
+
+          handlePtyMessage(resolvedPtyId, commandName, repoPath, msg);
+        },
+      );
 
       resolvedPtyId = ptyId;
       initActivity(ptyId);
@@ -193,6 +211,8 @@ export function usePty() {
       if (!activeRepoPath) return;
       const commandName = command.name;
 
+      const basePath = activeRepoPath;
+
       try {
         const ptyId = await spawnSession(
           command.command,
@@ -200,7 +220,7 @@ export function usePty() {
           cols,
           rows,
           commandName,
-          resolveCommandCwd(activeRepoPath, command.cwd ?? null),
+          resolveCommandCwd(basePath, command.cwd ?? null),
         );
         if (!ptyId) return;
 
@@ -220,8 +240,6 @@ export function usePty() {
             commandName,
             assistantId: null,
             sessionMode: null,
-            worktreePath: null,
-            branch: null,
           });
         }
 
@@ -257,7 +275,7 @@ export function usePty() {
       const state = useTerminalStore.getState();
       const commands = useCommandStore.getState().projectCommands[path] ?? [];
       const command = commands.find((c) => c.name === commandName);
-      const tab = state.projectState[path]?.tabs.find((t) => t.commandName === commandName);
+      const tab = state.getAllProjectTabs(path).find((t) => t.commandName === commandName);
       if (command?.ptyId) {
         cleanupActivityState(command.ptyId);
         stoppingPtys.add(command.ptyId);
@@ -309,8 +327,6 @@ export function usePty() {
           commandName: null,
           assistantId: null,
           sessionMode: null,
-          worktreePath: null,
-          branch: null,
         });
 
         return ptyId;
@@ -335,7 +351,6 @@ export function usePty() {
       cols: number,
       rows: number,
       mode: SessionMode = "standard",
-      worktreePath: string | null = null,
     ) => {
       if (!activeRepoPath) return;
       const assistant = CODING_ASSISTANTS.find((a) => a.id === assistantId);
@@ -346,28 +361,14 @@ export function usePty() {
         command = `${command} ${assistant.yoloFlag}`;
       }
 
-      // Ensure OpenCode uses the "system" theme so its ANSI colors
-      // match the active Shep terminal theme. Only writes the config
-      // if it doesn't already exist (respects user overrides).
-      if (assistantId === "opencode") {
-        const tuiDir = "$HOME/.config/opencode";
-        const tuiFile = `${tuiDir}/tui.json`;
-        command = `mkdir -p ${tuiDir} && [ ! -f ${tuiFile} ] && echo '{"$schema":"https://opencode.ai/tui.json","theme":"system"}' > ${tuiFile}; ${command}`;
-      }
-
-      const cwd = worktreePath ?? activeRepoPath;
-
       try {
-        // Fetch current branch for display
-        const branch = await gitCurrentBranch(cwd).catch(() => null);
-
         const ptyId = await spawnSession(
           command,
           {},
           cols,
           rows,
           null,
-          cwd,
+          activeRepoPath,
         );
         if (!ptyId) return;
 
@@ -380,8 +381,6 @@ export function usePty() {
           commandName: null,
           assistantId,
           sessionMode: mode,
-          worktreePath,
-          branch,
         });
 
         return ptyId;
@@ -422,28 +421,15 @@ export function usePty() {
         setCommandPtyId(tab.commandName, null);
       }
 
-      // Clean up worktree for YOLO sessions
-      if (tab.worktreePath) {
-        await gitRemoveWorktree(tab.repoPath, tab.worktreePath).catch((error) => {
-          if (import.meta.env.DEV) {
-            console.warn("Failed to remove worktree:", error);
-          }
-          pushNotice({
-            tone: "error",
-            title: "Worktree cleanup failed",
-            message: getErrorMessage(error),
-          });
-        });
-      }
-
       removeTab(tabId);
     },
-    [setCommandStatus, setCommandPtyId, removeTab, removeActivity, pushNotice],
+    [setCommandStatus, setCommandPtyId, removeTab, removeActivity],
   );
 
   const killProjectPtys = useCallback(async (repoPath: string) => {
     const state = useTerminalStore.getState();
-    const tabs = state.projectState[repoPath]?.tabs ?? [];
+    const tabs = state.getAllProjectTabs(repoPath);
+
     for (const tab of tabs) {
       cleanupActivityState(tab.ptyId);
       stoppingPtys.add(tab.ptyId);
@@ -452,21 +438,8 @@ export function usePty() {
       });
       unregisterTerminal(tab.ptyId);
       removeActivity(tab.ptyId);
-
-      if (tab.worktreePath) {
-        await gitRemoveWorktree(tab.repoPath, tab.worktreePath).catch((error) => {
-          if (import.meta.env.DEV) {
-            console.warn("Failed to remove worktree:", error);
-          }
-          pushNotice({
-            tone: "error",
-            title: "Worktree cleanup failed",
-            message: getErrorMessage(error),
-          });
-        });
-      }
     }
-  }, [removeActivity, pushNotice]);
+  }, [removeActivity]);
 
   return {
     startCommand,

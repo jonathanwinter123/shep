@@ -9,6 +9,8 @@ interface FileListProps {
   onSelect: (file: ChangedFile) => void;
   onStage: (file: ChangedFile) => void;
   onUnstage: (file: ChangedFile) => void;
+  onStageAll: () => void;
+  onUnstageAll: () => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -38,6 +40,8 @@ export default function FileList({
   onSelect,
   onStage,
   onUnstage,
+  onStageAll,
+  onUnstageAll,
 }: FileListProps) {
   const grouped = useMemo(() => {
     const staged: ChangedFile[] = [];
@@ -51,10 +55,12 @@ export default function FileList({
     return { staged, unstaged, untracked };
   }, [files]);
 
+  const hasUnstaged = grouped.unstaged.length > 0 || grouped.untracked.length > 0;
+  const hasStaged = grouped.staged.length > 0;
+
   const sections = [
-    { key: "staged", label: "STAGED", files: grouped.staged },
-    { key: "unstaged", label: "UNSTAGED", files: grouped.unstaged },
-    { key: "untracked", label: "UNTRACKED", files: grouped.untracked },
+    { key: "staged", label: "STAGED", files: grouped.staged, bulkAction: hasStaged ? onUnstageAll : undefined, bulkIcon: <Minus size={11} />, bulkTitle: "Unstage all" },
+    { key: "unstaged", label: "CHANGES", files: [...grouped.unstaged, ...grouped.untracked], bulkAction: hasUnstaged ? onStageAll : undefined, bulkIcon: <Plus size={11} />, bulkTitle: "Stage all" },
   ].filter((s) => s.files.length > 0);
 
   if (sections.length === 0) {
@@ -71,11 +77,25 @@ export default function FileList({
     <div className="git-panel__file-list">
       {sections.map((section) => (
         <div key={section.key} style={{ marginBottom: 4 }}>
-          <div className="section-label" style={{ padding: "8px 10px 4px" }}>
-            {section.label}{" "}
-            <span className="badge" style={{ marginLeft: 4 }}>
+          <div className="section-label" style={{ padding: "8px 10px 4px", display: "flex", alignItems: "center", gap: 4 }}>
+            <span>{section.label}</span>
+            <span className="badge" style={{ marginLeft: 2 }}>
               {section.files.length}
             </span>
+            <span style={{ flex: 1 }} />
+            {section.bulkAction && (
+              <button
+                className="icon-btn"
+                title={section.bulkTitle}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  section.bulkAction!();
+                }}
+                style={{ opacity: 0.5, padding: 2 }}
+              >
+                {section.bulkIcon}
+              </button>
+            )}
           </div>
           {section.files.map((file) => {
             const isSelected =

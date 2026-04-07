@@ -9,12 +9,13 @@ export interface EditorOption {
   label: string;
   appName: string;
   logoSrc: string;
+  logoClassName?: string;
 }
 
 export const EDITOR_OPTIONS: EditorOption[] = [
   { id: "vscode", label: "VS Code", appName: "Visual Studio Code", logoSrc: vscodeLogoSrc },
   { id: "zed", label: "Zed", appName: "Zed", logoSrc: zedLogoSrc },
-  { id: "cursor", label: "Cursor", appName: "Cursor", logoSrc: cursorLogoSrc },
+  { id: "cursor", label: "Cursor", appName: "Cursor", logoSrc: cursorLogoSrc, logoClassName: "themed-mono-logo" },
   { id: "sublime_text", label: "Sublime Text", appName: "Sublime Text", logoSrc: sublimeLogoSrc },
 ];
 

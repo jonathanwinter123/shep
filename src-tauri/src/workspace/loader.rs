@@ -8,18 +8,18 @@ use super::config::{
 
 // ── Paths ───────────────────────────────────────────────────────────
 
-fn shep_home() -> PathBuf {
-    dirs::home_dir()
-        .expect("Could not find home directory")
-        .join(".shep")
+fn shep_home() -> Result<PathBuf, String> {
+    Ok(dirs::home_dir()
+        .ok_or_else(|| "Could not find home directory".to_string())?
+        .join(".shep"))
 }
 
-fn global_config_path() -> PathBuf {
-    shep_home().join("config.yml")
+fn global_config_path() -> Result<PathBuf, String> {
+    Ok(shep_home()?.join("config.yml"))
 }
 
-fn old_projects_dir() -> PathBuf {
-    shep_home().join("projects")
+fn old_projects_dir() -> Result<PathBuf, String> {
+    Ok(shep_home()?.join("projects"))
 }
 
 fn repo_shep_dir(repo_path: &str) -> PathBuf {
@@ -33,7 +33,7 @@ fn repo_workspace_file(repo_path: &str) -> PathBuf {
 // ── Global config ───────────────────────────────────────────────────
 
 pub fn load_global_config() -> Result<GlobalConfig, String> {
-    let path = global_config_path();
+    let path = global_config_path()?;
     if !path.exists() {
         return Ok(GlobalConfig::default());
     }
@@ -43,10 +43,10 @@ pub fn load_global_config() -> Result<GlobalConfig, String> {
 }
 
 pub fn save_global_config(config: &GlobalConfig) -> Result<(), String> {
-    let dir = shep_home();
+    let dir = shep_home()?;
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create .shep dir: {e}"))?;
 
-    let path = global_config_path();
+    let path = global_config_path()?;
     let yaml =
         serde_yaml::to_string(config).map_err(|e| format!("Failed to serialize config: {e}"))?;
     fs::write(&path, yaml).map_err(|e| format!("Failed to write global config: {e}"))
@@ -96,8 +96,8 @@ pub fn save_usage_settings(settings: &UsageSettings) -> Result<(), String> {
 
 pub fn list_repos() -> Result<Vec<RepoInfo>, String> {
     let config = load_global_config()?;
-    let repos = config
-        .repos
+
+    let repos = config.repos
         .iter()
         .map(|entry| {
             let path = Path::new(&entry.path);
@@ -106,11 +106,9 @@ pub fn list_repos() -> Result<Vec<RepoInfo>, String> {
                 .and_then(|n| n.to_str())
                 .unwrap_or("unknown")
                 .to_string();
-            let valid = path.is_dir();
             RepoInfo {
                 path: entry.path.clone(),
                 name,
-                valid,
             }
         })
         .collect();
@@ -137,11 +135,9 @@ pub fn register_repo(repo_path: &str) -> Result<RegisteredRepo, String> {
         save_global_config(&config)?;
     }
 
-    // Create .shep/ in repo if needed
-    ensure_repo_shep_dir(&canonical_str)?;
-
-    // Load or create workspace config
-    let workspace = load_or_create_workspace(&canonical_str)?;
+    // Load existing workspace config or return an in-memory default. We create
+    // `.shep` lazily only when the user actually saves project config.
+    let workspace = load_or_default_workspace(&canonical_str)?;
     Ok(RegisteredRepo {
         path: canonical_str,
         workspace,
@@ -157,7 +153,7 @@ pub fn unregister_repo(repo_path: &str) -> Result<(), String> {
 // ── Per-repo workspace ──────────────────────────────────────────────
 
 pub fn load_repo_workspace(repo_path: &str) -> Result<WorkspaceConfig, String> {
-    load_or_create_workspace(repo_path)
+    load_or_default_workspace(repo_path)
 }
 
 pub fn save_repo_workspace(repo_path: &str, config: &WorkspaceConfig) -> Result<(), String> {
@@ -172,13 +168,13 @@ pub fn save_repo_workspace(repo_path: &str, config: &WorkspaceConfig) -> Result<
 // ── Migration ───────────────────────────────────────────────────────
 
 pub fn migrate_old_projects() -> Result<(), String> {
-    let old_dir = old_projects_dir();
+    let old_dir = old_projects_dir()?;
     if !old_dir.exists() {
         return Ok(());
     }
 
     // Check if we already have a global config (migration already done)
-    let global_path = global_config_path();
+    let global_path = global_config_path()?;
     if global_path.exists() {
         return Ok(());
     }
@@ -229,11 +225,7 @@ pub fn migrate_old_projects() -> Result<(), String> {
 
         // Convert tasks -> commands
         let commands: Vec<CommandConfig> = if let Some(tasks) = old_config.get("tasks") {
-            if let Ok(task_configs) = serde_yaml::from_value::<Vec<CommandConfig>>(tasks.clone()) {
-                task_configs
-            } else {
-                Vec::new()
-            }
+            serde_yaml::from_value::<Vec<CommandConfig>>(tasks.clone()).unwrap_or_default()
         } else {
             Vec::new()
         };
@@ -283,7 +275,7 @@ fn ensure_repo_shep_dir(repo_path: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn load_or_create_workspace(repo_path: &str) -> Result<WorkspaceConfig, String> {
+fn load_or_default_workspace(repo_path: &str) -> Result<WorkspaceConfig, String> {
     let path = repo_workspace_file(repo_path);
     if path.exists() {
         let content = fs::read_to_string(&path)
@@ -303,7 +295,6 @@ fn load_or_create_workspace(repo_path: &str) -> Result<WorkspaceConfig, String> 
             assistants: Vec::new(),
         };
 
-        save_repo_workspace(repo_path, &config)?;
         Ok(config)
     }
 }

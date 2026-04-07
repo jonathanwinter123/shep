@@ -7,33 +7,31 @@ interface FsChangedPayload {
   paths: string[];
 }
 
+/**
+ * Watches repo paths for git changes via file system events.
+ * Each project (including worktrees added as separate projects) is watched independently.
+ */
 export function useGitWatcher(repoPaths: string[]) {
-  const { refreshAll } = useGitStore.getState();
-  const prevPathsRef = useRef<Set<string>>(new Set());
+  const prevRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (repoPaths.length === 0) return;
 
-    const currentSet = new Set(repoPaths);
-    const prevSet = prevPathsRef.current;
+    const { refreshAll } = useGitStore.getState();
+    const current = new Set(repoPaths);
+    const prev = prevRef.current;
 
     // Watch newly added paths
-    for (const path of currentSet) {
-      if (!prevSet.has(path)) {
-        void watchRepo(path);
-      }
+    for (const path of current) {
+      if (!prev.has(path)) void watchRepo(path);
     }
-
     // Unwatch removed paths
-    for (const path of prevSet) {
-      if (!currentSet.has(path)) {
-        void unwatchRepo(path);
-      }
+    for (const path of prev) {
+      if (!current.has(path)) void unwatchRepo(path);
     }
+    prevRef.current = current;
 
-    prevPathsRef.current = currentSet;
-
-    // Immediate refresh on mount / path change
+    // Initial refresh
     refreshAll(repoPaths);
 
     // Listen for file system change events from the backend watcher
@@ -43,11 +41,8 @@ export function useGitWatcher(repoPaths: string[]) {
 
     return () => {
       unlisten.then((f) => f());
-      // Unwatch all on cleanup
-      for (const path of currentSet) {
-        void unwatchRepo(path);
-      }
+      for (const path of current) void unwatchRepo(path);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [repoPaths.join(","), refreshAll]);
+  }, [repoPaths.join(",")]);
 }

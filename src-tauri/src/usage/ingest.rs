@@ -414,8 +414,7 @@ fn ingest_codex_file(conn: &Connection, path: &Path) -> Result<(), String> {
                         .and_then(Value::as_str)
                         .unwrap_or_default()
                         .split('/')
-                        .filter(|s| !s.is_empty())
-                        .last()
+                        .rfind(|s| !s.is_empty())
                         .unwrap_or("unknown")
                         .to_string();
                 }
@@ -525,14 +524,16 @@ fn upsert_cursor(conn: &Connection, file_path: &str, provider: &str, file_size: 
 }
 
 fn clean_cursors(conn: &Connection, provider: &str, valid_files: &[PathBuf]) {
-    let mut stmt = conn
+    let mut stmt = match conn
         .prepare("SELECT file_path FROM ingest_cursors WHERE provider = ?1")
-        .unwrap();
-    let paths: Vec<String> = stmt
-        .query_map(params![provider], |row| row.get(0))
-        .unwrap()
-        .filter_map(|r| r.ok())
-        .collect();
+    {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    let paths: Vec<String> = match stmt.query_map(params![provider], |row| row.get(0)) {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(_) => return,
+    };
 
     for path in paths {
         let still_exists = valid_files.iter().any(|f| f.to_string_lossy() == path);
@@ -590,7 +591,7 @@ fn parse_iso_timestamp(s: &str) -> Option<u64> {
 }
 
 fn days_from_epoch(year: u64, month: u64, day: u64) -> Option<u64> {
-    if year < 1970 || month < 1 || month > 12 || day < 1 || day > 31 {
+    if year < 1970 || !(1..=12).contains(&month) || !(1..=31).contains(&day) {
         return None;
     }
     // Days from 1970-01-01
