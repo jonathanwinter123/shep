@@ -19,10 +19,11 @@ interface ThemeStore {
 }
 
 const initialId = loadThemeId();
+const initialTheme = getThemeById(initialId);
 
 export const useThemeStore = create<ThemeStore>((set) => ({
-  themeId: initialId,
-  theme: getThemeById(initialId),
+  themeId: initialTheme.id,
+  theme: initialTheme,
   setTheme: (id: string) => {
     const theme = getThemeById(id);
     try {

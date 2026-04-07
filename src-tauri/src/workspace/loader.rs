@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use super::config::{
     CommandConfig, EditorSettings, GlobalConfig, KeybindingSettings, RegisteredRepo, RepoEntry,
@@ -9,18 +8,18 @@ use super::config::{
 
 // ── Paths ───────────────────────────────────────────────────────────
 
-fn shep_home() -> PathBuf {
-    dirs::home_dir()
-        .expect("Could not find home directory")
-        .join(".shep")
+fn shep_home() -> Result<PathBuf, String> {
+    Ok(dirs::home_dir()
+        .ok_or_else(|| "Could not find home directory".to_string())?
+        .join(".shep"))
 }
 
-fn global_config_path() -> PathBuf {
-    shep_home().join("config.yml")
+fn global_config_path() -> Result<PathBuf, String> {
+    Ok(shep_home()?.join("config.yml"))
 }
 
-fn old_projects_dir() -> PathBuf {
-    shep_home().join("projects")
+fn old_projects_dir() -> Result<PathBuf, String> {
+    Ok(shep_home()?.join("projects"))
 }
 
 fn repo_shep_dir(repo_path: &str) -> PathBuf {
@@ -34,7 +33,7 @@ fn repo_workspace_file(repo_path: &str) -> PathBuf {
 // ── Global config ───────────────────────────────────────────────────
 
 pub fn load_global_config() -> Result<GlobalConfig, String> {
-    let path = global_config_path();
+    let path = global_config_path()?;
     if !path.exists() {
         return Ok(GlobalConfig::default());
     }
@@ -44,10 +43,10 @@ pub fn load_global_config() -> Result<GlobalConfig, String> {
 }
 
 pub fn save_global_config(config: &GlobalConfig) -> Result<(), String> {
-    let dir = shep_home();
+    let dir = shep_home()?;
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create .shep dir: {e}"))?;
 
-    let path = global_config_path();
+    let path = global_config_path()?;
     let yaml =
         serde_yaml::to_string(config).map_err(|e| format!("Failed to serialize config: {e}"))?;
     fs::write(&path, yaml).map_err(|e| format!("Failed to write global config: {e}"))
@@ -96,12 +95,7 @@ pub fn save_usage_settings(settings: &UsageSettings) -> Result<(), String> {
 // ── Repo operations ─────────────────────────────────────────────────
 
 pub fn list_repos() -> Result<Vec<RepoInfo>, String> {
-    let mut config = load_global_config()?;
-    let original_len = config.repos.len();
-    config.repos.retain(|entry| should_keep_registered_repo(&entry.path));
-    if config.repos.len() != original_len {
-        save_global_config(&config)?;
-    }
+    let config = load_global_config()?;
 
     let repos = config.repos
         .iter()
@@ -174,13 +168,13 @@ pub fn save_repo_workspace(repo_path: &str, config: &WorkspaceConfig) -> Result<
 // ── Migration ───────────────────────────────────────────────────────
 
 pub fn migrate_old_projects() -> Result<(), String> {
-    let old_dir = old_projects_dir();
+    let old_dir = old_projects_dir()?;
     if !old_dir.exists() {
         return Ok(());
     }
 
     // Check if we already have a global config (migration already done)
-    let global_path = global_config_path();
+    let global_path = global_config_path()?;
     if global_path.exists() {
         return Ok(());
     }
@@ -309,27 +303,3 @@ fn load_or_default_workspace(repo_path: &str) -> Result<WorkspaceConfig, String>
     }
 }
 
-fn should_keep_registered_repo(repo_path: &str) -> bool {
-    let path = Path::new(repo_path);
-    if !path.is_dir() {
-        return false;
-    }
-
-    // Shep-managed worktrees live under `.shep-worktrees`. If one has been
-    // removed by git but a leftover directory remains (for example only app
-    // metadata), do not keep showing it as a normal folder project.
-    let is_shep_managed_worktree = path
-        .components()
-        .filter_map(|component| component.as_os_str().to_str())
-        .any(|component| component == ".shep-worktrees");
-
-    if !is_shep_managed_worktree {
-        return true;
-    }
-
-    Command::new("git")
-        .args(["-C", repo_path, "rev-parse", "--git-dir"])
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
-}

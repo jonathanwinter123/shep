@@ -376,6 +376,7 @@ pub fn changed_files(path: &str) -> Result<Vec<ChangedFile>, String> {
             let parts: Vec<&str> = entry.splitn(9, ' ').collect();
             if parts.len() >= 9 {
                 let xy = parts[1].as_bytes();
+                if xy.len() < 2 { i += 1; continue; }
                 let file_path = parts[8].to_string();
 
                 if xy[0] != b'.' {
@@ -401,6 +402,7 @@ pub fn changed_files(path: &str) -> Result<Vec<ChangedFile>, String> {
             let parts: Vec<&str> = entry.splitn(10, ' ').collect();
             if parts.len() >= 10 {
                 let xy = parts[1].as_bytes();
+                if xy.len() < 2 { i += 1; continue; }
                 let file_path = parts[9].to_string();
                 // The original path follows as the next NUL-delimited field
                 let old_path = entries.get(i + 1).map(|s| s.to_string());
@@ -438,8 +440,8 @@ pub fn changed_files(path: &str) -> Result<Vec<ChangedFile>, String> {
                 });
             }
             i += 1;
-        } else if entry.starts_with("? ") {
-            let file_path = entry[2..].to_string();
+        } else if let Some(rest) = entry.strip_prefix("? ") {
+            let file_path = rest.to_string();
             files.push(ChangedFile {
                 path: file_path,
                 status: "?".to_string(),

@@ -82,6 +82,10 @@ export function revealInFinder(path: string): Promise<void> {
   return invoke("reveal_in_finder", { path });
 }
 
+export function openUrl(url: string): Promise<void> {
+  return invoke("open_url", { url });
+}
+
 // ── PTY commands ────────────────────────────────────────────────────
 
 export function spawnPty(

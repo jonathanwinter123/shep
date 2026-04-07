@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { RepoInfo, CommandState } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Sparkles, SquareTerminal } from "lucide-react";
@@ -47,9 +47,9 @@ export default function ProjectList({
   );
 
   // Auto-expand a newly selected project
-  const prevActiveRef = useState({ path: activeRepoPath })[0];
-  if (activeRepoPath && activeRepoPath !== prevActiveRef.path) {
-    prevActiveRef.path = activeRepoPath;
+  const prevActiveRef = useRef(activeRepoPath);
+  if (activeRepoPath && activeRepoPath !== prevActiveRef.current) {
+    prevActiveRef.current = activeRepoPath;
     if (!expandedPaths.has(activeRepoPath)) {
       setExpandedPaths((prev) => new Set(prev).add(activeRepoPath));
     }

@@ -344,7 +344,7 @@ export default function SettingsPanel() {
               <span className="settings-meta-row__label">Release notes</span>
               <button
                 className="text-sm underline text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-transparent border-0 cursor-pointer p-0"
-                onClick={() => import("@tauri-apps/plugin-shell").then((mod) => mod.open(releaseNotesUrl))}
+                onClick={() => import("../../lib/tauri").then((mod) => mod.openUrl(releaseNotesUrl))}
               >
                 View on GitHub
               </button>

@@ -1,4 +1,5 @@
 import type { ITheme } from "@xterm/xterm";
+import { hexLuminance } from "../../lib/themes";
 import type { ShepTheme } from "../../lib/themes";
 import type { TerminalSettings } from "../../lib/types";
 import { terminalCache } from "./TerminalView";
@@ -15,12 +16,7 @@ function withAlpha(hex: string, alpha: number): string {
 }
 
 function isLightTheme(theme: ShepTheme): boolean {
-  const hex = theme.appBg;
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const toLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b) > 0.3;
+  return hexLuminance(theme.appBg) > 0.3;
 }
 
 export function createTerminalTheme(theme: ShepTheme): ITheme {

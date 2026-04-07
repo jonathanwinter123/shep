@@ -236,7 +236,8 @@ export default function AppShell() {
       try {
         const config = await addRepo(repoPath);
         // addRepo sets activeRepoPath in the repo store, get the canonical path
-        const canonicalPath = useRepoStore.getState().activeRepoPath!;
+        const canonicalPath = useRepoStore.getState().activeRepoPath;
+        if (!canonicalPath) return;
         restoreAttemptedRef.current = true;
         window.localStorage.setItem(LAST_REPO_STORAGE_KEY, canonicalPath);
         useTerminalStore.getState().switchProject(canonicalPath);

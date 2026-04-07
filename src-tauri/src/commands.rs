@@ -137,6 +137,24 @@ pub fn reveal_in_finder(path: &str) -> Result<(), String> {
     }
 }
 
+#[tauri::command]
+pub fn open_url(url: &str) -> Result<(), String> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("Only http/https URLs are allowed".to_string());
+    }
+
+    let status = Command::new("open")
+        .arg(url)
+        .status()
+        .map_err(|e| format!("Failed to open URL: {e}"))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("open exited with status: {status}"))
+    }
+}
+
 // ── PTY commands ────────────────────────────────────────────────────
 
 #[tauri::command]

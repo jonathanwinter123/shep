@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { spawnPty, killPty, getDefaultShell, writePty } from "../lib/tauri";
 import { useThemeStore } from "../stores/useThemeStore";
+import { hexLuminance } from "../lib/themes";
 import type { PtyOutput, CommandConfig, SessionMode } from "../lib/types";
 import { useCommandStore } from "../stores/useCommandStore";
 import { useTerminalStore, nextTabId } from "../stores/useTerminalStore";
@@ -59,15 +60,6 @@ export function unregisterTerminal(ptyId: number) {
   pendingOutput.delete(ptyId);
   writeBatch.delete(ptyId);
   writeBatchScheduled.delete(ptyId);
-}
-
-/** Relative luminance of a hex color (0 = black, 1 = white) */
-function hexLuminance(hex: string): number {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const toLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
 }
 
 // Respond to OSC 11 background color queries immediately — before xterm

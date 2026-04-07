@@ -751,7 +751,7 @@ export const THEMES: Record<string, ShepTheme> = {
 export const THEME_LIST: ShepTheme[] = Object.values(THEMES);
 
 /** Relative luminance of a hex color (0 = black, 1 = white) */
-function hexLuminance(hex: string): number {
+export function hexLuminance(hex: string): number {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
   const b = parseInt(hex.slice(5, 7), 16) / 255;

@@ -5,7 +5,6 @@ import { useEditorStore } from "../../stores/useEditorStore";
 import {
   Folder,
   FolderOpen,
-  FolderOpen as FolderOpenIcon,
   GitFork,
   Plus,
   Copy,
@@ -190,7 +189,7 @@ export default function ProjectItem({
     },
     {
       label: "Open in Finder",
-      icon: <FolderOpenIcon size={14} />,
+      icon: <FolderOpen size={14} />,
       onClick: () => {
         revealInFinder(repo.path)
           .catch((error) => {
