@@ -12,7 +12,7 @@ import {
   registerTerminal,
   unregisterTerminal,
 } from "../../hooks/usePty";
-import { TERMINAL_LINE_HEIGHT } from "../../lib/terminalConfig";
+import { TERMINAL_LINE_HEIGHT, buildCSSFontFamily } from "../../lib/terminalConfig";
 import { createTerminalTheme } from "./terminalTheme";
 import { useThemeStore } from "../../stores/useThemeStore";
 import { notifyAgent } from "../../lib/notifications";
@@ -49,7 +49,7 @@ export default function TerminalView({
       cursorBlink: termSettings.cursorBlink,
       cursorStyle: termSettings.cursorStyle,
       fontSize: termSettings.fontSize,
-      fontFamily: termSettings.fontFamily,
+      fontFamily: buildCSSFontFamily(termSettings.fontFamily),
       lineHeight: TERMINAL_LINE_HEIGHT,
       theme: createTerminalTheme(useThemeStore.getState().theme),
       scrollback: termSettings.scrollback,
@@ -202,6 +202,24 @@ export default function TerminalView({
         void document.fonts.ready.then(() => {
           if (disposed) return;
           void fitAndResize();
+          if (import.meta.env.DEV) {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              const cssFont = term.options.fontFamily ?? "";
+              const fonts = cssFont.split(",").map(f => f.trim().replace(/^["']|["']$/g, ""));
+              ctx.font = `${term.options.fontSize}px serif`;
+              const serifW = ctx.measureText("mmmm").width;
+              for (const font of fonts) {
+                ctx.font = `${term.options.fontSize}px "${font}", serif`;
+                const w = ctx.measureText("mmmm").width;
+                if (w !== serifW) {
+                  console.log(`Terminal font: "${font}" (active)`);
+                  break;
+                }
+              }
+            }
+          }
         });
       }
     };
