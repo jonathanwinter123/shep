@@ -449,8 +449,7 @@ select {
 .settings-info-tip__bubble {
   position: absolute;
   bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 12px;
@@ -458,10 +457,13 @@ select {
   color: var(--text-primary);
   background: var(--glass-panel-strong);
   border: 1px solid var(--border-hover);
-  white-space: nowrap;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 48px));
+  white-space: normal;
   pointer-events: none;
   z-index: 50;
   backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 
 /* Primary action button */

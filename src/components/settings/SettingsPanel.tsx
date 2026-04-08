@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getIdentifier, getName, getTauriVersion, getVersion } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Upload } from "lucide-react";
@@ -49,8 +49,12 @@ export default function SettingsPanel() {
   const [importedFonts, setImportedFonts] = useState<ImportedFont[]>([]);
   const [fontImporting, setFontImporting] = useState(false);
   const [fontError, setFontError] = useState<string | null>(null);
+  const [themeError, setThemeError] = useState<string | null>(null);
   const themeId = useThemeStore((s) => s.themeId);
   const setTheme = useThemeStore((s) => s.setTheme);
+  const customTheme = useThemeStore((s) => s.customTheme);
+  const importTheme = useThemeStore((s) => s.importTheme);
+  const themeFileInputRef = useRef<HTMLInputElement | null>(null);
   const settings = useEditorStore((s) => s.settings);
   const hasLoaded = useEditorStore((s) => s.hasLoaded);
   const isSaving = useEditorStore((s) => s.isSaving);
@@ -183,6 +187,18 @@ export default function SettingsPanel() {
     }
   };
 
+  const importThemeFile = async (file: File | null) => {
+    if (!file) return;
+
+    try {
+      const source = await file.text();
+      importTheme(source);
+      setThemeError(null);
+    } catch (error) {
+      setThemeError(getErrorMessage(error));
+    }
+  };
+
   return (
     <div className="absolute inset-0 overflow-y-auto p-6">
       {/* ── Theme ──────────────────────────────────────────── */}
@@ -210,6 +226,55 @@ export default function SettingsPanel() {
             </button>
           );
         })}
+      </div>
+
+      <div className="settings-row mt-5">
+        <span className="settings-row__label flex items-center gap-2">
+          <span>Custom Theme</span>
+          <InfoTip text={"Ghostty-style file: background and foreground, plus palette entries 0 through 15. Download examples from terminalcolors.com/themes/."} />
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {customTheme && (
+            <button
+              onClick={() => setTheme(customTheme.id)}
+              className={`option-card option-card--compact ${themeId === customTheme.id ? "selected" : ""}`}
+            >
+              <div
+                className="shrink-0 rounded-full"
+                style={{
+                  width: 18,
+                  height: 18,
+                  background: `linear-gradient(135deg, ${customTheme.bgRadial1} 0%, ${customTheme.bgLinearMid} 50%, ${customTheme.bgRadial3} 100%)`,
+                }}
+              />
+              <span>Custom</span>
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setThemeError(null);
+              themeFileInputRef.current?.click();
+            }}
+            className="option-card option-card--compact"
+          >
+            <span className="flex items-center gap-2">
+              <Upload size={14} />
+              <span>{customTheme ? "Update Theme" : "Import Theme"}</span>
+            </span>
+          </button>
+          <input
+            ref={themeFileInputRef}
+            type="file"
+            accept=".txt,.conf,.theme,.config"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              void importThemeFile(file);
+              event.currentTarget.value = "";
+            }}
+          />
+        </div>
+        {themeError && <div className="mt-2 text-sm text-red-300">{themeError}</div>}
       </div>
       <hr className="settings-divider" />
 
