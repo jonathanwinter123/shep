@@ -6,6 +6,7 @@ use tauri::{Emitter, State};
 
 use crate::git;
 use crate::git::{ChangedFile, CreatedWorktree, GitStatus, WorktreeEntry};
+use crate::session_history::{SessionMessage, SessionSummary};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::{PtyColorTheme, PtyOutput};
 use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
@@ -493,6 +494,29 @@ fn editor_app_name(editor_id: &str) -> Option<&'static str> {
         "sublime_text" => Some("Sublime Text"),
         _ => None,
     }
+}
+
+// ── Session history commands ──────────────────────────────────────
+
+#[tauri::command]
+pub async fn list_claude_sessions(repo_path: String) -> Result<Vec<SessionSummary>, String> {
+    crate::session_history::list_sessions(&repo_path)
+}
+
+#[tauri::command]
+pub async fn read_claude_session(
+    repo_path: String,
+    session_id: String,
+) -> Result<Vec<SessionMessage>, String> {
+    crate::session_history::read_session(&repo_path, &session_id)
+}
+
+#[tauri::command]
+pub async fn search_claude_sessions(
+    repo_path: String,
+    query: String,
+) -> Result<Vec<String>, String> {
+    crate::session_history::search_sessions(&repo_path, &query)
 }
 
 // ── Port commands ─────────────────────────────────────────────────

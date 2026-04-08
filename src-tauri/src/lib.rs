@@ -2,6 +2,7 @@ mod commands;
 mod git;
 mod menu;
 mod pty;
+mod session_history;
 mod usage;
 mod watcher;
 mod workspace;
@@ -112,6 +113,9 @@ pub fn run() {
             commands::git_switch_branch,
             commands::git_create_branch,
             commands::check_command_exists,
+            commands::list_claude_sessions,
+            commands::read_claude_session,
+            commands::search_claude_sessions,
             commands::get_usage_settings,
             commands::save_usage_settings,
             commands::get_all_usage_snapshots,
