@@ -133,6 +133,22 @@ export interface ChangedFile {
   old_path: string | null;
 }
 
+// ── Session history ─────────────────────────────────────────────────
+
+export interface SessionSummary {
+  sessionId: string;
+  slug: string;
+  firstPrompt: string;
+  startedAt: string;
+  messageCount: number;
+}
+
+export interface SessionMessage {
+  role: string;
+  content: string;
+  timestamp: string;
+}
+
 // ── Port info ───────────────────────────────────────────────────────
 
 export interface PortInfo {

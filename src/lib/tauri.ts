@@ -18,6 +18,8 @@ import type {
   UsageSettings,
   UsageOverview,
   PortInfo,
+  SessionSummary,
+  SessionMessage,
 } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -266,6 +268,20 @@ export interface MemoryStats {
 
 export function getMemoryStats(): Promise<MemoryStats> {
   return invoke("get_memory_stats");
+}
+
+// ── Session history commands ──────────────────────────────────────
+
+export function listClaudeSessions(repoPath: string): Promise<SessionSummary[]> {
+  return invoke("list_claude_sessions", { repoPath });
+}
+
+export function readClaudeSession(repoPath: string, sessionId: string): Promise<SessionMessage[]> {
+  return invoke("read_claude_session", { repoPath, sessionId });
+}
+
+export function searchClaudeSessions(repoPath: string, query: string): Promise<string[]> {
+  return invoke("search_claude_sessions", { repoPath, query });
 }
 
 // ── Port commands ─────────────────────────────────────────────────
