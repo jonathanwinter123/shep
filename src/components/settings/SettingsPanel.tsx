@@ -11,10 +11,8 @@ import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUpdateStore } from "../../stores/useUpdateStore";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import {
-  displayTerminalFontFamily,
   FONT_OPTIONS,
   FONT_SIZE_OPTIONS,
-  normalizeTerminalFontFamily,
 } from "../../lib/terminalConfig";
 import type { CursorStyle, UsageProvider } from "../../lib/types";
 import { getErrorMessage } from "../../lib/errors";
@@ -43,9 +41,6 @@ export default function SettingsPanel() {
   const optionClass = "option-card w-44 justify-start";
   const [appMeta, setAppMeta] = useState<AppMeta | null>(null);
   const [appMetaError, setAppMetaError] = useState<string | null>(null);
-  const [customFontInput, setCustomFontInput] = useState(() =>
-    displayTerminalFontFamily(useTerminalSettingsStore.getState().settings.fontFamily)
-  );
   const themeId = useThemeStore((s) => s.themeId);
   const setTheme = useThemeStore((s) => s.setTheme);
   const settings = useEditorStore((s) => s.settings);
@@ -92,10 +87,6 @@ export default function SettingsPanel() {
     if (!termHasLoaded) void loadTermSettings();
     if (!usageHasLoaded) void loadUsageSettings();
   }, [hasLoaded, loadSettings, kbHasLoaded, loadKbSettings, termHasLoaded, loadTermSettings, usageHasLoaded, loadUsageSettings]);
-
-  useEffect(() => {
-    setCustomFontInput(displayTerminalFontFamily(termSettings.fontFamily));
-  }, [termSettings.fontFamily]);
 
   useEffect(() => {
     let cancelled = false;
@@ -253,34 +244,15 @@ export default function SettingsPanel() {
           {FONT_OPTIONS.map((font) => (
             <button
               key={font.id}
-              onClick={() => {
-                setCustomFontInput("");
-                void updateTermSettings({ fontFamily: font.id });
-              }}
+              onClick={() => void updateTermSettings({ fontFamily: font.id })}
               className={`option-card option-card--compact ${termSettings.fontFamily === font.id ? "selected" : ""}`}
             >
               <span>{font.label}</span>
             </button>
           ))}
-          <input
-            type="text"
-            placeholder="Custom font name..."
-            className={`option-card option-card--compact w-48 bg-transparent text-sm ${!FONT_OPTIONS.some((f) => f.id === termSettings.fontFamily) && customFontInput ? "selected" : ""}`}
-            value={customFontInput}
-            onChange={(e) => {
-              setCustomFontInput(e.target.value);
-            }}
-            onBlur={() => {
-              if (customFontInput.trim()) {
-                void updateTermSettings({ fontFamily: normalizeTerminalFontFamily(customFontInput) });
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.currentTarget.blur();
-              }
-            }}
-          />
+        </div>
+        <div className="mt-2 text-xs text-[var(--text-muted)]">
+          Additional fonts will move to an import flow so the app can load the selected font file reliably.
         </div>
       </div>
 

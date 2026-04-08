@@ -3,6 +3,21 @@ export const TERMINAL_FONT_FAMILY = "MesloLGS NF";
 export const TERMINAL_LINE_HEIGHT = 1;
 
 const DEFAULT_FALLBACKS = ["Courier New", "monospace"];
+const GENERIC_FAMILIES = new Set([
+  "serif",
+  "sans-serif",
+  "monospace",
+  "cursive",
+  "fantasy",
+  "system-ui",
+  "ui-serif",
+  "ui-sans-serif",
+  "ui-monospace",
+  "ui-rounded",
+  "math",
+  "emoji",
+  "fangsong",
+]);
 
 export const FONT_OPTIONS = [
   { id: "MesloLGS NF", label: "MesloLGS Nerd Font" },
@@ -32,20 +47,22 @@ export function normalizeTerminalFontFamily(fontFamily: string): string {
   return unquoted || TERMINAL_FONT_FAMILY;
 }
 
+function escapeCSSFontFamily(fontFamily: string): string {
+  return fontFamily.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 /**
  * Build a CSS font-family string for xterm.js from a stored font name.
  * Wraps each font in double quotes and appends fallback chain.
  */
 export function buildCSSFontFamily(fontName: string): string {
   const fonts = [fontName, ...DEFAULT_FALLBACKS.filter((f) => f !== fontName)];
-  return fonts.map((f) => (f === "monospace" ? f : `"${f}"`)).join(", ");
-}
-
-/**
- * Extract the display name for the custom font input field.
- * Returns empty string for preset fonts.
- */
-export function displayTerminalFontFamily(fontFamily: string): string {
-  if (FONT_OPTIONS.some((font) => font.id === fontFamily)) return "";
-  return fontFamily;
+  return fonts
+    .map((font) => {
+      const trimmed = font.trim();
+      return GENERIC_FAMILIES.has(trimmed.toLowerCase())
+        ? trimmed
+        : `"${escapeCSSFontFamily(trimmed)}"`;
+    })
+    .join(", ");
 }
