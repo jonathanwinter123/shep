@@ -211,11 +211,6 @@ export default function SettingsPanel() {
           );
         })}
       </div>
-
-      <p className="text-xs text-[var(--text-muted)] mt-4">
-        Note: CLI tools may need to be relaunched after switching themes. Use /theme to select light or dark if not updating.
-      </p>
-
       <hr className="settings-divider" />
 
       {/* ── Editor ─────────────────────────────────────────── */}

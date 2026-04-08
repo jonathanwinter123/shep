@@ -437,6 +437,55 @@ const jellybeans: ShepTheme = {
   termBrightWhite: "#ffffff",
 };
 
+/* ── Kanagawa Dark ───────────────────────────────────── */
+const kanagawa: ShepTheme = {
+  id: "kanagawa",
+  name: "Kanagawa",
+  isTransparent: false,
+
+  bgRadial1: "rgba(126, 156, 216, 0.10)",
+  bgRadial2: "rgba(149, 127, 184, 0.06)",
+  bgRadial3: "rgba(122, 168, 159, 0.06)",
+
+  bgLinearFrom: "#181820",
+  bgLinearMid: "#1f1f28",
+  bgLinearTo: "#181820",
+
+  frameTint: "#1f1f28",
+  panelTint: "rgba(31, 31, 40, 0.60)",
+  glassBorder: "rgba(220, 215, 186, 0.12)",
+  glassPanelStrong: "rgba(31, 31, 40, 0.78)",
+  glassBorderStrong: "rgba(220, 215, 186, 0.18)",
+
+  statusRunning: "#7e9cd8",
+  statusStopped: "#727169",
+  statusCrashed: "#e82424",
+  statusAttention: "#e6c384",
+
+  appBg: "#1f1f28",
+  appFg: "#dcd7ba",
+
+  termForeground: "#dcd7ba",
+  termCursor: "#dcd7ba",
+  termSelection: "#2d4f67",
+  termBlack: "#16161d",
+  termRed: "#c34043",
+  termGreen: "#76946a",
+  termYellow: "#c0a36e",
+  termBlue: "#7e9cd8",
+  termMagenta: "#957fb8",
+  termCyan: "#6a9589",
+  termWhite: "#c8c093",
+  termBrightBlack: "#727169",
+  termBrightRed: "#e82424",
+  termBrightGreen: "#98bb6c",
+  termBrightYellow: "#e6c384",
+  termBrightBlue: "#7fb4ca",
+  termBrightMagenta: "#938aa9",
+  termBrightCyan: "#7aa89f",
+  termBrightWhite: "#dcd7ba",
+};
+
 /* ── Nightfox Dark ────────────────────────────────────── */
 const nightfoxDark: ShepTheme = {
   id: "nightfox-dark",
@@ -736,6 +785,7 @@ export const THEMES: Record<string, ShepTheme> = {
   "nightfox-dark": nightfoxDark,
   "tokyo-night": tokyoNight,
   dracula,
+  kanagawa,
   carbonfox,
   jellybeans,
   "catppuccin-glass": catppuccinGlass,
