@@ -16,6 +16,8 @@ pub struct GlobalConfig {
     #[serde(default)]
     pub terminal: TerminalSettings,
     #[serde(default)]
+    pub fonts: Vec<ImportedFont>,
+    #[serde(default)]
     pub usage: UsageSettings,
 }
 
@@ -31,9 +33,20 @@ impl Default for GlobalConfig {
             editor: EditorSettings::default(),
             keybindings: KeybindingSettings::default(),
             terminal: TerminalSettings::default(),
+            fonts: Vec::new(),
             usage: UsageSettings::default(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportedFont {
+    pub id: String,
+    pub label: String,
+    pub family: String,
+    #[serde(rename = "fileName")]
+    pub file_name: String,
+    pub format: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -89,7 +102,7 @@ fn default_scrollback() -> u32 {
 }
 
 fn default_font_family() -> String {
-    "'MesloLGS NF', 'Menlo', 'Monaco', 'Courier New', monospace".to_string()
+    "MesloLGS NF".to_string()
 }
 
 fn default_font_size() -> u32 {

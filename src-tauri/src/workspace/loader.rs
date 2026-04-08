@@ -1,9 +1,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::config::{
-    CommandConfig, EditorSettings, GlobalConfig, KeybindingSettings, RegisteredRepo, RepoEntry,
-    RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
+    CommandConfig, EditorSettings, GlobalConfig, ImportedFont, KeybindingSettings,
+    RegisteredRepo, RepoEntry, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
 };
 
 // ── Paths ───────────────────────────────────────────────────────────
@@ -16,6 +17,10 @@ fn shep_home() -> Result<PathBuf, String> {
 
 fn global_config_path() -> Result<PathBuf, String> {
     Ok(shep_home()?.join("config.yml"))
+}
+
+fn imported_fonts_dir() -> Result<PathBuf, String> {
+    Ok(shep_home()?.join("fonts"))
 }
 
 fn old_projects_dir() -> Result<PathBuf, String> {
@@ -80,6 +85,84 @@ pub fn save_terminal_settings(settings: &TerminalSettings) -> Result<(), String>
     let mut config = load_global_config()?;
     config.terminal = settings.clone();
     save_global_config(&config)
+}
+
+pub fn list_imported_fonts() -> Result<Vec<ImportedFont>, String> {
+    Ok(load_global_config()?.fonts)
+}
+
+pub fn import_font(source_path: &str) -> Result<ImportedFont, String> {
+    let source = Path::new(source_path);
+    if !source.is_file() {
+        return Err(format!("Font file does not exist: {source_path}"));
+    }
+
+    let extension = source
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+        .ok_or_else(|| "Font file must have a .ttf, .otf, .woff, or .woff2 extension".to_string())?;
+
+    if !matches!(extension.as_str(), "ttf" | "otf" | "woff" | "woff2") {
+        return Err("Only .ttf, .otf, .woff, and .woff2 font files are supported".to_string());
+    }
+
+    let label = source
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .map(|stem| stem.trim().to_string())
+        .filter(|stem| !stem.is_empty())
+        .ok_or_else(|| "Could not determine a font name from the selected file".to_string())?;
+
+    let id = format!(
+        "font-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| format!("System clock error: {e}"))?
+            .as_millis()
+    );
+    let file_name = format!("{id}.{extension}");
+    let family = format!("Shep User Font {id}");
+    let format = match extension.as_str() {
+        "ttf" => "truetype",
+        "otf" => "opentype",
+        "woff" => "woff",
+        "woff2" => "woff2",
+        _ => unreachable!(),
+    }
+    .to_string();
+
+    let fonts_dir = imported_fonts_dir()?;
+    fs::create_dir_all(&fonts_dir).map_err(|e| format!("Failed to create fonts directory: {e}"))?;
+
+    let destination = fonts_dir.join(&file_name);
+    fs::copy(source, &destination).map_err(|e| format!("Failed to copy font file: {e}"))?;
+
+    let imported_font = ImportedFont {
+        id,
+        label,
+        family,
+        file_name,
+        format,
+    };
+
+    let mut config = load_global_config()?;
+    config.fonts.push(imported_font.clone());
+    save_global_config(&config)?;
+
+    Ok(imported_font)
+}
+
+pub fn read_imported_font(font_id: &str) -> Result<Vec<u8>, String> {
+    let config = load_global_config()?;
+    let font = config
+        .fonts
+        .iter()
+        .find(|font| font.id == font_id)
+        .ok_or_else(|| format!("Unknown imported font: {font_id}"))?;
+
+    let path = imported_fonts_dir()?.join(&font.file_name);
+    fs::read(&path).map_err(|e| format!("Failed to read imported font: {e}"))
 }
 
 pub fn load_usage_settings() -> Result<UsageSettings, String> {

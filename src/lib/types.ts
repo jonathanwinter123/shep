@@ -46,6 +46,14 @@ export interface TerminalSettings {
   fontSize: number;
 }
 
+export interface ImportedFont {
+  id: string;
+  label: string;
+  family: string;
+  fileName: string;
+  format: string;
+}
+
 // ── Runtime state types ─────────────────────────────────────────────
 
 export type CommandStatus = "stopped" | "running" | "crashed";

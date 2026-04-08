@@ -2,7 +2,7 @@ export const TERMINAL_FONT_SIZE = 14;
 export const TERMINAL_FONT_FAMILY = "MesloLGS NF";
 export const TERMINAL_LINE_HEIGHT = 1;
 
-const DEFAULT_FALLBACKS = ["Courier New", "monospace"];
+const DEFAULT_FALLBACKS = ["MesloLGS NF", "Menlo", "Monaco", "Courier", "Andale Mono", "monospace"];
 const GENERIC_FAMILIES = new Set([
   "serif",
   "sans-serif",
@@ -21,10 +21,9 @@ const GENERIC_FAMILIES = new Set([
 
 export const FONT_OPTIONS = [
   { id: "MesloLGS NF", label: "MesloLGS Nerd Font" },
-  { id: "SF Mono", label: "SF Mono" },
   { id: "Menlo", label: "Menlo" },
   { id: "Monaco", label: "Monaco" },
-  { id: "Courier New", label: "Courier New" },
+  { id: "Courier", label: "Courier" },
   { id: "Andale Mono", label: "Andale Mono" },
 ] as const;
 

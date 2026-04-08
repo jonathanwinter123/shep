@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { getIdentifier, getName, getTauriVersion, getVersion } from "@tauri-apps/api/app";
+import { open } from "@tauri-apps/plugin-dialog";
+import { Upload } from "lucide-react";
 import { EDITOR_OPTIONS } from "../../lib/editors";
 import { DARK_THEMES, LIGHT_THEMES, TRANSPARENT_THEMES } from "../../lib/themes";
 import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
@@ -16,6 +18,9 @@ import {
 } from "../../lib/terminalConfig";
 import type { CursorStyle, UsageProvider } from "../../lib/types";
 import { getErrorMessage } from "../../lib/errors";
+import { getHomeDirectory } from "../../lib/tauri";
+import { getImportedFonts, importUserFont } from "../../lib/userFonts";
+import type { ImportedFont } from "../../lib/types";
 
 interface AppMeta {
   name: string;
@@ -41,6 +46,9 @@ export default function SettingsPanel() {
   const optionClass = "option-card w-44 justify-start";
   const [appMeta, setAppMeta] = useState<AppMeta | null>(null);
   const [appMetaError, setAppMetaError] = useState<string | null>(null);
+  const [importedFonts, setImportedFonts] = useState<ImportedFont[]>([]);
+  const [fontImporting, setFontImporting] = useState(false);
+  const [fontError, setFontError] = useState<string | null>(null);
   const themeId = useThemeStore((s) => s.themeId);
   const setTheme = useThemeStore((s) => s.setTheme);
   const settings = useEditorStore((s) => s.settings);
@@ -116,6 +124,64 @@ export default function SettingsPanel() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getImportedFonts()
+      .then((fonts) => {
+        if (!cancelled) {
+          setImportedFonts(fonts);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setFontError(getErrorMessage(error));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const importFontFile = async () => {
+    try {
+      setFontImporting(true);
+      setFontError(null);
+
+      const homeDirectory = await getHomeDirectory();
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        defaultPath: `${homeDirectory}/Library/Fonts`,
+        filters: [
+          {
+            name: "Font Files",
+            extensions: ["ttf", "otf", "woff", "woff2"],
+          },
+        ],
+      });
+
+      if (!selected || Array.isArray(selected)) {
+        setFontImporting(false);
+        return;
+      }
+
+      const imported = await importUserFont(selected);
+      setImportedFonts((current) => {
+        if (current.some((font) => font.id === imported.id)) {
+          return current;
+        }
+        return [...current, imported];
+      });
+      await updateTermSettings({ fontFamily: imported.family });
+      setFontImporting(false);
+    } catch (error) {
+      setFontImporting(false);
+      setFontError(getErrorMessage(error));
+    }
+  };
 
   return (
     <div className="absolute inset-0 overflow-y-auto p-6">
@@ -251,9 +317,36 @@ export default function SettingsPanel() {
             </button>
           ))}
         </div>
-        <div className="mt-2 text-xs text-[var(--text-muted)]">
-          Additional fonts will move to an import flow so the app can load the selected font file reliably.
+      </div>
+
+      <div className="settings-row">
+        <span className="settings-row__label">Custom Fonts</span>
+        <div className="flex flex-wrap gap-2">
+          {importedFonts.map((font) => (
+            <button
+              key={font.id}
+              onClick={() => void updateTermSettings({ fontFamily: font.family })}
+              className={`option-card option-card--compact ${termSettings.fontFamily === font.family ? "selected" : ""}`}
+              title={`Imported from ~/.shep/fonts/${font.fileName}`}
+            >
+              <span>{font.label}</span>
+            </button>
+          ))}
+          <button
+            onClick={() => void importFontFile()}
+            className="option-card option-card--compact"
+            disabled={fontImporting}
+          >
+            <span className="flex items-center gap-2">
+              <Upload size={14} />
+              <span>{fontImporting ? "Importing..." : "Import Font"}</span>
+            </span>
+          </button>
         </div>
+        {!importedFonts.length && !fontError && (
+          <div className="mt-2 text-xs text-[var(--text-muted)]">No custom fonts imported.</div>
+        )}
+        {fontError && <div className="mt-2 text-sm text-red-300">{fontError}</div>}
       </div>
 
       <div className="settings-row">
