@@ -267,6 +267,12 @@ select {
   align-items: center;
   width: 16px;
 }
+.context-menu__shortcut {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
 
 /* Sidebar status dots — unified right-aligned indicator */
 .sidebar-status-dot {

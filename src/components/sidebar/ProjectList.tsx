@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import type { RepoInfo, CommandState, TerminalTabData } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Sparkles, SquareTerminal } from "lucide-react";
+import tabKindMeta from "../../lib/tabKindMeta";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
 import ProjectItem from "./ProjectItem";
@@ -137,8 +137,8 @@ export default function ProjectList({
             {isExpanded && (
               <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
                 <CollapsibleSection
-                  label="AI Assistants"
-                  icon={<Sparkles size={14} />}
+                  label={tabKindMeta.assistant.label + "s"}
+                  icon={tabKindMeta.assistant.icon(14)}
                   badge={assistantTabs.length || null}
                   hasItems={assistantTabs.length > 0}
                   onAdd={onNewAssistant}
@@ -152,8 +152,8 @@ export default function ProjectList({
                 </CollapsibleSection>
 
                 <CollapsibleSection
-                  label="Terminals"
-                  icon={<SquareTerminal size={14} />}
+                  label={tabKindMeta.terminal.label + "s"}
+                  icon={tabKindMeta.terminal.icon(14)}
                   badge={shellTabs.length || null}
                   hasItems={shellTabs.length > 0}
                   onAdd={onNewShell}

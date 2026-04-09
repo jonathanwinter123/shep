@@ -103,7 +103,7 @@ export function panelTabId(kind: PanelTabKind): string {
 export const panelTabDefaults: Record<PanelTabKind, { label: string }> = {
   git: { label: "Git" },
   commands: { label: "Commands" },
-  launcher: { label: "New AI Assistant" },
+  launcher: { label: "New Agent" },
 };
 
 /** @deprecated Use TerminalTabData instead — kept as alias during migration */

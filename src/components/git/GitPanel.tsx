@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { GitBranch, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
+import tabKindMeta from "../../lib/tabKindMeta";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import {
@@ -184,7 +185,7 @@ export default function GitPanel() {
   return (
     <div className="git-panel">
       <div className="git-panel__header">
-        <GitBranch size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
+        <span style={{ opacity: 0.5, flexShrink: 0 }}>{tabKindMeta.git.icon(14)}</span>
         <BranchDropdown
           repoPath={activeProjectPath}
           currentBranch={gitStatus.branch}

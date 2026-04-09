@@ -480,6 +480,12 @@ export default function AppShell() {
         case "new_agent":
           handleNewAssistant();
           break;
+        case "new_commands":
+          useTerminalStore.getState().addPanelTab("commands");
+          break;
+        case "new_git":
+          useTerminalStore.getState().addPanelTab("git");
+          break;
         case "toggle_sidebar":
           useUIStore.getState().toggleSidebar();
           break;
@@ -565,6 +571,9 @@ export default function AppShell() {
             onClose={handleCloseTab}
             onNewShell={handleNewShell}
             onNewAssistant={handleNewAssistant}
+            onNewCommands={() => useTerminalStore.getState().addPanelTab("commands")}
+            onNewGit={() => useTerminalStore.getState().addPanelTab("git")}
+            onOpenInEditor={() => { const p = useTerminalStore.getState().activeProjectPath; if (p) handleOpenInEditor(p); }}
           />
 
           <div ref={terminalContainerRef} className="terminal-stage">
