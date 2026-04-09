@@ -7,6 +7,7 @@ import { GitBranch, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined, Rad
 import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
+import { useGitStore } from "../../stores/useGitStore";
 
 
 function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () => void; onNewShell: () => void }) {
@@ -91,6 +92,15 @@ export default function TabBar({
   );
   const projectTerminals = projectState;
   const projectName = activeProjectPath ? activeProjectPath.split("/").pop() : null;
+  const gitStatus = useGitStore((s) => activeProjectPath ? s.projectGitStatus[activeProjectPath] : null);
+  const branch = gitStatus?.branch ?? null;
+  const branchIconColor = !gitStatus || !gitStatus.is_git_repo
+    ? undefined
+    : gitStatus.dirty
+      ? "var(--status-attention)"
+      : gitStatus.ahead > 0 || gitStatus.behind > 0
+        ? "var(--status-running)"
+        : "rgb(45, 212, 191)";
   const tabs = projectTerminals?.tabs ?? [];
   const activeTabId = projectTerminals?.activeTabId ?? null;
   const { setActiveTab, reorderTab, updateTab } = useTerminalStore.getState();
@@ -209,12 +219,6 @@ export default function TabBar({
         role="tablist"
         aria-label="Workspace tabs"
       >
-        {projectName && (
-          <>
-            <span className="tab-bar__project-name">{projectName}</span>
-            <span className="tab-bar__project-sep" />
-          </>
-        )}
         {tabs.map((tab, i) => {
           const isActive = tab.id === activeTabId && !anyOverlay;
           const isDragging = tab.id === dragTabId;
@@ -446,6 +450,18 @@ export default function TabBar({
 
         <NewSessionButton onNewAssistant={onNewAssistant} onNewShell={onNewShell} />
       </div>
+      {projectName && (
+        <span className="tab-bar__breadcrumb">
+          {projectName}
+          {branch && (
+            <>
+              <span className="tab-bar__breadcrumb-on">on</span>
+              <GitBranch size={15} className="tab-bar__breadcrumb-icon" style={branchIconColor ? { color: branchIconColor } : undefined} />
+              {branch}
+            </>
+          )}
+        </span>
+      )}
     </div>
   );
 }

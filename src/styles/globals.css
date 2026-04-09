@@ -958,6 +958,16 @@ select {
   align-items: center;
   justify-content: center;
 }
+.drag-region__title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  pointer-events: none;
+  user-select: none;
+}
 
 /* ── Sidebar usage section ─────────────────────────────── */
 
@@ -1740,20 +1750,25 @@ select {
   overflow: hidden;
   padding: 6px 0 8px;
 }
-.tab-bar__project-name {
+.tab-bar__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: var(--text-body);
-  font-weight: 400;
   color: var(--text-muted);
   white-space: nowrap;
   flex-shrink: 0;
-  padding: 0 4px;
+  margin-left: auto;
+  padding: 0 8px 0 12px;
+  border-left: 1px solid color-mix(in srgb, var(--overlay) 10%, transparent);
 }
-.tab-bar__project-sep {
-  width: 1px;
-  height: 14px;
-  background: color-mix(in srgb, var(--overlay) 12%, transparent);
-  flex-shrink: 0;
-  margin-right: 4px;
+.tab-bar__breadcrumb-on {
+  opacity: 0.4;
+}
+.tab-bar__breadcrumb-icon {
+  opacity: 0.8;
+  align-self: flex-end;
+  margin-bottom: 1px;
 }
 
 /* ── Git Panel ─────────────────────────────────────────── */
