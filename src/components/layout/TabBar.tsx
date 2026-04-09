@@ -98,9 +98,7 @@ export default function TabBar({
     ? undefined
     : gitStatus.dirty
       ? "var(--status-attention)"
-      : gitStatus.ahead > 0 || gitStatus.behind > 0
-        ? "var(--status-running)"
-        : "rgb(45, 212, 191)";
+      : "rgb(45, 212, 191)";
   const tabs = projectTerminals?.tabs ?? [];
   const activeTabId = projectTerminals?.activeTabId ?? null;
   const { setActiveTab, reorderTab, updateTab } = useTerminalStore.getState();
