@@ -13,6 +13,8 @@ interface UIStore {
   usagePanelActive: boolean;  // usage panel is the active view
   portsPanelOpen: boolean;    // ports tab visible in tab bar
   portsPanelActive: boolean;  // ports panel is the active view
+  sessionHistoryOpen: boolean;   // session history tab visible in tab bar
+  sessionHistoryActive: boolean; // session history panel is the active view
   sidebarVisible: boolean;    // sidebar visibility
   username: string | null;
   computerName: string | null;
@@ -45,6 +47,11 @@ interface UIStore {
   activatePortsPanel: () => void;
   deactivatePortsPanel: () => void;
   togglePortsPanel: () => void;
+  openSessionHistory: () => void;
+  closeSessionHistory: () => void;
+  activateSessionHistory: () => void;
+  deactivateSessionHistory: () => void;
+  toggleSessionHistory: () => void;
   toggleSidebar: () => void;
   setUsername: (name: string) => void;
   setComputerName: (name: string) => void;
@@ -59,6 +66,7 @@ function activateNextOpen(s: UIStore, excluding: string): Partial<UIStore> {
     ["launcher", s.launcherOpen],
     ["usage", s.usageTabOpen],
     ["ports", s.portsPanelOpen],
+    ["sessionHistory", s.sessionHistoryOpen],
   ];
   for (const [name, isOpen] of candidates) {
     if (name === excluding || !isOpen) continue;
@@ -69,6 +77,7 @@ function activateNextOpen(s: UIStore, excluding: string): Partial<UIStore> {
       case "launcher": return { launcherActive: true };
       case "usage": return { usagePanelActive: true };
       case "ports": return { portsPanelActive: true };
+      case "sessionHistory": return { sessionHistoryActive: true };
     }
   }
   return {};
@@ -81,6 +90,7 @@ const deactivateAll = {
   launcherActive: false,
   usagePanelActive: false,
   portsPanelActive: false,
+  sessionHistoryActive: false,
 };
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -96,6 +106,8 @@ export const useUIStore = create<UIStore>((set) => ({
   usagePanelActive: false,
   portsPanelOpen: false,
   portsPanelActive: false,
+  sessionHistoryOpen: false,
+  sessionHistoryActive: false,
   sidebarVisible: true,
   username: null,
   computerName: null,
@@ -244,6 +256,32 @@ export const useUIStore = create<UIStore>((set) => ({
         return { ...deactivateAll, portsPanelActive: true };
       }
       return { portsPanelOpen: true, ...deactivateAll, portsPanelActive: true };
+    }),
+  openSessionHistory: () => set({
+    sessionHistoryOpen: true,
+    ...deactivateAll,
+    sessionHistoryActive: true,
+  }),
+  closeSessionHistory: () =>
+    set((s) => ({
+      sessionHistoryOpen: false,
+      sessionHistoryActive: false,
+      ...activateNextOpen(s, "sessionHistory"),
+    })),
+  activateSessionHistory: () => set({
+    ...deactivateAll,
+    sessionHistoryActive: true,
+  }),
+  deactivateSessionHistory: () => set({ sessionHistoryActive: false }),
+  toggleSessionHistory: () =>
+    set((s) => {
+      if (s.sessionHistoryOpen && s.sessionHistoryActive) {
+        return { sessionHistoryOpen: false, sessionHistoryActive: false, ...activateNextOpen(s, "sessionHistory") };
+      }
+      if (s.sessionHistoryOpen) {
+        return { ...deactivateAll, sessionHistoryActive: true };
+      }
+      return { sessionHistoryOpen: true, ...deactivateAll, sessionHistoryActive: true };
     }),
   toggleSidebar: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })),
   setUsername: (name: string) => set({ username: name }),
