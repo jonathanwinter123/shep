@@ -89,6 +89,7 @@ body,
   --status-stopped: #414868;
   --status-crashed: #f7768e;
   --status-attention: #e0af68;
+  --status-clean: #9ece6a;
 }
 
 .logo-unavailable {

@@ -362,7 +362,7 @@ const carbonfox: ShepTheme = {
   statusRunning: "#78a9ff",
   statusStopped: "#484848",
   statusCrashed: "#ee5396",
-  statusAttention: "#08bdba",
+  statusAttention: "#ffe97b",
 
   appBg: "#161616",
   appFg: "#f2f4f8",

@@ -195,7 +195,7 @@ export default function GitPanel() {
         <span
           style={{
             width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-            backgroundColor: activeStatus.dirty ? "rgb(251, 191, 36)" : "rgb(74, 222, 128)",
+            backgroundColor: activeStatus.dirty ? "var(--status-attention)" : "var(--status-clean)",
           }}
         />
         {showPush && (

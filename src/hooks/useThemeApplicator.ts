@@ -25,6 +25,7 @@ const CSS_VAR_MAP: [keyof ShepTheme, string][] = [
   ["statusStopped", "--status-stopped"],
   ["statusCrashed", "--status-crashed"],
   ["statusAttention", "--status-attention"],
+  ["termGreen", "--status-clean"],
 ];
 
 export function useThemeApplicator(): void {
