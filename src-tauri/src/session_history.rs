@@ -29,6 +29,52 @@ fn encode_repo_path(repo_path: &str) -> String {
     repo_path.replace('/', "-")
 }
 
+/// Extract a user-friendly prompt from raw message text.
+/// Detects command invocations (XML tags) and returns the command name + args
+/// instead of the raw expanded content.
+fn clean_prompt_text(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+
+    // Skip local-command-caveat messages entirely — caller should try next message
+    if trimmed.starts_with("<local-command-caveat>") {
+        return None;
+    }
+
+    // Skip system_instruction messages
+    if trimmed.starts_with("<system_instruction>") || trimmed.starts_with("<system-reminder>") {
+        return None;
+    }
+
+    // Extract <command-name>/foo</command-name> with optional <command-args>bar</command-args>
+    if let Some(cmd) = extract_xml_tag(trimmed, "command-name") {
+        let args = extract_xml_tag(trimmed, "command-args").unwrap_or_default();
+        if args.is_empty() {
+            return Some(cmd.to_string());
+        }
+        return Some(format!("{cmd} {args}"));
+    }
+
+    // Extract <command-message>foo</command-message> as fallback
+    if let Some(msg) = extract_xml_tag(trimmed, "command-message") {
+        return Some(msg.to_string());
+    }
+
+    Some(trimmed.to_string())
+}
+
+fn extract_xml_tag<'a>(text: &'a str, tag: &str) -> Option<&'a str> {
+    let open = format!("<{tag}>");
+    let close = format!("</{tag}>");
+    let start = text.find(&open)? + open.len();
+    let end = text[start..].find(&close)? + start;
+    let content = text[start..end].trim();
+    if content.is_empty() {
+        None
+    } else {
+        Some(content)
+    }
+}
+
 fn extract_text_content(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::String(s) => s.clone(),
@@ -123,18 +169,30 @@ pub fn list_sessions(repo_path: &str) -> Result<Vec<SessionSummary>, String> {
                         message_count += 1;
 
                         if first_prompt.is_empty() {
-                            if let Some(ts) = obj.get("timestamp").and_then(|t| t.as_str()) {
-                                started_at = ts.to_string();
-                            }
                             if let Some(content_val) = obj.get("message").and_then(|m| m.get("content")) {
-                                let text = extract_text_content(content_val);
-                                first_prompt = if text.len() > 200 {
-                                    let mut truncated = text[..200].to_string();
-                                    truncated.push_str("…");
-                                    truncated
+                                let raw_text = extract_text_content(content_val);
+                                if let Some(cleaned) = clean_prompt_text(&raw_text) {
+                                    // Found a usable first prompt
+                                    if started_at.is_empty() {
+                                        if let Some(ts) = obj.get("timestamp").and_then(|t| t.as_str()) {
+                                            started_at = ts.to_string();
+                                        }
+                                    }
+                                    first_prompt = if cleaned.len() > 200 {
+                                        let mut truncated = cleaned[..200].to_string();
+                                        truncated.push_str("…");
+                                        truncated
+                                    } else {
+                                        cleaned
+                                    };
                                 } else {
-                                    text
-                                };
+                                    // Skippable message (caveat, system) — still record timestamp
+                                    if started_at.is_empty() {
+                                        if let Some(ts) = obj.get("timestamp").and_then(|t| t.as_str()) {
+                                            started_at = ts.to_string();
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
