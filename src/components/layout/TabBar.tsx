@@ -7,7 +7,6 @@ import { GitBranch, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined, Rad
 import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
-import DevMemory from "./DevMemory";
 
 
 function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () => void; onNewShell: () => void }) {
@@ -87,9 +86,11 @@ export default function TabBar({
   onNewShell,
   onNewAssistant,
 }: TabBarProps) {
-  const projectTerminals = useTerminalStore(
-    (s) => (s.activeProjectPath ? s.projectState[s.activeProjectPath] : null),
+  const { activeProjectPath, projectState } = useTerminalStore(
+    useShallow((s) => ({ activeProjectPath: s.activeProjectPath, projectState: s.activeProjectPath ? s.projectState[s.activeProjectPath] : null })),
   );
+  const projectTerminals = projectState;
+  const projectName = activeProjectPath ? activeProjectPath.split("/").pop() : null;
   const tabs = projectTerminals?.tabs ?? [];
   const activeTabId = projectTerminals?.activeTabId ?? null;
   const { setActiveTab, reorderTab, updateTab } = useTerminalStore.getState();
@@ -208,6 +209,12 @@ export default function TabBar({
         role="tablist"
         aria-label="Workspace tabs"
       >
+        {projectName && (
+          <>
+            <span className="tab-bar__project-name">{projectName}</span>
+            <span className="tab-bar__project-sep" />
+          </>
+        )}
         {tabs.map((tab, i) => {
           const isActive = tab.id === activeTabId && !anyOverlay;
           const isDragging = tab.id === dragTabId;
@@ -439,9 +446,6 @@ export default function TabBar({
 
         <NewSessionButton onNewAssistant={onNewAssistant} onNewShell={onNewShell} />
       </div>
-
-      {import.meta.env.DEV && <DevMemory />}
-
     </div>
   );
 }

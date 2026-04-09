@@ -1736,11 +1736,24 @@ select {
 
 .tab-bar {
   display: flex;
-  min-height: 36px;
   align-items: center;
-  gap: 4px;
   overflow: hidden;
-  padding: 4px 0 8px;
+  padding: 6px 0 8px;
+}
+.tab-bar__project-name {
+  font-size: var(--text-body);
+  font-weight: 400;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+.tab-bar__project-sep {
+  width: 1px;
+  height: 14px;
+  background: color-mix(in srgb, var(--overlay) 12%, transparent);
+  flex-shrink: 0;
+  margin-right: 4px;
 }
 
 /* ── Git Panel ─────────────────────────────────────────── */
