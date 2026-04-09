@@ -351,13 +351,16 @@ export function usePty() {
       cols: number,
       rows: number,
       mode: SessionMode = "standard",
+      resumeSessionId?: string,
     ) => {
       if (!activeRepoPath) return;
       const assistant = CODING_ASSISTANTS.find((a) => a.id === assistantId);
       if (!assistant) return;
 
       let command = assistant.command;
-      if (mode === "yolo" && assistant.yoloFlag) {
+      if (resumeSessionId) {
+        command = `${command} --resume ${resumeSessionId}`;
+      } else if (mode === "yolo" && assistant.yoloFlag) {
         command = `${command} ${assistant.yoloFlag}`;
       }
 

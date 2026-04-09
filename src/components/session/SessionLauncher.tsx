@@ -3,19 +3,23 @@ import type { CodingAssistant, SessionMode } from "../../lib/types";
 import { CODING_ASSISTANTS } from "../sidebar/constants";
 import { checkCommandExists } from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
+import { useSessionHistoryStore } from "../../stores/useSessionHistoryStore";
 import { HandMetal } from "lucide-react";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { ASSISTANT_INSTALL_URLS } from "../sidebar/constants";
+import SessionList from "./SessionList";
 
 interface SessionLauncherProps {
   onStartSession: (
     assistantId: string,
     mode: SessionMode,
   ) => Promise<boolean>;
+  onResumeSession: (sessionId: string) => Promise<boolean>;
 }
 
-export default function SessionLauncher({ onStartSession }: SessionLauncherProps) {
+export default function SessionLauncher({ onStartSession, onResumeSession }: SessionLauncherProps) {
   const activeRepoPath = useRepoStore((s) => s.activeRepoPath);
+  const { sessions, searchQuery, loading, setSearchQuery, loadSessions } = useSessionHistoryStore();
 
   const [selectedAssistant, setSelectedAssistant] = useState<CodingAssistant | null>(null);
   const [available, setAvailable] = useState<Record<string, boolean>>({});
@@ -86,6 +90,9 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
                     if (isAvailable) {
                       setSelectedAssistant(assistant);
                       setInstallPopover(null);
+                      if (assistant.id === "claude" && activeRepoPath) {
+                        loadSessions(activeRepoPath);
+                      }
                     } else {
                       setInstallPopover(showPopover ? null : assistant.id);
                     }
@@ -123,6 +130,20 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
           })}
         </div>
       </div>
+
+      {/* Resume Session */}
+      {selectedAssistant?.id === "claude" && sessions.length > 0 && (
+        <div className="mb-6">
+          <label className="section-label !p-0 mb-3 block text-xs opacity-50">Resume Session</label>
+          <SessionList
+            sessions={sessions}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onSelectSession={(sessionId) => void onResumeSession(sessionId)}
+            loading={loading}
+          />
+        </div>
+      )}
 
       {/* Mode picker */}
       {selectedAssistant && (

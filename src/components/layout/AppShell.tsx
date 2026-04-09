@@ -339,6 +339,27 @@ export default function AppShell() {
     [launchAssistant, getTerminalDimensions],
   );
 
+  const handleResumeSession = useCallback(
+    async (sessionId: string) => {
+      const { cols, rows } = getTerminalDimensions();
+      const ptyId = await launchAssistant("claude", cols, rows, "standard", sessionId);
+      if (ptyId) {
+        const ui = useUIStore.getState();
+        ui.deactivateSettings();
+        ui.deactivateLauncher();
+        ui.deactivateGitPanel();
+        ui.deactivateCommandsPanel();
+        ui.deactivateUsagePanel();
+        ui.deactivatePortsPanel();
+        ui.deactivateSessionHistory();
+        useUIStore.setState({ launcherOpen: false });
+        return true;
+      }
+      return false;
+    },
+    [launchAssistant, getTerminalDimensions],
+  );
+
   const handleNewShell = useCallback(() => {
     useUIStore.getState().deactivateSettings();
     useUIStore.getState().deactivateLauncher();
@@ -581,7 +602,7 @@ export default function AppShell() {
                 onStopAllCommands={handleStopAllCommands}
               />
             )}
-            {launcherActive && <SessionLauncher onStartSession={handleStartSession} />}
+            {launcherActive && <SessionLauncher onStartSession={handleStartSession} onResumeSession={handleResumeSession} />}
             {usagePanelActive && <UsagePanel />}
             {portsPanelActive && <PortsPanel />}
 
