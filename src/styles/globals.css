@@ -656,7 +656,7 @@ select {
 /* Close button: hidden by default, shown on hover inside tab at right */
 .tab .tab-close {
   position: absolute;
-  left: 6px;
+  right: 6px;
   width: 16px;
   height: 16px;
   display: flex;
