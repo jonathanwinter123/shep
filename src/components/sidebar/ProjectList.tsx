@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import type { RepoInfo, CommandState } from "../../lib/types";
+import type { RepoInfo, CommandState, TerminalTabData } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Sparkles, SquareTerminal } from "lucide-react";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -86,12 +86,12 @@ export default function ProjectList({
 
   const assistantTabs = useMemo(() => {
     if (!projectTabs) return [];
-    return projectTabs.filter((t) => t.assistantId !== null);
+    return projectTabs.filter((t): t is TerminalTabData => t.kind === "assistant");
   }, [projectTabs]);
 
   const shellTabs = useMemo(() => {
     if (!projectTabs) return [];
-    return projectTabs.filter((t) => !t.assistantId);
+    return projectTabs.filter((t): t is TerminalTabData => t.kind === "terminal");
   }, [projectTabs]);
 
   const commandsBadge = commands.length > 0 ? String(commands.length) : null;

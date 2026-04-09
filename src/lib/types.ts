@@ -70,15 +70,44 @@ export interface CommandState {
 
 export type SessionMode = "standard" | "yolo";
 
-export interface TerminalTab {
+// ── Unified tab model ──────────────────────────────────────────────
+
+export type PanelTabKind = "git" | "commands" | "launcher";
+export type TabKind = "terminal" | "assistant" | PanelTabKind;
+
+interface TabBase {
   id: string;
+  kind: TabKind;
   label: string;
+}
+
+export interface TerminalTabData extends TabBase {
+  kind: "terminal" | "assistant";
   ptyId: number;
   repoPath: string;
-  commandName: string | null; // null = blank shell or assistant
-  assistantId: string | null; // null = not an assistant tab
-  sessionMode: SessionMode | null; // null = not an assistant tab
+  commandName: string | null;
+  assistantId: string | null;
+  sessionMode: SessionMode | null;
 }
+
+export interface PanelTabData extends TabBase {
+  kind: PanelTabKind;
+}
+
+export type UnifiedTab = TerminalTabData | PanelTabData;
+
+export function panelTabId(kind: PanelTabKind): string {
+  return `panel-${kind}`;
+}
+
+export const panelTabDefaults: Record<PanelTabKind, { label: string }> = {
+  git: { label: "Git" },
+  commands: { label: "Commands" },
+  launcher: { label: "New AI Assistant" },
+};
+
+/** @deprecated Use TerminalTabData instead — kept as alias during migration */
+export type TerminalTab = TerminalTabData;
 
 // ── Tab activity tracking ────────────────────────────────────────────
 
