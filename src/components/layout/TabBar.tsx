@@ -42,7 +42,7 @@ function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () =
     <>
       <button
         ref={btnRef}
-        className="tab !px-3 !py-1.5 !text-base font-semibold"
+        className="tab tab-auto !px-3 font-semibold"
         onClick={handleToggle}
         title="New session"
         aria-label="Open new session"
@@ -274,7 +274,7 @@ export default function TabBar({
                 </>
               )}
               <button
-                className="icon-btn ml-0.5"
+                className="tab-close"
                 aria-label={`Close tab ${tab.label}`}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -300,7 +300,7 @@ export default function TabBar({
             <span>+</span>
             <span>New AI Assistant</span>
             <button
-              className="icon-btn ml-0.5"
+              className="tab-close"
               aria-label="Close new session panel"
               onClick={(e) => {
                 e.stopPropagation();
@@ -325,7 +325,7 @@ export default function TabBar({
             <GitBranch size={12} />
             <span>Git</span>
             <button
-              className="icon-btn ml-0.5"
+              className="tab-close"
               aria-label="Close Git panel"
               onClick={(e) => {
                 e.stopPropagation();
@@ -350,7 +350,7 @@ export default function TabBar({
             <Terminal size={12} />
             <span>Commands</span>
             <button
-              className="icon-btn ml-0.5"
+              className="tab-close"
               aria-label="Close commands panel"
               onClick={(e) => {
                 e.stopPropagation();
@@ -375,7 +375,7 @@ export default function TabBar({
             <ChartNoAxesCombined size={12} />
             <span>Usage</span>
             <button
-              className="icon-btn ml-0.5"
+              className="tab-close"
               aria-label="Close usage panel"
               onClick={(e) => {
                 e.stopPropagation();
@@ -400,7 +400,7 @@ export default function TabBar({
             <Radio size={12} />
             <span>Ports</span>
             <button
-              className="icon-btn ml-0.5"
+              className="tab-close"
               aria-label="Close ports panel"
               onClick={(e) => {
                 e.stopPropagation();
@@ -425,7 +425,7 @@ export default function TabBar({
             <GearIcon size={12} />
             <span>Settings</span>
             <button
-              className="icon-btn ml-0.5"
+              className="tab-close"
               aria-label="Close settings panel"
               onClick={(e) => {
                 e.stopPropagation();

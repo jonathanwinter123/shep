@@ -621,19 +621,28 @@ select {
   position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 4px 10px;
+  min-height: 32px;
+  width: 192px;
   border-radius: var(--radius-sm);
   font-size: var(--text-body);
-  border: 1px solid transparent;
+  border: none;
+  background: var(--surface-hover);
   color: var(--text-secondary);
   cursor: pointer;
   user-select: none;
+  flex-shrink: 1;
+  flex-grow: 0;
+  transition: background 160ms ease, color 160ms ease;
+}
+.tab.tab-auto {
+  width: auto;
   flex-shrink: 0;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 .tab:hover {
-  background: var(--surface-hover);
+  background: var(--surface-active);
   color: var(--text-primary);
 }
 .tab:focus-visible {
@@ -641,8 +650,34 @@ select {
   outline-offset: 2px;
 }
 .tab.active {
-  background: var(--surface-active);
-  border-color: var(--border-active);
+  background: color-mix(in srgb, var(--overlay) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--overlay) 10%, transparent);
+  color: var(--text-primary);
+}
+/* Close button: hidden by default, shown on hover inside tab at right */
+.tab .tab-close {
+  position: absolute;
+  left: 6px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-secondary);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, background 120ms ease;
+}
+.tab:hover .tab-close {
+  opacity: 1;
+  pointer-events: auto;
+}
+.tab .tab-close:hover {
+  background: color-mix(in srgb, var(--overlay) 12%, transparent);
   color: var(--text-primary);
 }
 .tab.dragging {
@@ -1701,12 +1736,11 @@ select {
 
 .tab-bar {
   display: flex;
-  min-height: 40px;
+  min-height: 36px;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
   overflow: hidden;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--glass-border);
+  padding: 4px 0 8px;
 }
 
 /* ── Git Panel ─────────────────────────────────────────── */
