@@ -11,6 +11,7 @@ import SessionLauncher from "../session/SessionLauncher";
 import NoticeCenter from "../shared/NoticeCenter";
 import UsagePanel from "../usage/UsagePanel";
 import PortsPanel from "../ports/PortsPanel";
+import SessionHistoryPanel from "../session/SessionHistoryPanel";
 import { PanelLeft, PanelLeftOpen } from "lucide-react";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
@@ -143,7 +144,7 @@ export default function AppShell() {
   );
 
   const {
-    settingsActive, gitPanelActive, commandsPanelActive, launcherActive, usagePanelActive, portsPanelActive, sidebarVisible,
+    settingsActive, gitPanelActive, commandsPanelActive, launcherActive, usagePanelActive, portsPanelActive, sessionHistoryActive, sidebarVisible,
   } = useUIStore(useShallow((s) => ({
     settingsActive: s.settingsActive,
     gitPanelActive: s.gitPanelActive,
@@ -151,6 +152,7 @@ export default function AppShell() {
     launcherActive: s.launcherActive,
     usagePanelActive: s.usagePanelActive,
     portsPanelActive: s.portsPanelActive,
+    sessionHistoryActive: s.sessionHistoryActive,
     sidebarVisible: s.sidebarVisible,
   })));
   const { loadSettings: loadEditorSettings } = useEditorStore.getState();
@@ -304,6 +306,7 @@ export default function AppShell() {
     useUIStore.getState().deactivateLauncher();
     useUIStore.getState().deactivateUsagePanel();
     useUIStore.getState().deactivatePortsPanel();
+    useUIStore.getState().deactivateSessionHistory();
     setActiveTab(tabId); // auto-switches workspace if tab is in a different one
     const store = useTerminalStore.getState();
     const allTabs = activeRepoPath ? store.getAllProjectTabs(activeRepoPath) : [];
@@ -331,6 +334,7 @@ export default function AppShell() {
         ui.deactivateCommandsPanel();
         ui.deactivateUsagePanel();
         ui.deactivatePortsPanel();
+        ui.deactivateSessionHistory();
         useUIStore.setState({ launcherOpen: false });
         return true;
       }
@@ -367,6 +371,7 @@ export default function AppShell() {
     useUIStore.getState().deactivateCommandsPanel();
     useUIStore.getState().deactivateUsagePanel();
     useUIStore.getState().deactivatePortsPanel();
+    useUIStore.getState().deactivateSessionHistory();
     const { cols, rows } = getTerminalDimensions();
     spawnBlankShell(cols, rows);
   }, [spawnBlankShell, getTerminalDimensions]);
@@ -529,7 +534,7 @@ export default function AppShell() {
     return () => { unlisten.then((f) => f()); };
   }, [handleNewShell, handleNewAssistant, handleOpenInEditor, pushNotice]);
 
-  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive || portsPanelActive;
+  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive || portsPanelActive || sessionHistoryActive;
 
   return (
     <div className="app-shell">
@@ -605,6 +610,7 @@ export default function AppShell() {
             {launcherActive && <SessionLauncher onStartSession={handleStartSession} onResumeSession={handleResumeSession} />}
             {usagePanelActive && <UsagePanel />}
             {portsPanelActive && <PortsPanel />}
+            {sessionHistoryActive && <SessionHistoryPanel onResumeSession={handleResumeSession} />}
 
             {!showOverlay && tabs.length === 0 && (
               <div className="terminal-empty">
