@@ -10,8 +10,20 @@ import type {
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
-import { formatCost, formatPercent, formatReset, formatTokenCount, getProviderLabel, computePace, paceLabel } from "./usageHelpers";
-import type { UsageProvider, UsageSettings, ProviderUsageSnapshot, UsageWindowSnapshot } from "../../lib/types";
+import {
+  ALL_USAGE_PROVIDERS,
+  TONE_COLORS,
+  TONE_TRACK,
+  barTone,
+  formatCost,
+  formatPercent,
+  formatReset,
+  formatTokenCount,
+  getProviderLabel,
+  computePace,
+  paceLabel,
+} from "./usageHelpers";
+import type { UsageSettings, ProviderUsageSnapshot, UsageWindowSnapshot } from "../../lib/types";
 
 const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
   { key: "5h", label: "5 hour" },
@@ -375,31 +387,6 @@ function BreakdownList({
   );
 }
 
-const TONE_COLORS: Record<string, string> = {
-  low: "rgba(52, 211, 153, 0.75)",
-  medium: "rgba(245, 158, 11, 0.75)",
-  high: "rgba(251, 146, 60, 0.85)",
-  critical: "rgba(248, 113, 113, 0.9)",
-  local: "rgba(96, 165, 250, 0.5)",
-};
-
-const TONE_TRACK: Record<string, string> = {
-  low: "rgba(52, 211, 153, 0.1)",
-  medium: "rgba(245, 158, 11, 0.1)",
-  high: "rgba(251, 146, 60, 0.12)",
-  critical: "rgba(248, 113, 113, 0.14)",
-  local: "rgba(96, 165, 250, 0.08)",
-};
-
-function barTone(pace: ReturnType<typeof computePace>, pct: number | null | undefined): string {
-  if (pct == null) return "local";
-  if (pct >= 90) return "critical";
-  if (pace?.status === "over") return pct >= 50 ? "high" : "medium";
-  if (pct >= 75) return "high";
-  if (pct >= 50) return "medium";
-  return "low";
-}
-
 const PACE_LABEL_COLORS: Record<string, string> = {
   under: "rgba(52, 211, 153, 0.8)",
   on: "var(--text-muted)",
@@ -407,7 +394,7 @@ const PACE_LABEL_COLORS: Record<string, string> = {
 };
 
 function CustomBudgets({ snapshots, settings }: { snapshots: Record<string, ProviderUsageSnapshot>; settings: UsageSettings }) {
-  const budgetProviders = (["claude", "codex", "gemini", "opencode"] as UsageProvider[]).filter((p) => {
+  const budgetProviders = ALL_USAGE_PROVIDERS.filter((p) => {
     const config = settings[p];
     if (!config.show || config.budgetMode !== "custom" || config.monthlyBudget == null || config.monthlyBudget <= 0) return false;
     const snap = snapshots[p];
@@ -486,7 +473,7 @@ function ProviderLimits({
 }) {
   if (window !== "5h" && window !== "7d") return null;
 
-  const providers = (["claude", "codex", "gemini", "opencode"] as UsageProvider[]).filter((p) => {
+  const providers = ALL_USAGE_PROVIDERS.filter((p) => {
     const snap = snapshots[p];
     if (!snap) return false;
     // Rate Limits only shows providers with actual provider API data, not synthetic budget windows

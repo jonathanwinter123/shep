@@ -1,16 +1,10 @@
-import { useEffect, useCallback, useRef, useMemo } from "react";
+import { Suspense, lazy, useEffect, useCallback, useRef, useMemo } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import Sidebar from "../sidebar/Sidebar";
 import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
 import TerminalErrorBoundary from "../terminal/TerminalErrorBoundary";
-import SettingsPanel from "../settings/SettingsPanel";
-import GitPanel from "../git/GitPanel";
-import CommandsPanel from "../commands/CommandsPanel";
-import SessionLauncher from "../session/SessionLauncher";
 import NoticeCenter from "../shared/NoticeCenter";
-import UsagePanel from "../usage/UsagePanel";
-import PortsPanel from "../ports/PortsPanel";
 import { PanelLeft, PanelLeftOpen } from "lucide-react";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
@@ -41,6 +35,12 @@ const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
 // useSyncExternalStore — selectors must return the same reference for the same state.
 const EMPTY_TABS: UnifiedTab[] = [];
 const EMPTY_COMMANDS: CommandState[] = [];
+const SettingsPanel = lazy(() => import("../settings/SettingsPanel"));
+const GitPanel = lazy(() => import("../git/GitPanel"));
+const CommandsPanel = lazy(() => import("../commands/CommandsPanel"));
+const SessionLauncher = lazy(() => import("../session/SessionLauncher"));
+const UsagePanel = lazy(() => import("../usage/UsagePanel"));
+const PortsPanel = lazy(() => import("../ports/PortsPanel"));
 
 function toCommandConfig(command: CommandState): CommandConfig {
   return {
@@ -54,6 +54,10 @@ function toCommandConfig(command: CommandState): CommandConfig {
 
 function fallbackWorkspaceName(repoPath: string) {
   return repoPath.split("/").filter(Boolean).pop() ?? "Project";
+}
+
+function PanelLoader() {
+  return <div className="terminal-empty">Loading panel…</div>;
 }
 
 export default function AppShell() {
@@ -579,25 +583,47 @@ export default function AppShell() {
 
           <div ref={terminalContainerRef} className="terminal-stage">
             {/* Global overlays (Settings, Usage, Ports) */}
-            {settingsActive && <SettingsPanel />}
-            {usagePanelActive && <UsagePanel />}
-            {portsPanelActive && <PortsPanel />}
+            {settingsActive && (
+              <Suspense fallback={<PanelLoader />}>
+                <SettingsPanel />
+              </Suspense>
+            )}
+            {usagePanelActive && (
+              <Suspense fallback={<PanelLoader />}>
+                <UsagePanel />
+              </Suspense>
+            )}
+            {portsPanelActive && (
+              <Suspense fallback={<PanelLoader />}>
+                <PortsPanel />
+              </Suspense>
+            )}
 
             {/* Local panel tabs (Git, Commands, Launcher) */}
-            {!showOverlay && activeTab?.kind === "git" && <GitPanel />}
-            {!showOverlay && activeTab?.kind === "commands" && (
-              <CommandsPanel
-                commands={commands}
-                onStartCommand={handleStartCommand}
-                onStopCommand={stopCommand}
-                onCreateCommand={handleCreateCommand}
-                onUpdateCommand={handleUpdateCommand}
-                onDeleteCommand={handleDeleteCommand}
-                onStartAllCommands={handleStartAllCommands}
-                onStopAllCommands={handleStopAllCommands}
-              />
+            {!showOverlay && activeTab?.kind === "git" && (
+              <Suspense fallback={<PanelLoader />}>
+                <GitPanel />
+              </Suspense>
             )}
-            {!showOverlay && activeTab?.kind === "launcher" && <SessionLauncher onStartSession={handleStartSession} />}
+            {!showOverlay && activeTab?.kind === "commands" && (
+              <Suspense fallback={<PanelLoader />}>
+                <CommandsPanel
+                  commands={commands}
+                  onStartCommand={handleStartCommand}
+                  onStopCommand={stopCommand}
+                  onCreateCommand={handleCreateCommand}
+                  onUpdateCommand={handleUpdateCommand}
+                  onDeleteCommand={handleDeleteCommand}
+                  onStartAllCommands={handleStartAllCommands}
+                  onStopAllCommands={handleStopAllCommands}
+                />
+              </Suspense>
+            )}
+            {!showOverlay && activeTab?.kind === "launcher" && (
+              <Suspense fallback={<PanelLoader />}>
+                <SessionLauncher onStartSession={handleStartSession} />
+              </Suspense>
+            )}
 
             {!showOverlay && !activeTab && tabs.length === 0 && (
               <div className="terminal-empty">

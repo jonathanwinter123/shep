@@ -494,8 +494,9 @@ fn ingest_opencode(conn: &Connection) -> Result<bool, String> {
     let meta = fs::metadata(&db_path).map_err(|e| e.to_string())?;
     let file_size = meta.len() as i64;
     let mtime = file_mtime(&meta);
+    let cursor = get_cursor(conn, cursor_key);
 
-    if let Some((size, _, last_mtime)) = get_cursor(conn, cursor_key) {
+    if let Some((size, _, last_mtime)) = cursor {
         if size == file_size && last_mtime == mtime {
             return Ok(true);
         }
@@ -507,11 +508,17 @@ fn ingest_opencode(conn: &Connection) -> Result<bool, String> {
     ).map_err(|e| format!("Failed to open OpenCode DB: {e}"))?;
 
     conn.execute_batch("BEGIN").map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM usage_messages WHERE provider = 'opencode'", [])
-        .map_err(|e| e.to_string())?;
+    let (last_size, last_rowid, _) = cursor.unwrap_or((0, 0, 0));
+    let should_rebuild = last_rowid > 0 && file_size < last_size;
+
+    if should_rebuild {
+        conn.execute("DELETE FROM usage_messages WHERE provider = 'opencode'", [])
+            .map_err(|e| e.to_string())?;
+    }
 
     let mut stmt = source.prepare(
         "SELECT
+            m.rowid,
             m.session_id,
             s.directory,
             m.time_created,
@@ -519,23 +526,28 @@ fn ingest_opencode(conn: &Connection) -> Result<bool, String> {
          FROM message m
          JOIN session s ON s.id = m.session_id
          WHERE json_extract(m.data, '$.role') = 'assistant'
-         ORDER BY m.time_created ASC"
+           AND m.rowid > ?1
+         ORDER BY m.rowid ASC"
     ).map_err(|e| format!("Failed to query OpenCode DB: {e}"))?;
 
-    let rows = stmt.query_map([], |row| {
+    let start_rowid = if should_rebuild { 0 } else { last_rowid };
+    let rows = stmt.query_map(params![start_rowid], |row| {
         Ok((
-            row.get::<_, String>(0)?,
+            row.get::<_, i64>(0)?,
             row.get::<_, String>(1)?,
-            row.get::<_, i64>(2)?,
-            row.get::<_, String>(3)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, i64>(3)?,
+            row.get::<_, String>(4)?,
         ))
     }).map_err(|e| e.to_string())?;
 
+    let mut max_rowid = start_rowid;
     for row in rows {
-        let (session_id, directory, time_created, data) = match row {
+        let (rowid, session_id, directory, time_created, data) = match row {
             Ok(value) => value,
             Err(_) => continue,
         };
+        max_rowid = rowid;
         let payload: Value = match serde_json::from_str(&data) {
             Ok(value) => value,
             Err(_) => continue,
@@ -607,7 +619,7 @@ fn ingest_opencode(conn: &Connection) -> Result<bool, String> {
         ).map_err(|e| e.to_string())?;
     }
 
-    upsert_cursor(conn, cursor_key, "opencode", file_size, file_size, mtime)?;
+    upsert_cursor(conn, cursor_key, "opencode", file_size, max_rowid, mtime)?;
     conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
     Ok(true)
 }

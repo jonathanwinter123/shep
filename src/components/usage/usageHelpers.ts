@@ -1,6 +1,22 @@
 import type { ProviderUsageSnapshot, UsageProvider, UsageWindowSnapshot } from "../../lib/types";
 
 const WINDOW_PRIORITY = ["5h", "7d", "30d"];
+export const ALL_USAGE_PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini", "opencode"];
+export const TONE_COLORS: Record<string, string> = {
+  low: "rgba(52, 211, 153, 0.75)",
+  medium: "rgba(245, 158, 11, 0.75)",
+  high: "rgba(251, 146, 60, 0.85)",
+  critical: "rgba(248, 113, 113, 0.9)",
+  local: "rgba(96, 165, 250, 0.5)",
+};
+
+export const TONE_TRACK: Record<string, string> = {
+  low: "rgba(52, 211, 153, 0.1)",
+  medium: "rgba(245, 158, 11, 0.1)",
+  high: "rgba(251, 146, 60, 0.12)",
+  critical: "rgba(248, 113, 113, 0.14)",
+  local: "rgba(96, 165, 250, 0.08)",
+};
 
 export function getPrimaryWindow(snapshot: ProviderUsageSnapshot | null): UsageWindowSnapshot | null {
   if (!snapshot) return null;
@@ -115,6 +131,15 @@ export function paceLabel(status: PaceStatus): string {
     case "on": return "on pace";
     case "over": return "over pace";
   }
+}
+
+export function barTone(pace: ReturnType<typeof computePace>, pct: number | null | undefined): string {
+  if (pct == null) return "local";
+  if (pct >= 90) return "critical";
+  if (pace?.status === "over") return pct >= 50 ? "high" : "medium";
+  if (pct >= 75) return "high";
+  if (pct >= 50) return "medium";
+  return "low";
 }
 
 function currentMonthRange(now: Date) {

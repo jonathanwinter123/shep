@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { TerminalTab, TabActivity, UnifiedTab, PanelTabKind, PanelTabData } from "../lib/types";
+import type { TerminalTabData, TabActivity, UnifiedTab, PanelTabKind, PanelTabData } from "../lib/types";
 import { panelTabId, panelTabDefaults } from "../lib/types";
 import { useUIStore } from "./useUIStore";
 
@@ -22,8 +22,8 @@ interface TerminalStore {
   addPanelTab: (kind: PanelTabKind) => void;
   removePanelTab: (kind: PanelTabKind) => void;
   togglePanelTab: (kind: PanelTabKind) => void;
-  findTabByCommand: (commandName: string) => TerminalTab | undefined;
-  findTabByPtyId: (ptyId: number) => TerminalTab | undefined;
+  findTabByCommand: (commandName: string) => TerminalTabData | undefined;
+  findTabByPtyId: (ptyId: number) => TerminalTabData | undefined;
   initActivity: (ptyId: number) => void;
   setTabActive: (ptyId: number, active: boolean) => void;
   setTabExited: (ptyId: number, exitCode: number) => void;
@@ -243,7 +243,7 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     if (!state.activeProjectPath) return undefined;
     const ps = state.projectState[state.activeProjectPath];
     return ps?.tabs.find(
-      (t): t is TerminalTab => (t.kind === "terminal" || t.kind === "assistant") && t.commandName === commandName,
+      (t): t is TerminalTabData => (t.kind === "terminal" || t.kind === "assistant") && t.commandName === commandName,
     );
   },
 
@@ -252,7 +252,7 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     if (!state.activeProjectPath) return undefined;
     const ps = state.projectState[state.activeProjectPath];
     return ps?.tabs.find(
-      (t): t is TerminalTab => (t.kind === "terminal" || t.kind === "assistant") && t.ptyId === ptyId,
+      (t): t is TerminalTabData => (t.kind === "terminal" || t.kind === "assistant") && t.ptyId === ptyId,
     );
   },
 

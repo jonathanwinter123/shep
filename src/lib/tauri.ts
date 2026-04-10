@@ -218,6 +218,10 @@ export function gitUnstageFile(path: string, filePath: string): Promise<void> {
   return invoke("git_unstage_file", { path, filePath });
 }
 
+export function gitUnstageAll(path: string): Promise<void> {
+  return invoke("git_unstage_all", { path });
+}
+
 export function gitSwitchBranch(path: string, branchName: string): Promise<void> {
   return invoke("git_switch_branch", { path, branchName });
 }

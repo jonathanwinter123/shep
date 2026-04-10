@@ -1,11 +1,14 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::config::{
     CommandConfig, EditorSettings, GlobalConfig, ImportedFont, KeybindingSettings,
     RegisteredRepo, RepoEntry, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
 };
+
+static CONFIG_CACHE: Mutex<Option<(GlobalConfig, SystemTime)>> = Mutex::new(None);
 
 // ── Paths ───────────────────────────────────────────────────────────
 
@@ -42,9 +45,29 @@ pub fn load_global_config() -> Result<GlobalConfig, String> {
     if !path.exists() {
         return Ok(GlobalConfig::default());
     }
+
+    let mtime = fs::metadata(&path)
+        .and_then(|m| m.modified())
+        .unwrap_or(UNIX_EPOCH);
+
+    if let Ok(guard) = CONFIG_CACHE.lock() {
+        if let Some((ref cached, ref cached_mtime)) = *guard {
+            if *cached_mtime == mtime {
+                return Ok(cached.clone());
+            }
+        }
+    }
+
     let content =
         fs::read_to_string(&path).map_err(|e| format!("Failed to read global config: {e}"))?;
-    serde_yaml::from_str(&content).map_err(|e| format!("Failed to parse global config: {e}"))
+    let config: GlobalConfig =
+        serde_yaml::from_str(&content).map_err(|e| format!("Failed to parse global config: {e}"))?;
+
+    if let Ok(mut guard) = CONFIG_CACHE.lock() {
+        *guard = Some((config.clone(), mtime));
+    }
+
+    Ok(config)
 }
 
 pub fn save_global_config(config: &GlobalConfig) -> Result<(), String> {
@@ -54,7 +77,16 @@ pub fn save_global_config(config: &GlobalConfig) -> Result<(), String> {
     let path = global_config_path()?;
     let yaml =
         serde_yaml::to_string(config).map_err(|e| format!("Failed to serialize config: {e}"))?;
-    fs::write(&path, yaml).map_err(|e| format!("Failed to write global config: {e}"))
+    fs::write(&path, &yaml).map_err(|e| format!("Failed to write global config: {e}"))?;
+
+    // Update cache with the config we just wrote
+    if let Ok(mtime) = fs::metadata(&path).and_then(|m| m.modified()) {
+        if let Ok(mut guard) = CONFIG_CACHE.lock() {
+            *guard = Some((config.clone(), mtime));
+        }
+    }
+
+    Ok(())
 }
 
 pub fn load_editor_settings() -> Result<EditorSettings, String> {

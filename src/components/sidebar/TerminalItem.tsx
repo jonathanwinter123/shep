@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { TerminalTab, TabActivity } from "../../lib/types";
+import type { TerminalTabData, TabActivity } from "../../lib/types";
 import { X } from "lucide-react";
 import tabKindMeta from "../../lib/tabKindMeta";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -8,7 +8,7 @@ import ContextMenu from "../shared/ContextMenu";
 import type { ContextMenuItem } from "../shared/ContextMenu";
 
 interface TerminalItemProps {
-  tab: TerminalTab;
+  tab: TerminalTabData;
   isActive: boolean;
   onClick: () => void;
   onClose: () => void;

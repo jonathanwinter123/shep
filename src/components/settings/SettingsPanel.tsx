@@ -16,7 +16,8 @@ import {
   FONT_OPTIONS,
   FONT_SIZE_OPTIONS,
 } from "../../lib/terminalConfig";
-import type { CursorStyle, UsageProvider, BudgetMode } from "../../lib/types";
+import { ALL_USAGE_PROVIDERS } from "../usage/usageHelpers";
+import type { CursorStyle, BudgetMode } from "../../lib/types";
 import { getErrorMessage } from "../../lib/errors";
 import { getHomeDirectory } from "../../lib/tauri";
 import { getImportedFonts, importUserFont } from "../../lib/userFonts";
@@ -452,7 +453,7 @@ export default function SettingsPanel() {
       <h2 className="section-label !p-0 mb-4">Usage Providers</h2>
 
       <div className="usage-provider-grid">
-        {(["claude", "codex", "gemini", "opencode"] as UsageProvider[]).map((provider) => {
+        {ALL_USAGE_PROVIDERS.map((provider) => {
           const config = usageSettings[provider];
           const logo = assistantLogoSrc[provider];
           const label = provider === "claude"

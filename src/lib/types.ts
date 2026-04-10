@@ -106,8 +106,6 @@ export const panelTabDefaults: Record<PanelTabKind, { label: string }> = {
   launcher: { label: "New Agent" },
 };
 
-/** @deprecated Use TerminalTabData instead — kept as alias during migration */
-export type TerminalTab = TerminalTabData;
 
 // ── Tab activity tracking ────────────────────────────────────────────
 
@@ -127,12 +125,7 @@ export interface CodingAssistant {
   yoloFlag: string | null;
 }
 
-export interface AssistantConfig {
-  id: string;
-  name: string;
-  command: string;
-  yoloFlag: string | null;
-}
+export type AssistantConfig = CodingAssistant;
 
 // ── Git status ──────────────────────────────────────────────────────
 

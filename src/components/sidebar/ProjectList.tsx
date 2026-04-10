@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { RepoInfo, CommandState, TerminalTabData } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
 import tabKindMeta from "../../lib/tabKindMeta";
@@ -46,14 +46,13 @@ export default function ProjectList({
     () => new Set(activeRepoPath ? [activeRepoPath] : []),
   );
 
-  // Auto-expand a newly selected project
-  const prevActiveRef = useRef(activeRepoPath);
-  if (activeRepoPath && activeRepoPath !== prevActiveRef.current) {
-    prevActiveRef.current = activeRepoPath;
-    if (!expandedPaths.has(activeRepoPath)) {
-      setExpandedPaths((prev) => new Set(prev).add(activeRepoPath));
-    }
-  }
+  useEffect(() => {
+    if (!activeRepoPath) return;
+    setExpandedPaths((prev) => {
+      if (prev.has(activeRepoPath)) return prev;
+      return new Set(prev).add(activeRepoPath);
+    });
+  }, [activeRepoPath]);
 
   const handleProjectClick = (repoPath: string) => {
     if (repoPath === activeRepoPath) {

@@ -332,6 +332,11 @@ pub async fn git_unstage_file(path: String, file_path: String) -> Result<(), Str
 }
 
 #[tauri::command]
+pub async fn git_unstage_all(path: String) -> Result<(), String> {
+    git::unstage_all(&path)
+}
+
+#[tauri::command]
 pub async fn git_switch_branch(path: String, branch_name: String) -> Result<(), String> {
     git::switch_branch(&path, &branch_name)
 }
@@ -404,6 +409,7 @@ fn enabled_providers(workspace: &State<'_, WorkspaceManager>) -> crate::usage::E
     crate::usage::EnabledProviders {
         claude: settings.claude.show,
         codex: settings.codex.show,
+        gemini: settings.gemini.show,
     }
 }
 

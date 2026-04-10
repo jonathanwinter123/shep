@@ -104,6 +104,7 @@ static PROVIDER_CACHE: Mutex<ProviderCache> = Mutex::new(ProviderCache {
 pub struct EnabledProviders {
     pub claude: bool,
     pub codex: bool,
+    pub gemini: bool,
 }
 
 /// Fetch snapshots for all providers from whatever is currently in the DB.
@@ -178,7 +179,7 @@ fn spawn_provider_refresh(enabled: &EnabledProviders) {
         (
             enabled.claude && cache.claude.is_stale(now),
             enabled.codex && cache.codex.is_stale(now),
-            cache.gemini.is_stale(now),
+            enabled.gemini && cache.gemini.is_stale(now),
         )
     };
 

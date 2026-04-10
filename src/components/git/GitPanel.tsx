@@ -4,7 +4,7 @@ import tabKindMeta from "../../lib/tabKindMeta";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import {
-  gitChangedFiles, gitFileDiff, gitStageFile, gitUnstageFile,
+  gitChangedFiles, gitFileDiff, gitStageFile, gitUnstageAll, gitUnstageFile,
   gitStageAll, gitCommit, gitPushBranch,
 } from "../../lib/tauri";
 import type { ChangedFile } from "../../lib/types";
@@ -113,15 +113,13 @@ export default function GitPanel() {
 
   const handleUnstageAll = useCallback(async () => {
     if (!activeProjectPath) return;
-    // Unstage each staged file
-    const staged = files.filter((f) => f.area === "staged");
     try {
-      for (const f of staged) await gitUnstageFile(activeProjectPath, f.path);
+      await gitUnstageAll(activeProjectPath);
       await refreshAfterChange();
     } catch (error) {
       pushNotice({ tone: "error", title: "Couldn't unstage all", message: getErrorMessage(error) });
     }
-  }, [activeProjectPath, files, refreshAfterChange, pushNotice]);
+  }, [activeProjectPath, refreshAfterChange, pushNotice]);
 
   const handleCommit = useCallback(async () => {
     if (!activeProjectPath || !commitMsg.trim() || committing) return;
