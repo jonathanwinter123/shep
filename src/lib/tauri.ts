@@ -20,6 +20,8 @@ import type {
   PortInfo,
   SessionSummary,
   SessionMessage,
+  FileEntry,
+  FileContents,
 } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -292,4 +294,14 @@ export function listListeningPorts(): Promise<PortInfo[]> {
 
 export function killPort(pid: number): Promise<void> {
   return invoke("kill_port", { pid });
+}
+
+// ── File explorer commands ───────────────────────────────────────
+
+export function listDirectory(path: string, depth: number): Promise<FileEntry[]> {
+  return invoke("list_directory", { path, depth });
+}
+
+export function readFileContents(path: string, maxBytes: number): Promise<FileContents> {
+  return invoke("read_file_contents", { path, maxBytes });
 }

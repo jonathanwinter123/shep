@@ -295,3 +295,20 @@ export interface ProviderUsageSnapshot {
   localDetails: LocalUsageDetails | null;
   error: string | null;
 }
+
+// ── File explorer ──────────────────────────────────────────────────
+
+export interface FileEntry {
+  path: string;
+  name: string;
+  is_dir: boolean;
+  size: number;
+  depth: number;
+}
+
+export interface FileContents {
+  path: string;
+  content: string;
+  truncated: boolean;
+  size: number;
+}
