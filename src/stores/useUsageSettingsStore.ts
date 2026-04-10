@@ -1,6 +1,14 @@
 import { create } from "zustand";
 import { getUsageSettings, saveUsageSettings } from "../lib/tauri";
-import type { UsageSettings, UsageProvider } from "../lib/types";
+import type { UsageSettings, UsageProvider, ProviderBudgetConfig } from "../lib/types";
+
+const DEFAULT_PROVIDER: ProviderBudgetConfig = { show: true, budgetMode: "subscription", monthlyBudget: null };
+const DEFAULT_SETTINGS: UsageSettings = {
+  claude: { ...DEFAULT_PROVIDER },
+  codex: { ...DEFAULT_PROVIDER },
+  gemini: { ...DEFAULT_PROVIDER },
+  opencode: { show: true, budgetMode: "custom", monthlyBudget: null },
+};
 
 interface UsageSettingsStore {
   settings: UsageSettings;
@@ -8,20 +16,13 @@ interface UsageSettingsStore {
   isSaving: boolean;
   error: string | null;
   loadSettings: () => Promise<void>;
-  setProviderEnabled: (provider: UsageProvider, enabled: boolean) => Promise<void>;
-  setOpencodeMonthlyBudget: (budget: number | null) => Promise<void>;
+  updateProvider: (provider: UsageProvider, patch: Partial<ProviderBudgetConfig>) => Promise<void>;
   isProviderEnabled: (provider: UsageProvider) => boolean;
+  getProviderConfig: (provider: UsageProvider) => ProviderBudgetConfig;
 }
 
-const KEY_MAP: Record<UsageProvider, "showClaude" | "showCodex" | "showGemini" | "showOpencode"> = {
-  claude: "showClaude",
-  codex: "showCodex",
-  gemini: "showGemini",
-  opencode: "showOpencode",
-};
-
 export const useUsageSettingsStore = create<UsageSettingsStore>((set, get) => ({
-  settings: { showClaude: true, showCodex: true, showGemini: true, showOpencode: true, opencodeMonthlyBudget: null },
+  settings: DEFAULT_SETTINGS,
   hasLoaded: false,
   isSaving: false,
   error: null,
@@ -36,10 +37,9 @@ export const useUsageSettingsStore = create<UsageSettingsStore>((set, get) => ({
       });
     }
   },
-  setProviderEnabled: async (provider, enabled) => {
+  updateProvider: async (provider, patch) => {
     const prev = get().settings;
-    const key = KEY_MAP[provider];
-    const next = { ...prev, [key]: enabled };
+    const next = { ...prev, [provider]: { ...prev[provider], ...patch } };
     set({ settings: next, isSaving: true });
     try {
       await saveUsageSettings(next);
@@ -52,23 +52,6 @@ export const useUsageSettingsStore = create<UsageSettingsStore>((set, get) => ({
       });
     }
   },
-  setOpencodeMonthlyBudget: async (budget) => {
-    const prev = get().settings;
-    const next = { ...prev, opencodeMonthlyBudget: budget };
-    set({ settings: next, isSaving: true });
-    try {
-      await saveUsageSettings(next);
-      set({ isSaving: false, error: null });
-    } catch (error) {
-      set({
-        settings: prev,
-        isSaving: false,
-        error: error instanceof Error ? error.message : "Failed to save usage settings",
-      });
-    }
-  },
-  isProviderEnabled: (provider) => {
-    const key = KEY_MAP[provider];
-    return get().settings[key];
-  },
+  isProviderEnabled: (provider) => get().settings[provider].show,
+  getProviderConfig: (provider) => get().settings[provider],
 }));

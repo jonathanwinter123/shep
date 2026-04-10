@@ -11,7 +11,7 @@ import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogo
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { formatCost, formatPercent, formatReset, formatTokenCount, getProviderLabel, computePace, paceLabel, syntheticBudgetWindow } from "./usageHelpers";
-import type { UsageProvider, ProviderUsageSnapshot, UsageWindowSnapshot } from "../../lib/types";
+import type { UsageProvider, UsageSettings, ProviderUsageSnapshot, UsageWindowSnapshot } from "../../lib/types";
 
 const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
   { key: "5h", label: "5 hour" },
@@ -406,57 +406,71 @@ const PACE_LABEL_COLORS: Record<string, string> = {
   over: "rgba(248, 113, 113, 0.8)",
 };
 
-function OpenCodeBudget({ snapshot, budget }: { snapshot: ProviderUsageSnapshot | null; budget: number | null }) {
-  if (!snapshot || budget == null || budget <= 0) return null;
+function CustomBudgets({ snapshots, settings }: { snapshots: Record<string, ProviderUsageSnapshot>; settings: UsageSettings }) {
+  const budgetProviders = (["claude", "codex", "gemini", "opencode"] as UsageProvider[]).filter((p) => {
+    const config = settings[p];
+    if (!config.show || config.budgetMode !== "custom" || config.monthlyBudget == null || config.monthlyBudget <= 0) return false;
+    const snap = snapshots[p];
+    return snap?.localDetails?.costMonth != null;
+  });
 
-  const currentMonthCost = snapshot.localDetails?.costMonth ?? null;
-  if (currentMonthCost == null) return null;
+  if (budgetProviders.length === 0) return null;
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const elapsedPct = Math.min(Math.max(((now.getTime() - monthStart.getTime()) / (nextMonth.getTime() - monthStart.getTime())) * 100, 0), 100);
-  const usedPct = Math.min((currentMonthCost / budget) * 100, 999);
-  const delta = usedPct - elapsedPct;
-  const paceStatus = delta <= -10 ? "under" : delta >= 10 ? "over" : "on";
-  const tone = barTone({ status: paceStatus, elapsedPct }, usedPct);
 
   return (
     <>
       <hr className="settings-divider" />
       <section className="usage-section">
         <div className="usage-section__header">
-          <h3 className="section-label !p-0">OpenCode Budget</h3>
+          <h3 className="section-label !p-0">Monthly Budgets</h3>
           <span className="usage-section__hint">Current month</span>
         </div>
         <div className="usage-limits">
-          <div className="usage-limit">
-            <div className="usage-limit__header">
-              <span className="usage-limit__provider">
-                <img src={assistantLogoSrc.opencode} alt="" className="usage-list__icon" />
-                OpenCode
-              </span>
-              <span className="usage-limit__pct">{formatPercent(usedPct)} of budget</span>
-            </div>
-            <div className="usage-limit__bar">
-              <div className="usage-limit__bar-track" style={{ background: TONE_TRACK[tone] }} />
-              <div
-                className="usage-limit__bar-fill"
-                style={{
-                  width: `${Math.min(usedPct, 100)}%`,
-                  background: TONE_COLORS[tone],
-                }}
-              />
-              <div
-                className="usage-limit__bar-pace"
-                style={{ left: `${Math.min(elapsedPct, 100)}%` }}
-              />
-            </div>
-            <div className="usage-limit__meta">
-              <span>{presentCost(currentMonthCost)} spent of {presentCost(budget)}</span>
-              <span style={{ color: PACE_LABEL_COLORS[paceStatus] }}>{paceLabel(paceStatus)}</span>
-            </div>
-          </div>
+          {budgetProviders.map((provider) => {
+            const config = settings[provider];
+            const budget = config.monthlyBudget!;
+            const snap = snapshots[provider]!;
+            const currentMonthCost = snap.localDetails!.costMonth!;
+            const usedPct = Math.min((currentMonthCost / budget) * 100, 999);
+            const delta = usedPct - elapsedPct;
+            const paceStatus = delta <= -10 ? "under" : delta >= 10 ? "over" : "on";
+            const tone = barTone({ status: paceStatus, elapsedPct }, usedPct);
+            const logoSrc = assistantLogoSrc[provider];
+
+            return (
+              <div key={provider} className="usage-limit">
+                <div className="usage-limit__header">
+                  <span className="usage-limit__provider">
+                    {logoSrc && <img src={logoSrc} alt="" className={`usage-list__icon ${getAssistantLogoClass(provider) ?? ""}`} />}
+                    {getProviderLabel(provider)}
+                  </span>
+                  <span className="usage-limit__pct">{formatPercent(usedPct)} of budget</span>
+                </div>
+                <div className="usage-limit__bar">
+                  <div className="usage-limit__bar-track" style={{ background: TONE_TRACK[tone] }} />
+                  <div
+                    className="usage-limit__bar-fill"
+                    style={{
+                      width: `${Math.min(usedPct, 100)}%`,
+                      background: TONE_COLORS[tone],
+                    }}
+                  />
+                  <div
+                    className="usage-limit__bar-pace"
+                    style={{ left: `${Math.min(elapsedPct, 100)}%` }}
+                  />
+                </div>
+                <div className="usage-limit__meta">
+                  <span>{presentCost(currentMonthCost)} spent of {presentCost(budget)}</span>
+                  <span style={{ color: PACE_LABEL_COLORS[paceStatus] }}>{paceLabel(paceStatus)}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
     </>
@@ -466,26 +480,27 @@ function OpenCodeBudget({ snapshot, budget }: { snapshot: ProviderUsageSnapshot 
 function ProviderLimits({
   snapshots,
   window,
-  opencodeMonthlyBudget,
+  settings,
 }: {
   snapshots: Record<string, ProviderUsageSnapshot>;
   window: TimeWindow;
-  opencodeMonthlyBudget: number | null;
+  settings: UsageSettings;
 }) {
   if (window !== "5h" && window !== "7d") return null;
 
   const providers = (["claude", "codex", "gemini", "opencode"] as UsageProvider[]).filter((p) => {
     const snap = snapshots[p];
     if (!snap) return false;
-    const syntheticWindow = p === "opencode"
+    const config = settings[p];
+    const synthetic = config.budgetMode === "custom"
       ? syntheticBudgetWindow(
           p,
           window,
           snap.localDetails ? window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d : null,
-          opencodeMonthlyBudget,
+          config.monthlyBudget,
         )
       : null;
-    const w = snap.summaryWindows.find((sw) => sw.window === window) ?? syntheticWindow;
+    const w = snap.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null) ?? synthetic;
     return w?.usedPercent != null;
   });
 
@@ -502,15 +517,16 @@ function ProviderLimits({
       <div className="usage-limits">
         {providers.map((provider) => {
           const snap = snapshots[provider]!;
-          const syntheticWindow = provider === "opencode"
+          const config = settings[provider];
+          const synthetic = config.budgetMode === "custom"
             ? syntheticBudgetWindow(
                 provider,
                 window,
                 snap.localDetails ? window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d : null,
-                opencodeMonthlyBudget,
+                config.monthlyBudget,
               )
             : null;
-          const w = (snap.summaryWindows.find((sw) => sw.window === window) ?? syntheticWindow) as UsageWindowSnapshot;
+          const w = (snap.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null) ?? synthetic) as UsageWindowSnapshot;
           const pct = w.usedPercent ?? 0;
           const remaining = w.remainingPercent;
           const pace = computePace(w);
@@ -554,7 +570,7 @@ function ProviderLimits({
                     {paceLabel(pace.status)}
                   </span>
                 )}
-                {provider === "opencode" && snap.localDetails && (
+                {config.budgetMode === "custom" && snap.localDetails && (
                   <span>
                     {presentCost(window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d)} spent
                   </span>
@@ -630,15 +646,15 @@ function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snaps
         </div>
       </section>
 
-      <OpenCodeBudget
-        snapshot={snapshots.opencode ?? null}
-        budget={usageSettings.opencodeMonthlyBudget}
+      <CustomBudgets
+        snapshots={snapshots}
+        settings={usageSettings}
       />
 
       <ProviderLimits
         snapshots={snapshots}
         window={overview.window as TimeWindow}
-        opencodeMonthlyBudget={usageSettings.opencodeMonthlyBudget}
+        settings={usageSettings}
       />
 
       <hr className="settings-divider" />

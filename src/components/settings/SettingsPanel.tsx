@@ -16,7 +16,7 @@ import {
   FONT_OPTIONS,
   FONT_SIZE_OPTIONS,
 } from "../../lib/terminalConfig";
-import type { CursorStyle, UsageProvider } from "../../lib/types";
+import type { CursorStyle, UsageProvider, BudgetMode } from "../../lib/types";
 import { getErrorMessage } from "../../lib/errors";
 import { getHomeDirectory } from "../../lib/tauri";
 import { getImportedFonts, importUserFont } from "../../lib/userFonts";
@@ -81,9 +81,8 @@ export default function SettingsPanel() {
   const usageIsSaving = useUsageSettingsStore((s) => s.isSaving);
   const usageError = useUsageSettingsStore((s) => s.error);
   const loadUsageSettings = useUsageSettingsStore((s) => s.loadSettings);
-  const setProviderEnabled = useUsageSettingsStore((s) => s.setProviderEnabled);
-  const setOpencodeMonthlyBudget = useUsageSettingsStore((s) => s.setOpencodeMonthlyBudget);
-  const [opencodeBudgetInput, setOpencodeBudgetInput] = useState("");
+  const updateProvider = useUsageSettingsStore((s) => s.updateProvider);
+  const [budgetInputs, setBudgetInputs] = useState<Record<string, string>>({});
 
   const updateStatus = useUpdateStore((s) => s.status);
   const availableVersion = useUpdateStore((s) => s.availableVersion);
@@ -101,12 +100,6 @@ export default function SettingsPanel() {
     if (!termHasLoaded) void loadTermSettings();
     if (!usageHasLoaded) void loadUsageSettings();
   }, [hasLoaded, loadSettings, kbHasLoaded, loadKbSettings, termHasLoaded, loadTermSettings, usageHasLoaded, loadUsageSettings]);
-
-  useEffect(() => {
-    setOpencodeBudgetInput(
-      usageSettings.opencodeMonthlyBudget != null ? String(usageSettings.opencodeMonthlyBudget) : "",
-    );
-  }, [usageSettings.opencodeMonthlyBudget]);
 
   useEffect(() => {
     let cancelled = false;
@@ -458,16 +451,9 @@ export default function SettingsPanel() {
       {/* ── Usage ──────────────────────────────────────────── */}
       <h2 className="section-label !p-0 mb-4">Usage Providers</h2>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col gap-4">
         {(["claude", "codex", "gemini", "opencode"] as UsageProvider[]).map((provider) => {
-          const key = provider === "claude"
-            ? "showClaude"
-            : provider === "codex"
-              ? "showCodex"
-              : provider === "gemini"
-                ? "showGemini"
-                : "showOpencode";
-          const active = usageSettings[key];
+          const config = usageSettings[provider];
           const logo = assistantLogoSrc[provider];
           const label = provider === "claude"
             ? "Claude"
@@ -476,45 +462,70 @@ export default function SettingsPanel() {
               : provider === "gemini"
                 ? "Gemini"
                 : "OpenCode";
+          const budgetInput = budgetInputs[provider] ?? (config.monthlyBudget != null ? String(config.monthlyBudget) : "");
           return (
-            <button
-              key={provider}
-              onClick={() => void setProviderEnabled(provider, !active)}
-              className={`${optionClass} ${active ? "selected" : ""}`}
-            >
-              {logo && <img src={logo} alt="" width={20} height={20} className={`shrink-0 ${getAssistantLogoClass(provider) ?? ""}`} />}
-              <span>{label}</span>
-            </button>
+            <div key={provider} className="usage-provider-card">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  {logo && <img src={logo} alt="" width={20} height={20} className={`shrink-0 ${getAssistantLogoClass(provider) ?? ""}`} />}
+                  <span className="text-sm font-medium">{label}</span>
+                </span>
+                <button
+                  onClick={() => void updateProvider(provider, { show: !config.show })}
+                  className={`option-card option-card--compact ${config.show ? "selected" : ""}`}
+                >
+                  {config.show ? "On" : "Off"}
+                </button>
+              </div>
+
+              {config.show && (
+                <div className="mt-3">
+                  <span className="text-xs text-[var(--text-muted)] block mb-2">Budget</span>
+                  <div className="flex flex-wrap gap-2">
+                    {(["subscription", "custom"] as BudgetMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => void updateProvider(provider, { budgetMode: mode })}
+                        className={`option-card option-card--compact ${config.budgetMode === mode ? "selected" : ""}`}
+                      >
+                        <span className="capitalize">{mode}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {config.budgetMode === "custom" && (
+                    <div className="mt-3 max-w-xs">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        inputMode="decimal"
+                        placeholder="Monthly budget ($)"
+                        value={budgetInput}
+                        onChange={(event) =>
+                          setBudgetInputs((prev) => ({ ...prev, [provider]: event.target.value }))
+                        }
+                        onBlur={() => {
+                          const trimmed = budgetInput.trim();
+                          const nextBudget = trimmed === "" ? null : Number(trimmed);
+                          if (nextBudget == null || Number.isFinite(nextBudget)) {
+                            void updateProvider(provider, { monthlyBudget: nextBudget });
+                          }
+                          setBudgetInputs((prev) => {
+                            const next = { ...prev };
+                            delete next[provider];
+                            return next;
+                          });
+                        }}
+                        className="w-full rounded-md border border-[color-mix(in_srgb,var(--text-primary),transparent_82%)] bg-[color-mix(in_srgb,var(--bg-primary),white_2%)] px-3 py-2 text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           );
         })}
-      </div>
-
-      <div className="mt-4 max-w-xs">
-        <label className="section-label !p-0 mb-2 block">OpenCode Monthly Budget</label>
-        <input
-          type="number"
-          min="0"
-          step="1"
-          inputMode="decimal"
-          placeholder="250"
-          value={opencodeBudgetInput}
-          onChange={(event) => setOpencodeBudgetInput(event.target.value)}
-          onBlur={() => {
-            const trimmed = opencodeBudgetInput.trim();
-            const nextBudget = trimmed === "" ? null : Number(trimmed);
-            if (nextBudget == null || Number.isFinite(nextBudget)) {
-              void setOpencodeMonthlyBudget(nextBudget);
-            } else {
-              setOpencodeBudgetInput(
-                usageSettings.opencodeMonthlyBudget != null ? String(usageSettings.opencodeMonthlyBudget) : "",
-              );
-            }
-          }}
-          className="w-full rounded-md border border-[color-mix(in_srgb,var(--text-primary),transparent_82%)] bg-[color-mix(in_srgb,var(--bg-primary),white_2%)] px-3 py-2 text-sm"
-        />
-        <p className="mt-2 text-xs text-[var(--text-muted)]">
-          Optional. Used only for OpenCode monthly pace tracking.
-        </p>
       </div>
 
       {usageIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving...</div>}

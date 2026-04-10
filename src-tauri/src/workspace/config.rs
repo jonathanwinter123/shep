@@ -122,27 +122,64 @@ impl Default for TerminalSettings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderBudgetConfig {
+    #[serde(default = "default_true")]
+    pub show: bool,
+    #[serde(default = "default_budget_mode_subscription", rename = "budgetMode")]
+    pub budget_mode: String,
+    #[serde(default, rename = "monthlyBudget")]
+    pub monthly_budget: Option<f64>,
+}
+
+fn default_budget_mode_subscription() -> String {
+    "subscription".to_string()
+}
+
+impl ProviderBudgetConfig {
+    fn default_subscription() -> Self {
+        ProviderBudgetConfig {
+            show: true,
+            budget_mode: "subscription".to_string(),
+            monthly_budget: None,
+        }
+    }
+
+    fn default_custom() -> Self {
+        ProviderBudgetConfig {
+            show: true,
+            budget_mode: "custom".to_string(),
+            monthly_budget: None,
+        }
+    }
+}
+
+fn default_provider_subscription() -> ProviderBudgetConfig {
+    ProviderBudgetConfig::default_subscription()
+}
+
+fn default_provider_custom() -> ProviderBudgetConfig {
+    ProviderBudgetConfig::default_custom()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageSettings {
-    #[serde(default = "default_true", rename = "showClaude")]
-    pub show_claude: bool,
-    #[serde(default = "default_true", rename = "showCodex")]
-    pub show_codex: bool,
-    #[serde(default = "default_true", rename = "showGemini")]
-    pub show_gemini: bool,
-    #[serde(default = "default_true", rename = "showOpencode")]
-    pub show_opencode: bool,
-    #[serde(default, rename = "opencodeMonthlyBudget")]
-    pub opencode_monthly_budget: Option<f64>,
+    #[serde(default = "default_provider_subscription")]
+    pub claude: ProviderBudgetConfig,
+    #[serde(default = "default_provider_subscription")]
+    pub codex: ProviderBudgetConfig,
+    #[serde(default = "default_provider_subscription")]
+    pub gemini: ProviderBudgetConfig,
+    #[serde(default = "default_provider_custom")]
+    pub opencode: ProviderBudgetConfig,
 }
 
 impl Default for UsageSettings {
     fn default() -> Self {
         UsageSettings {
-            show_claude: true,
-            show_codex: true,
-            show_gemini: true,
-            show_opencode: true,
-            opencode_monthly_budget: None,
+            claude: ProviderBudgetConfig::default_subscription(),
+            codex: ProviderBudgetConfig::default_subscription(),
+            gemini: ProviderBudgetConfig::default_subscription(),
+            opencode: ProviderBudgetConfig::default_custom(),
         }
     }
 }

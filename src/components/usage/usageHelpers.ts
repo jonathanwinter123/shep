@@ -147,7 +147,7 @@ export function syntheticBudgetWindow(
   cost: number | null,
   monthlyBudget: number | null,
 ): UsageWindowSnapshot | null {
-  if (provider !== "opencode" || cost == null || monthlyBudget == null || monthlyBudget <= 0) {
+  if (cost == null || monthlyBudget == null || monthlyBudget <= 0) {
     return null;
   }
 

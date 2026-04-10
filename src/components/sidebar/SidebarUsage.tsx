@@ -44,13 +44,7 @@ export default function SidebarUsage() {
   const { setWindow } = useUsageStore.getState();
   const { toggleUsagePanel } = useUIStore.getState();
 
-  const providers = useMemo(() => ALL_PROVIDERS.filter((p) => {
-    if (p === "claude") return usageSettings.showClaude;
-    if (p === "codex") return usageSettings.showCodex;
-    if (p === "gemini") return usageSettings.showGemini;
-    if (p === "opencode") return usageSettings.showOpencode;
-    return true;
-  }), [usageSettings]);
+  const providers = useMemo(() => ALL_PROVIDERS.filter((p) => usageSettings[p].show), [usageSettings]);
 
   const hasData = Object.keys(snapshots).length > 0;
   if (!hasData || providers.length === 0) return null;
@@ -80,16 +74,18 @@ export default function SidebarUsage() {
 
           const local = snapshot.localDetails;
           const budgetWindow = window === "5h" || window === "7d" ? window : null;
-          const syntheticWindow = provider === "opencode"
+          const providerConfig = usageSettings[provider];
+          const syntheticWindow = providerConfig.budgetMode === "custom"
             && budgetWindow
             ? syntheticBudgetWindow(
                 provider,
                 budgetWindow,
                 local ? budgetWindow === "5h" ? local.cost5h : local.cost7d : null,
-                usageSettings.opencodeMonthlyBudget,
+                providerConfig.monthlyBudget,
               )
             : null;
-          const w = snapshot.summaryWindows.find((sw) => sw.window === window) ?? syntheticWindow ?? null;
+          const providerWindow = snapshot.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null);
+          const w = providerWindow ?? syntheticWindow ?? snapshot.summaryWindows.find((sw) => sw.window === window) ?? null;
           const pct = w?.usedPercent;
           const hasPercent = pct != null;
           const clampedPct = hasPercent ? Math.min(pct, 100) : 0;

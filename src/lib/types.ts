@@ -199,12 +199,19 @@ export interface PtyColorTheme {
 
 export type UsageProvider = "codex" | "claude" | "gemini" | "opencode";
 
+export type BudgetMode = "subscription" | "custom";
+
+export interface ProviderBudgetConfig {
+  show: boolean;
+  budgetMode: BudgetMode;
+  monthlyBudget: number | null;
+}
+
 export interface UsageSettings {
-  showClaude: boolean;
-  showCodex: boolean;
-  showGemini: boolean;
-  showOpencode: boolean;
-  opencodeMonthlyBudget: number | null;
+  claude: ProviderBudgetConfig;
+  codex: ProviderBudgetConfig;
+  gemini: ProviderBudgetConfig;
+  opencode: ProviderBudgetConfig;
 }
 export type UsageSourceType = "provider" | "local";
 export type UsageConfidence = "official" | "observed" | "estimated";

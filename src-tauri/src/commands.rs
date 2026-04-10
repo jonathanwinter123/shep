@@ -402,8 +402,8 @@ pub async fn get_usage_snapshot(
 fn enabled_providers(workspace: &State<'_, WorkspaceManager>) -> crate::usage::EnabledProviders {
     let settings = workspace.load_usage_settings().unwrap_or_default();
     crate::usage::EnabledProviders {
-        claude: settings.show_claude,
-        codex: settings.show_codex,
+        claude: settings.claude.show,
+        codex: settings.codex.show,
     }
 }
 

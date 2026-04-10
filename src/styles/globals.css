@@ -335,6 +335,14 @@ select {
   font-size: 13px;
 }
 
+/* Usage provider card */
+.usage-provider-card {
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: var(--surface-card);
+}
+
 /* Settings layout helpers */
 .settings-divider {
   border: none;
