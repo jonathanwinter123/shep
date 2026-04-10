@@ -230,6 +230,51 @@ fn collect_entries(
     Ok(())
 }
 
+#[derive(serde::Serialize, Clone)]
+pub struct FileContents {
+    pub path: String,
+    pub content: String,
+    pub truncated: bool,
+    pub size: u64,
+}
+
+#[tauri::command]
+pub async fn read_file_contents(path: String, max_bytes: u64) -> Result<FileContents, String> {
+    let file_path = Path::new(&path);
+    if !file_path.is_file() {
+        return Err(format!("Not a file: {path}"));
+    }
+
+    let metadata = std::fs::metadata(&path)
+        .map_err(|e| format!("Failed to read file metadata: {e}"))?;
+    let size = metadata.len();
+
+    let bytes_to_read = std::cmp::min(size, max_bytes) as usize;
+    let mut file = std::fs::File::open(&path)
+        .map_err(|e| format!("Failed to open file: {e}"))?;
+
+    let mut buffer = vec![0u8; bytes_to_read];
+    use std::io::Read;
+    file.read_exact(&mut buffer)
+        .map_err(|e| format!("Failed to read file: {e}"))?;
+
+    // Binary detection: check for null bytes in the first 8KB
+    let check_len = std::cmp::min(buffer.len(), 8192);
+    if buffer[..check_len].contains(&0) {
+        return Err("Binary file — cannot preview".to_string());
+    }
+
+    let content = String::from_utf8(buffer)
+        .map_err(|_| "File is not valid UTF-8".to_string())?;
+
+    Ok(FileContents {
+        path,
+        content,
+        truncated: size > max_bytes,
+        size,
+    })
+}
+
 // ── PTY commands ────────────────────────────────────────────────────
 
 #[tauri::command]
