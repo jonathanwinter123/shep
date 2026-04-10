@@ -1,6 +1,22 @@
 import type { ProviderUsageSnapshot, UsageProvider, UsageWindowSnapshot } from "../../lib/types";
 
 const WINDOW_PRIORITY = ["5h", "7d", "30d"];
+export const ALL_USAGE_PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini", "opencode"];
+export const TONE_COLORS: Record<string, string> = {
+  low: "rgba(52, 211, 153, 0.75)",
+  medium: "rgba(245, 158, 11, 0.75)",
+  high: "rgba(251, 146, 60, 0.85)",
+  critical: "rgba(248, 113, 113, 0.9)",
+  local: "rgba(96, 165, 250, 0.5)",
+};
+
+export const TONE_TRACK: Record<string, string> = {
+  low: "rgba(52, 211, 153, 0.1)",
+  medium: "rgba(245, 158, 11, 0.1)",
+  high: "rgba(251, 146, 60, 0.12)",
+  critical: "rgba(248, 113, 113, 0.14)",
+  local: "rgba(96, 165, 250, 0.08)",
+};
 
 export function getPrimaryWindow(snapshot: ProviderUsageSnapshot | null): UsageWindowSnapshot | null {
   if (!snapshot) return null;
@@ -19,6 +35,8 @@ export function getProviderLabel(provider: UsageProvider): string {
       return "Claude";
     case "gemini":
       return "Gemini";
+    case "opencode":
+      return "opencode";
   }
 }
 
@@ -113,4 +131,75 @@ export function paceLabel(status: PaceStatus): string {
     case "on": return "on pace";
     case "over": return "over pace";
   }
+}
+
+export function barTone(pace: ReturnType<typeof computePace>, pct: number | null | undefined): string {
+  if (pct == null) return "local";
+  if (pct >= 90) return "critical";
+  if (pace?.status === "over") return pct >= 50 ? "high" : "medium";
+  if (pct >= 75) return "high";
+  if (pct >= 50) return "medium";
+  return "low";
+}
+
+function currentMonthRange(now: Date) {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return { start, end };
+}
+
+function currentFiveHourBlock(now: Date) {
+  const start = new Date(now);
+  const hour = start.getHours();
+  start.setHours(hour - (hour % 5), 0, 0, 0);
+  const end = new Date(start);
+  end.setHours(start.getHours() + 5);
+  return { start, end };
+}
+
+function currentSevenDayBlock(now: Date) {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - start.getDay());
+  const end = new Date(start);
+  end.setDate(start.getDate() + 7);
+  return { start, end };
+}
+
+export function syntheticBudgetWindow(
+  provider: UsageProvider,
+  window: "5h" | "7d",
+  cost: number | null,
+  monthlyBudget: number | null,
+): UsageWindowSnapshot | null {
+  if (cost == null || monthlyBudget == null || monthlyBudget <= 0) {
+    return null;
+  }
+
+  const now = new Date();
+  const month = currentMonthRange(now);
+  const budgetRange = window === "5h" ? currentFiveHourBlock(now) : currentSevenDayBlock(now);
+  const monthDays = Math.max(Math.round((month.end.getTime() - month.start.getTime()) / (24 * 60 * 60 * 1000)), 1);
+  const monthDurationMs = monthDays * 8 * 60 * 60 * 1000;
+  const rangeDurationMs = window === "5h"
+    ? 5 * 60 * 60 * 1000
+    : 7 * 8 * 60 * 60 * 1000;
+
+  if (monthDurationMs <= 0 || rangeDurationMs <= 0) return null;
+
+  const windowBudget = monthlyBudget * (rangeDurationMs / monthDurationMs);
+  if (windowBudget <= 0) return null;
+
+  return {
+    provider,
+    window,
+    label: window,
+    sourceType: "local",
+    confidence: "estimated",
+    usedPercent: (cost / windowBudget) * 100,
+    remainingPercent: Math.max(100 - (cost / windowBudget) * 100, 0),
+    resetAt: new Date(budgetRange.end).toISOString(),
+    tokenTotal: null,
+    paceStatus: null,
+  };
 }

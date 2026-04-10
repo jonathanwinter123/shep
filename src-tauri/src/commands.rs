@@ -10,7 +10,10 @@ use crate::pty::manager::PtyManager;
 use crate::pty::session::{PtyColorTheme, PtyOutput};
 use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
 use crate::watcher::GitWatcher;
-use crate::workspace::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig};
+use crate::workspace::config::{
+    EditorSettings, ImportedFont, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings,
+    UsageSettings, WorkspaceConfig,
+};
 use crate::workspace::manager::WorkspaceManager;
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -96,6 +99,29 @@ pub fn save_terminal_settings(
     workspace: State<'_, WorkspaceManager>,
 ) -> Result<(), String> {
     workspace.save_terminal_settings(&settings)
+}
+
+#[tauri::command]
+pub fn list_imported_fonts(
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<Vec<ImportedFont>, String> {
+    workspace.list_imported_fonts()
+}
+
+#[tauri::command]
+pub fn import_font(
+    source_path: &str,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<ImportedFont, String> {
+    workspace.import_font(source_path)
+}
+
+#[tauri::command]
+pub fn read_imported_font(
+    font_id: &str,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<Vec<u8>, String> {
+    workspace.read_imported_font(font_id)
 }
 
 #[tauri::command]
@@ -306,6 +332,11 @@ pub async fn git_unstage_file(path: String, file_path: String) -> Result<(), Str
 }
 
 #[tauri::command]
+pub async fn git_unstage_all(path: String) -> Result<(), String> {
+    git::unstage_all(&path)
+}
+
+#[tauri::command]
 pub async fn git_switch_branch(path: String, branch_name: String) -> Result<(), String> {
     git::switch_branch(&path, &branch_name)
 }
@@ -320,6 +351,13 @@ pub async fn git_create_branch(path: String, branch_name: String) -> Result<(), 
 #[tauri::command]
 pub fn get_username() -> String {
     std::env::var("USER").unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn get_home_directory() -> Result<String, String> {
+    dirs::home_dir()
+        .map(|path| path.to_string_lossy().to_string())
+        .ok_or_else(|| "Could not find home directory".to_string())
 }
 
 #[tauri::command]
@@ -369,8 +407,9 @@ pub async fn get_usage_snapshot(
 fn enabled_providers(workspace: &State<'_, WorkspaceManager>) -> crate::usage::EnabledProviders {
     let settings = workspace.load_usage_settings().unwrap_or_default();
     crate::usage::EnabledProviders {
-        claude: settings.show_claude,
-        codex: settings.show_codex,
+        claude: settings.claude.show,
+        codex: settings.codex.show,
+        gemini: settings.gemini.show,
     }
 }
 

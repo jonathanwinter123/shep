@@ -62,6 +62,7 @@ export default function Sidebar({
       let hasAttention = false;
       let hasCrash = false;
       for (const tab of repoTabs) {
+        if (tab.kind !== "terminal" && tab.kind !== "assistant") continue;
         const a = tabActivity[tab.ptyId];
         if (a) {
           if (a.bell) hasAttention = true;
@@ -69,7 +70,7 @@ export default function Sidebar({
         }
       }
       activity[repo.path] = {
-        terminalCount: repoTabs.length,
+        terminalCount: repoTabs.filter((t) => t.kind === "terminal" || t.kind === "assistant").length,
         runningCount: cmds.filter((c) => c.status === "running").length,
         hasAttention,
         hasCrash,

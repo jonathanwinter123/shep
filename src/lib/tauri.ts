@@ -12,6 +12,7 @@ import type {
   EditorSettings,
   KeybindingSettings,
   TerminalSettings,
+  ImportedFont,
   PreferredEditor,
   ProviderUsageSnapshot,
   LocalUsageDetails,
@@ -67,6 +68,18 @@ export function getTerminalSettings(): Promise<TerminalSettings> {
 
 export function saveTerminalSettings(settings: TerminalSettings): Promise<void> {
   return invoke("save_terminal_settings", { settings });
+}
+
+export function listImportedFonts(): Promise<ImportedFont[]> {
+  return invoke("list_imported_fonts");
+}
+
+export function importFont(sourcePath: string): Promise<ImportedFont> {
+  return invoke("import_font", { sourcePath });
+}
+
+export function readImportedFont(fontId: string): Promise<number[]> {
+  return invoke("read_imported_font", { fontId });
 }
 
 export function openInEditor(
@@ -205,6 +218,10 @@ export function gitUnstageFile(path: string, filePath: string): Promise<void> {
   return invoke("git_unstage_file", { path, filePath });
 }
 
+export function gitUnstageAll(path: string): Promise<void> {
+  return invoke("git_unstage_all", { path });
+}
+
 export function gitSwitchBranch(path: string, branchName: string): Promise<void> {
   return invoke("git_switch_branch", { path, branchName });
 }
@@ -217,6 +234,10 @@ export function gitCreateBranch(path: string, branchName: string): Promise<void>
 
 export function getUsername(): Promise<string> {
   return invoke("get_username");
+}
+
+export function getHomeDirectory(): Promise<string> {
+  return invoke("get_home_directory");
 }
 
 export function getDefaultShell(): Promise<string> {

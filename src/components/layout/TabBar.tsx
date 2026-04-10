@@ -3,14 +3,15 @@ import { createPortal } from "react-dom";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { useShallow } from "zustand/shallow";
-import { GitBranch, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined, Radio } from "lucide-react";
-import GearIcon from "../sidebar/icons/GearIcon";
+import { GitBranch } from "lucide-react";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
-import DevMemory from "./DevMemory";
+import { useGitStore } from "../../stores/useGitStore";
+import tabKindMeta, { extraActions } from "../../lib/tabKindMeta";
+import type { UnifiedTab } from "../../lib/types";
 
 
-function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () => void; onNewShell: () => void }) {
+function NewSessionButton({ onNewAssistant, onNewShell, onNewCommands, onNewGit, onOpenInEditor }: { onNewAssistant: () => void; onNewShell: () => void; onNewCommands: () => void; onNewGit: () => void; onOpenInEditor: () => void }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -30,6 +31,14 @@ function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () =
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
+  const menuItems = [
+    { key: "assistant", meta: tabKindMeta.assistant, action: onNewAssistant },
+    { key: "terminal", meta: tabKindMeta.terminal, action: onNewShell },
+    { key: "commands", meta: tabKindMeta.commands, action: onNewCommands },
+    { key: "git", meta: tabKindMeta.git, action: onNewGit },
+    { key: "editor", meta: extraActions.openInEditor, action: onOpenInEditor },
+  ];
+
   const handleToggle = () => {
     if (!open && btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect();
@@ -42,7 +51,7 @@ function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () =
     <>
       <button
         ref={btnRef}
-        className="tab !px-3 !py-1.5 !text-base font-semibold"
+        className="tab tab-auto !px-3 font-semibold"
         onClick={handleToggle}
         title="New session"
         aria-label="Open new session"
@@ -55,20 +64,17 @@ function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () =
           className="context-menu"
           style={{ top: pos.top, left: pos.left }}
         >
-          <button
-            className="context-menu__item"
-            onClick={() => { onNewAssistant(); setOpen(false); }}
-          >
-            <span className="context-menu__icon"><Sparkles size={14} /></span>
-            <span>AI Assistant</span>
-          </button>
-          <button
-            className="context-menu__item"
-            onClick={() => { onNewShell(); setOpen(false); }}
-          >
-            <span className="context-menu__icon"><SquareTerminal size={14} /></span>
-            <span>Terminal</span>
-          </button>
+          {menuItems.map(({ key, meta, action }) => (
+            <button
+              key={key}
+              className="context-menu__item"
+              onClick={() => { action(); setOpen(false); }}
+            >
+              <span className="context-menu__icon">{meta.icon(14)}</span>
+              <span>{meta.label}</span>
+              {meta.shortcut && <span className="context-menu__shortcut">{meta.shortcut}</span>}
+            </button>
+          ))}
         </div>,
         document.body,
       )}
@@ -76,20 +82,47 @@ function NewSessionButton({ onNewAssistant, onNewShell }: { onNewAssistant: () =
   );
 }
 
+/** Render the icon for a tab based on its kind */
+function TabIcon({ tab }: { tab: UnifiedTab }) {
+  if (tab.kind === "assistant" && tab.assistantId) {
+    const logoUrl = assistantLogoSrc[tab.assistantId];
+    if (logoUrl) {
+      return <img src={logoUrl} alt="" width={12} height={12} className={getAssistantLogoClass(tab.assistantId)} />;
+    }
+  }
+  const meta = tabKindMeta[tab.kind];
+  return meta ? <>{meta.icon(12)}</> : null;
+}
+
 interface TabBarProps {
   onClose: (tabId: string) => void;
   onNewShell: () => void;
   onNewAssistant: () => void;
+  onNewCommands: () => void;
+  onNewGit: () => void;
+  onOpenInEditor: () => void;
 }
 
 export default function TabBar({
   onClose,
   onNewShell,
   onNewAssistant,
+  onNewCommands,
+  onNewGit,
+  onOpenInEditor,
 }: TabBarProps) {
-  const projectTerminals = useTerminalStore(
-    (s) => (s.activeProjectPath ? s.projectState[s.activeProjectPath] : null),
+  const { activeProjectPath, projectState } = useTerminalStore(
+    useShallow((s) => ({ activeProjectPath: s.activeProjectPath, projectState: s.activeProjectPath ? s.projectState[s.activeProjectPath] : null })),
   );
+  const projectTerminals = projectState;
+  const projectName = activeProjectPath ? activeProjectPath.split("/").pop() : null;
+  const gitStatus = useGitStore((s) => activeProjectPath ? s.projectGitStatus[activeProjectPath] : null);
+  const branch = gitStatus?.branch ?? null;
+  const branchIconColor = !gitStatus || !gitStatus.is_git_repo
+    ? undefined
+    : gitStatus.dirty
+      ? "var(--status-attention)"
+      : "var(--status-clean)";
   const tabs = projectTerminals?.tabs ?? [];
   const activeTabId = projectTerminals?.activeTabId ?? null;
   const { setActiveTab, reorderTab, updateTab } = useTerminalStore.getState();
@@ -153,52 +186,25 @@ export default function TabBar({
     window.addEventListener("pointercancel", onCancel);
   }, [computeDropIndex, reorderTab]);
 
-  // Single shallow subscription for all UI panel booleans (1 subscription, not 25)
-  const {
-    settingsTabOpen, settingsActive,
-    gitPanelOpen, gitPanelActive,
-    launcherOpen, launcherActive,
-    commandsPanelOpen, commandsPanelActive,
-    usageTabOpen, usagePanelActive,
-    portsPanelOpen, portsPanelActive,
-  } = useUIStore(useShallow((s) => ({
-    settingsTabOpen: s.settingsTabOpen,
+  // Only subscribe to global overlay state (Settings, Usage, Ports)
+  const { settingsActive, usagePanelActive, portsPanelActive } = useUIStore(useShallow((s) => ({
     settingsActive: s.settingsActive,
-    gitPanelOpen: s.gitPanelOpen,
-    gitPanelActive: s.gitPanelActive,
-    launcherOpen: s.launcherOpen,
-    launcherActive: s.launcherActive,
-    commandsPanelOpen: s.commandsPanelOpen,
-    commandsPanelActive: s.commandsPanelActive,
-    usageTabOpen: s.usageTabOpen,
     usagePanelActive: s.usagePanelActive,
-    portsPanelOpen: s.portsPanelOpen,
     portsPanelActive: s.portsPanelActive,
   })));
 
-  // Actions are stable — grab via getState() to avoid subscribing
-  const {
-    activateSettings, closeSettingsTab,
-    activateGitPanel, closeGitPanel,
-    activateLauncher, closeLauncher,
-    activateCommandsPanel, closeCommandsPanel,
-    activateUsagePanel, closeUsageTab,
-    activatePortsPanel, closePortsPanel,
-  } = useUIStore.getState();
-
-  const anyOverlay = settingsActive || launcherActive || gitPanelActive || commandsPanelActive || usagePanelActive || portsPanelActive;
+  const anyOverlay = settingsActive || usagePanelActive || portsPanelActive;
 
   const handleSelectTab = (tabId: string) => {
-    useUIStore.getState().deactivateSettings();
-    useUIStore.getState().deactivateLauncher();
-    useUIStore.getState().deactivateGitPanel();
-    useUIStore.getState().deactivateCommandsPanel();
-    useUIStore.getState().deactivateUsagePanel();
-    useUIStore.getState().deactivatePortsPanel();
+    useUIStore.getState().deactivateAllOverlays();
     setActiveTab(tabId);
     const tab = tabs.find((t) => t.id === tabId);
-    if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
+    if (tab && (tab.kind === "terminal" || tab.kind === "assistant")) {
+      useTerminalStore.getState().clearTabBell(tab.ptyId);
+    }
   };
+
+  const isRenameable = (tab: UnifiedTab) => tab.kind === "terminal" || tab.kind === "assistant";
 
   return (
     <div className="tab-bar">
@@ -211,9 +217,6 @@ export default function TabBar({
         {tabs.map((tab, i) => {
           const isActive = tab.id === activeTabId && !anyOverlay;
           const isDragging = tab.id === dragTabId;
-          const logoUrl = tab.assistantId
-            ? assistantLogoSrc[tab.assistantId]
-            : null;
 
           const showDropBefore = dropIndex !== null && dragTabId && tab.id !== dragTabId && dropIndex === i;
           const showDropAfter = dropIndex !== null && dragTabId && tab.id !== dragTabId && dropIndex === i + 1 && i === tabs.length - 1;
@@ -233,9 +236,7 @@ export default function TabBar({
               aria-selected={isActive}
               aria-label={`Open tab ${tab.label}`}
             >
-              {logoUrl ? (
-                <img src={logoUrl} alt="" width={12} height={12} className={tab.assistantId ? getAssistantLogoClass(tab.assistantId) : undefined} />
-              ) : null}
+              <TabIcon tab={tab} />
               {editingTabId === tab.id ? (
                 <input
                   className="tab-rename-input"
@@ -264,17 +265,17 @@ export default function TabBar({
                 <>
                   <span
                     className="truncate max-w-32"
-                    onDoubleClick={(e) => {
+                    onDoubleClick={isRenameable(tab) ? (e) => {
                       e.stopPropagation();
                       setEditingTabId(tab.id);
-                    }}
+                    } : undefined}
                   >
                     {tab.label}
                   </span>
                 </>
               )}
               <button
-                className="icon-btn ml-0.5"
+                className="tab-close"
                 aria-label={`Close tab ${tab.label}`}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -287,161 +288,20 @@ export default function TabBar({
           );
         })}
 
-        {launcherOpen && (
-          <div
-            className={`tab ${launcherActive ? "active" : ""}`}
-            onClick={activateLauncher}
-            onKeyDown={(event) => handleActionKey(event, activateLauncher)}
-            role="tab"
-            tabIndex={0}
-            aria-selected={launcherActive}
-            aria-label="Open new AI assistant panel"
-          >
-            <span>+</span>
-            <span>New AI Assistant</span>
-            <button
-              className="icon-btn ml-0.5"
-              aria-label="Close new session panel"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeLauncher();
-              }}
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        {gitPanelOpen && (
-          <div
-            className={`tab ${gitPanelActive ? "active" : ""}`}
-            onClick={activateGitPanel}
-            onKeyDown={(event) => handleActionKey(event, activateGitPanel)}
-            role="tab"
-            tabIndex={0}
-            aria-selected={gitPanelActive}
-            aria-label="Open Git panel"
-          >
-            <GitBranch size={12} />
-            <span>Git</span>
-            <button
-              className="icon-btn ml-0.5"
-              aria-label="Close Git panel"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeGitPanel();
-              }}
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        {commandsPanelOpen && (
-          <div
-            className={`tab ${commandsPanelActive ? "active" : ""}`}
-            onClick={activateCommandsPanel}
-            onKeyDown={(event) => handleActionKey(event, activateCommandsPanel)}
-            role="tab"
-            tabIndex={0}
-            aria-selected={commandsPanelActive}
-            aria-label="Open commands panel"
-          >
-            <Terminal size={12} />
-            <span>Commands</span>
-            <button
-              className="icon-btn ml-0.5"
-              aria-label="Close commands panel"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeCommandsPanel();
-              }}
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        {usageTabOpen && (
-          <div
-            className={`tab ${usagePanelActive ? "active" : ""}`}
-            onClick={activateUsagePanel}
-            onKeyDown={(event) => handleActionKey(event, activateUsagePanel)}
-            role="tab"
-            tabIndex={0}
-            aria-selected={usagePanelActive}
-            aria-label="Open usage panel"
-          >
-            <ChartNoAxesCombined size={12} />
-            <span>Usage</span>
-            <button
-              className="icon-btn ml-0.5"
-              aria-label="Close usage panel"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeUsageTab();
-              }}
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        {portsPanelOpen && (
-          <div
-            className={`tab ${portsPanelActive ? "active" : ""}`}
-            onClick={activatePortsPanel}
-            onKeyDown={(event) => handleActionKey(event, activatePortsPanel)}
-            role="tab"
-            tabIndex={0}
-            aria-selected={portsPanelActive}
-            aria-label="Open ports panel"
-          >
-            <Radio size={12} />
-            <span>Ports</span>
-            <button
-              className="icon-btn ml-0.5"
-              aria-label="Close ports panel"
-              onClick={(e) => {
-                e.stopPropagation();
-                closePortsPanel();
-              }}
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        {settingsTabOpen && (
-          <div
-            className={`tab ${settingsActive ? "active" : ""}`}
-            onClick={activateSettings}
-            onKeyDown={(event) => handleActionKey(event, activateSettings)}
-            role="tab"
-            tabIndex={0}
-            aria-selected={settingsActive}
-            aria-label="Open settings panel"
-          >
-            <GearIcon size={12} />
-            <span>Settings</span>
-            <button
-              className="icon-btn ml-0.5"
-              aria-label="Close settings panel"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeSettingsTab();
-              }}
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        <NewSessionButton onNewAssistant={onNewAssistant} onNewShell={onNewShell} />
+        <NewSessionButton onNewAssistant={onNewAssistant} onNewShell={onNewShell} onNewCommands={onNewCommands} onNewGit={onNewGit} onOpenInEditor={onOpenInEditor} />
       </div>
-
-      {import.meta.env.DEV && <DevMemory />}
-
+      {projectName && (
+        <span className="tab-bar__breadcrumb">
+          {projectName}
+          {branch && (
+            <>
+              <span className="tab-bar__breadcrumb-on">on</span>
+              <GitBranch size={15} className="tab-bar__breadcrumb-icon" style={branchIconColor ? { color: branchIconColor } : undefined} />
+              {branch}
+            </>
+          )}
+        </span>
+      )}
     </div>
   );
 }

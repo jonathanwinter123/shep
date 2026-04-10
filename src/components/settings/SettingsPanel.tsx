@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getIdentifier, getName, getTauriVersion, getVersion } from "@tauri-apps/api/app";
+import { open } from "@tauri-apps/plugin-dialog";
+import { Upload } from "lucide-react";
 import { EDITOR_OPTIONS } from "../../lib/editors";
 import { DARK_THEMES, LIGHT_THEMES, TRANSPARENT_THEMES } from "../../lib/themes";
 import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
@@ -11,13 +13,15 @@ import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUpdateStore } from "../../stores/useUpdateStore";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import {
-  displayTerminalFontFamily,
   FONT_OPTIONS,
   FONT_SIZE_OPTIONS,
-  normalizeTerminalFontFamily,
 } from "../../lib/terminalConfig";
-import type { CursorStyle, UsageProvider } from "../../lib/types";
+import { ALL_USAGE_PROVIDERS } from "../usage/usageHelpers";
+import type { CursorStyle, BudgetMode } from "../../lib/types";
 import { getErrorMessage } from "../../lib/errors";
+import { getHomeDirectory } from "../../lib/tauri";
+import { getImportedFonts, importUserFont } from "../../lib/userFonts";
+import type { ImportedFont } from "../../lib/types";
 
 interface AppMeta {
   name: string;
@@ -43,11 +47,15 @@ export default function SettingsPanel() {
   const optionClass = "option-card w-44 justify-start";
   const [appMeta, setAppMeta] = useState<AppMeta | null>(null);
   const [appMetaError, setAppMetaError] = useState<string | null>(null);
-  const [customFontInput, setCustomFontInput] = useState(() =>
-    displayTerminalFontFamily(useTerminalSettingsStore.getState().settings.fontFamily)
-  );
+  const [importedFonts, setImportedFonts] = useState<ImportedFont[]>([]);
+  const [fontImporting, setFontImporting] = useState(false);
+  const [fontError, setFontError] = useState<string | null>(null);
+  const [themeError, setThemeError] = useState<string | null>(null);
   const themeId = useThemeStore((s) => s.themeId);
   const setTheme = useThemeStore((s) => s.setTheme);
+  const customTheme = useThemeStore((s) => s.customTheme);
+  const importTheme = useThemeStore((s) => s.importTheme);
+  const themeFileInputRef = useRef<HTMLInputElement | null>(null);
   const settings = useEditorStore((s) => s.settings);
   const hasLoaded = useEditorStore((s) => s.hasLoaded);
   const isSaving = useEditorStore((s) => s.isSaving);
@@ -74,7 +82,8 @@ export default function SettingsPanel() {
   const usageIsSaving = useUsageSettingsStore((s) => s.isSaving);
   const usageError = useUsageSettingsStore((s) => s.error);
   const loadUsageSettings = useUsageSettingsStore((s) => s.loadSettings);
-  const setProviderEnabled = useUsageSettingsStore((s) => s.setProviderEnabled);
+  const updateProvider = useUsageSettingsStore((s) => s.updateProvider);
+  const [budgetInputs, setBudgetInputs] = useState<Record<string, string>>({});
 
   const updateStatus = useUpdateStore((s) => s.status);
   const availableVersion = useUpdateStore((s) => s.availableVersion);
@@ -92,10 +101,6 @@ export default function SettingsPanel() {
     if (!termHasLoaded) void loadTermSettings();
     if (!usageHasLoaded) void loadUsageSettings();
   }, [hasLoaded, loadSettings, kbHasLoaded, loadKbSettings, termHasLoaded, loadTermSettings, usageHasLoaded, loadUsageSettings]);
-
-  useEffect(() => {
-    setCustomFontInput(displayTerminalFontFamily(termSettings.fontFamily));
-  }, [termSettings.fontFamily]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +131,76 @@ export default function SettingsPanel() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    void getImportedFonts()
+      .then((fonts) => {
+        if (!cancelled) {
+          setImportedFonts(fonts);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setFontError(getErrorMessage(error));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const importFontFile = async () => {
+    try {
+      setFontImporting(true);
+      setFontError(null);
+
+      const homeDirectory = await getHomeDirectory();
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        defaultPath: `${homeDirectory}/Library/Fonts`,
+        filters: [
+          {
+            name: "Font Files",
+            extensions: ["ttf", "otf", "woff", "woff2"],
+          },
+        ],
+      });
+
+      if (!selected || Array.isArray(selected)) {
+        setFontImporting(false);
+        return;
+      }
+
+      const imported = await importUserFont(selected);
+      setImportedFonts((current) => {
+        if (current.some((font) => font.id === imported.id)) {
+          return current;
+        }
+        return [...current, imported];
+      });
+      await updateTermSettings({ fontFamily: imported.family });
+      setFontImporting(false);
+    } catch (error) {
+      setFontImporting(false);
+      setFontError(getErrorMessage(error));
+    }
+  };
+
+  const importThemeFile = async (file: File | null) => {
+    if (!file) return;
+
+    try {
+      const source = await file.text();
+      importTheme(source);
+      setThemeError(null);
+    } catch (error) {
+      setThemeError(getErrorMessage(error));
+    }
+  };
+
   return (
     <div className="absolute inset-0 overflow-y-auto p-6">
       {/* ── Theme ──────────────────────────────────────────── */}
@@ -155,10 +230,54 @@ export default function SettingsPanel() {
         })}
       </div>
 
-      <p className="text-xs text-[var(--text-muted)] mt-4">
-        Note: CLI tools may need to be relaunched after switching themes. Use /theme to select light or dark if not updating.
-      </p>
-
+      <div className="settings-row mt-5">
+        <span className="settings-row__label flex items-center gap-2">
+          <span>Custom Theme</span>
+          <InfoTip text={"Ghostty-style file: background and foreground, plus palette entries 0 through 15. Download examples from terminalcolors.com/themes/."} />
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {customTheme && (
+            <button
+              onClick={() => setTheme(customTheme.id)}
+              className={`option-card option-card--compact ${themeId === customTheme.id ? "selected" : ""}`}
+            >
+              <div
+                className="shrink-0 rounded-full"
+                style={{
+                  width: 18,
+                  height: 18,
+                  background: `linear-gradient(135deg, ${customTheme.bgRadial1} 0%, ${customTheme.bgLinearMid} 50%, ${customTheme.bgRadial3} 100%)`,
+                }}
+              />
+              <span>Custom</span>
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setThemeError(null);
+              themeFileInputRef.current?.click();
+            }}
+            className="option-card option-card--compact"
+          >
+            <span className="flex items-center gap-2">
+              <Upload size={14} />
+              <span>{customTheme ? "Update Theme" : "Import Theme"}</span>
+            </span>
+          </button>
+          <input
+            ref={themeFileInputRef}
+            type="file"
+            accept=".txt,.conf,.theme,.config"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              void importThemeFile(file);
+              event.currentTarget.value = "";
+            }}
+          />
+        </div>
+        {themeError && <div className="mt-2 text-sm text-red-300">{themeError}</div>}
+      </div>
       <hr className="settings-divider" />
 
       {/* ── Editor ─────────────────────────────────────────── */}
@@ -253,35 +372,43 @@ export default function SettingsPanel() {
           {FONT_OPTIONS.map((font) => (
             <button
               key={font.id}
-              onClick={() => {
-                setCustomFontInput("");
-                void updateTermSettings({ fontFamily: font.id });
-              }}
+              onClick={() => void updateTermSettings({ fontFamily: font.id })}
               className={`option-card option-card--compact ${termSettings.fontFamily === font.id ? "selected" : ""}`}
             >
               <span>{font.label}</span>
             </button>
           ))}
-          <input
-            type="text"
-            placeholder="Custom font name..."
-            className={`option-card option-card--compact w-48 bg-transparent text-sm ${!FONT_OPTIONS.some((f) => f.id === termSettings.fontFamily) && customFontInput ? "selected" : ""}`}
-            value={customFontInput}
-            onChange={(e) => {
-              setCustomFontInput(e.target.value);
-            }}
-            onBlur={() => {
-              if (customFontInput.trim()) {
-                void updateTermSettings({ fontFamily: normalizeTerminalFontFamily(customFontInput) });
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.currentTarget.blur();
-              }
-            }}
-          />
         </div>
+      </div>
+
+      <div className="settings-row">
+        <span className="settings-row__label">Custom Fonts</span>
+        <div className="flex flex-wrap gap-2">
+          {importedFonts.map((font) => (
+            <button
+              key={font.id}
+              onClick={() => void updateTermSettings({ fontFamily: font.family })}
+              className={`option-card option-card--compact ${termSettings.fontFamily === font.family ? "selected" : ""}`}
+              title={`Imported from ~/.shep/fonts/${font.fileName}`}
+            >
+              <span>{font.label}</span>
+            </button>
+          ))}
+          <button
+            onClick={() => void importFontFile()}
+            className="option-card option-card--compact"
+            disabled={fontImporting}
+          >
+            <span className="flex items-center gap-2">
+              <Upload size={14} />
+              <span>{fontImporting ? "Importing..." : "Import Font"}</span>
+            </span>
+          </button>
+        </div>
+        {!importedFonts.length && !fontError && (
+          <div className="mt-2 text-xs text-[var(--text-muted)]">No custom fonts imported.</div>
+        )}
+        {fontError && <div className="mt-2 text-sm text-red-300">{fontError}</div>}
       </div>
 
       <div className="settings-row">
@@ -325,21 +452,73 @@ export default function SettingsPanel() {
       {/* ── Usage ──────────────────────────────────────────── */}
       <h2 className="section-label !p-0 mb-4">Usage Providers</h2>
 
-      <div className="flex flex-wrap gap-3">
-        {(["claude", "codex", "gemini"] as UsageProvider[]).map((provider) => {
-          const key = provider === "claude" ? "showClaude" : provider === "codex" ? "showCodex" : "showGemini";
-          const active = usageSettings[key];
+      <div className="usage-provider-grid">
+        {ALL_USAGE_PROVIDERS.map((provider) => {
+          const config = usageSettings[provider];
           const logo = assistantLogoSrc[provider];
-          const label = provider === "claude" ? "Claude" : provider === "codex" ? "Codex" : "Gemini";
+          const label = provider === "claude"
+            ? "Claude"
+            : provider === "codex"
+              ? "Codex"
+              : provider === "gemini"
+                ? "Gemini"
+                : "opencode";
+          const budgetInput = budgetInputs[provider] ?? (config.monthlyBudget != null ? String(config.monthlyBudget) : "");
           return (
-            <button
-              key={provider}
-              onClick={() => void setProviderEnabled(provider, !active)}
-              className={`${optionClass} ${active ? "selected" : ""}`}
-            >
-              {logo && <img src={logo} alt="" width={20} height={20} className={`shrink-0 ${getAssistantLogoClass(provider) ?? ""}`} />}
-              <span>{label}</span>
-            </button>
+            <div key={provider} className="usage-provider-row">
+              <span className="usage-provider-row__name">
+                {logo && <img src={logo} alt="" width={18} height={18} className={`shrink-0 ${getAssistantLogoClass(provider) ?? ""}`} />}
+                <span>{label}</span>
+              </span>
+
+              <button
+                onClick={() => void updateProvider(provider, { show: !config.show })}
+                className={`option-card option-card--compact ${config.show ? "selected" : ""}`}
+              >
+                {config.show ? "On" : "Off"}
+              </button>
+
+              {config.show && (
+                <>
+                  {(["subscription", "custom"] as BudgetMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => void updateProvider(provider, { budgetMode: mode })}
+                      className={`option-card option-card--compact ${config.budgetMode === mode ? "selected" : ""}`}
+                    >
+                      <span className="capitalize">{mode}</span>
+                    </button>
+                  ))}
+
+                  {config.budgetMode === "custom" && (
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputMode="decimal"
+                      placeholder="$ / month"
+                      value={budgetInput}
+                      onChange={(event) =>
+                        setBudgetInputs((prev) => ({ ...prev, [provider]: event.target.value }))
+                      }
+                      onBlur={() => {
+                        const trimmed = budgetInput.trim();
+                        const nextBudget = trimmed === "" ? null : Number(trimmed);
+                        if (nextBudget == null || Number.isFinite(nextBudget)) {
+                          void updateProvider(provider, { monthlyBudget: nextBudget });
+                        }
+                        setBudgetInputs((prev) => {
+                          const next = { ...prev };
+                          delete next[provider];
+                          return next;
+                        });
+                      }}
+                      className="usage-provider-row__budget-input"
+                    />
+                  )}
+                </>
+              )}
+            </div>
           );
         })}
       </div>

@@ -4,6 +4,7 @@ import { getTerminalSettings, saveTerminalSettings } from "../lib/tauri";
 import { applyTerminalSettings } from "../components/terminal/terminalTheme";
 
 import { normalizeTerminalFontFamily, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from "../lib/terminalConfig";
+import { ensureUserFontLoaded } from "../lib/userFonts";
 
 const DEFAULT_SETTINGS: TerminalSettings = {
   cursorStyle: "block",
@@ -35,6 +36,7 @@ export const useTerminalSettingsStore = create<TerminalSettingsStore>((set, get)
         ...settings,
         fontFamily: normalizeTerminalFontFamily(settings.fontFamily),
       };
+      await ensureUserFontLoaded(normalizedSettings.fontFamily);
       set({ settings: normalizedSettings, hasLoaded: true, error: null });
       applyTerminalSettings(normalizedSettings);
       if (normalizedSettings.fontFamily !== settings.fontFamily) {
@@ -58,8 +60,9 @@ export const useTerminalSettingsStore = create<TerminalSettingsStore>((set, get)
     };
     // Optimistic update
     set({ settings: next, isSaving: true, error: null });
-    applyTerminalSettings(next);
     try {
+      await ensureUserFontLoaded(next.fontFamily);
+      applyTerminalSettings(next);
       await saveTerminalSettings(next);
       set({ isSaving: false });
     } catch (error) {

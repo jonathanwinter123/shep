@@ -17,11 +17,13 @@ struct ModelPricing {
     thoughts_per_m: f64,
 }
 
+type PricingMap = HashMap<(String, String), ModelPricing>;
+
 /// Load all pricing patterns from the DB.
-fn load_pricing(conn: &Connection) -> HashMap<String, ModelPricing> {
+fn load_pricing(conn: &Connection) -> PricingMap {
     let mut map = HashMap::new();
     let mut stmt = match conn.prepare(
-        "SELECT model_pattern, input_per_m, output_per_m, cache_read_per_m, cache_write_per_m, thoughts_per_m FROM model_pricing"
+        "SELECT provider, model_pattern, input_per_m, output_per_m, cache_read_per_m, cache_write_per_m, thoughts_per_m FROM model_pricing"
     ) {
         Ok(s) => s,
         Err(_) => return map,
@@ -30,34 +32,33 @@ fn load_pricing(conn: &Connection) -> HashMap<String, ModelPricing> {
     let rows = stmt.query_map([], |row| {
         Ok((
             row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
             ModelPricing {
-                input_per_m: row.get(1)?,
-                output_per_m: row.get(2)?,
-                cache_read_per_m: row.get(3)?,
-                cache_write_per_m: row.get(4)?,
-                thoughts_per_m: row.get(5)?,
+                input_per_m: row.get(2)?,
+                output_per_m: row.get(3)?,
+                cache_read_per_m: row.get(4)?,
+                cache_write_per_m: row.get(5)?,
+                thoughts_per_m: row.get(6)?,
             },
         ))
     });
 
     if let Ok(rows) = rows {
         for row in rows.flatten() {
-            map.insert(row.0, row.1);
+            map.insert((row.0, row.1), row.2);
         }
     }
     map
 }
 
 /// Match a model name to a pricing pattern (prefix match).
-fn find_pricing<'a>(model: &str, pricing: &'a HashMap<String, ModelPricing>) -> Option<&'a ModelPricing> {
-    // Try exact match first
-    if let Some(p) = pricing.get(model) {
+fn find_pricing<'a>(provider: &str, model: &str, pricing: &'a PricingMap) -> Option<&'a ModelPricing> {
+    if let Some(p) = pricing.get(&(provider.to_string(), model.to_string())) {
         return Some(p);
     }
-    // Try prefix match (e.g., "claude-opus-4-6" matches "claude-opus-4-6-20251101")
     let mut best_match: Option<(&str, &ModelPricing)> = None;
-    for (pattern, p) in pricing {
-        if model.starts_with(pattern.as_str()) {
+    for ((pricing_provider, pattern), p) in pricing {
+        if pricing_provider == provider && model.starts_with(pattern.as_str()) {
             match best_match {
                 Some((prev, _)) if pattern.len() > prev.len() => best_match = Some((pattern, p)),
                 None => best_match = Some((pattern, p)),
@@ -78,12 +79,42 @@ fn calculate_cost(pricing: &ModelPricing, input: i64, output: i64, cache_read: i
         / 1_000_000.0
 }
 
+fn resolved_cost(
+    pricing_provider: &str,
+    model: &str,
+    input: i64,
+    output: i64,
+    cache_read: i64,
+    cache_write: i64,
+    thoughts: i64,
+    recorded_cost: f64,
+    has_recorded_cost: bool,
+    pricing: &PricingMap,
+) -> Option<f64> {
+    if has_recorded_cost {
+        return Some(recorded_cost);
+    }
+
+    find_pricing(pricing_provider, model, pricing)
+        .map(|p| calculate_cost(p, input, output, cache_read, cache_write, thoughts))
+}
+
+fn local_month_cutoff(conn: &Connection) -> i64 {
+    conn.query_row(
+        "SELECT CAST(strftime('%s', 'now', 'localtime', 'start of month', 'utc') AS INTEGER)",
+        [],
+        |row| row.get::<_, i64>(0),
+    ).unwrap_or(0)
+}
+
 /// Calculate cost for a windowed query (total tokens by type for a given provider/cutoff).
-fn windowed_cost(conn: &Connection, provider: &str, cutoff: i64, pricing: &HashMap<String, ModelPricing>) -> Option<f64> {
+fn windowed_cost(conn: &Connection, provider: &str, cutoff: i64, pricing: &PricingMap) -> Option<f64> {
     let mut stmt = conn.prepare(
-        "SELECT COALESCE(model, 'unknown'), SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts)
+        "SELECT COALESCE(pricing_provider, provider), COALESCE(model, 'unknown'),
+                SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts),
+                COALESCE(SUM(recorded_cost), 0), MAX(CASE WHEN recorded_cost IS NOT NULL THEN 1 ELSE 0 END)
          FROM usage_messages WHERE provider = ?1 AND timestamp >= ?2
-         GROUP BY model"
+         GROUP BY COALESCE(pricing_provider, provider), model"
     ).ok()?;
 
     let mut total_cost = 0.0;
@@ -92,18 +123,32 @@ fn windowed_cost(conn: &Connection, provider: &str, cutoff: i64, pricing: &HashM
     let rows = stmt.query_map(params![provider, cutoff], |row| {
         Ok((
             row.get::<_, String>(0)?,
-            row.get::<_, i64>(1)?,
+            row.get::<_, String>(1)?,
             row.get::<_, i64>(2)?,
             row.get::<_, i64>(3)?,
             row.get::<_, i64>(4)?,
             row.get::<_, i64>(5)?,
+            row.get::<_, i64>(6)?,
+            row.get::<_, f64>(7)?,
+            row.get::<_, i64>(8)?,
         ))
     }).ok()?;
 
     for row in rows.flatten() {
-        let (model, input, output, cache_read, cache_write, thoughts) = row;
-        if let Some(p) = find_pricing(&model, pricing) {
-            total_cost += calculate_cost(p, input, output, cache_read, cache_write, thoughts);
+        let (pricing_provider, model, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost) = row;
+        if let Some(cost) = resolved_cost(
+            &pricing_provider,
+            &model,
+            input,
+            output,
+            cache_read,
+            cache_write,
+            thoughts,
+            recorded_cost,
+            has_recorded_cost != 0,
+            pricing,
+        ) {
+            total_cost += cost;
             has_any = true;
         }
     }
@@ -119,6 +164,7 @@ pub fn local_details(conn: &Connection, provider: &str) -> Option<LocalUsageDeta
     let t30d = now - 2_592_000;
 
     let pricing = load_pricing(conn);
+    let month_cutoff = local_month_cutoff(conn);
 
     // Time-windowed totals
     let (tokens_5h, tokens_7d, tokens_30d, tokens_total) = conn
@@ -162,6 +208,7 @@ pub fn local_details(conn: &Connection, provider: &str) -> Option<LocalUsageDeta
     let cost_7d = windowed_cost(conn, provider, t7d, &pricing);
     let cost_30d = windowed_cost(conn, provider, t30d, &pricing);
     let cost_total = windowed_cost(conn, provider, 0, &pricing);
+    let cost_month = windowed_cost(conn, provider, month_cutoff, &pricing);
 
     let top_models = query_top_models(conn, provider, &pricing);
     let top_tasks = query_top_tasks(conn, provider, &pricing);
@@ -179,6 +226,7 @@ pub fn local_details(conn: &Connection, provider: &str) -> Option<LocalUsageDeta
         tokens_7d: tokens_7d as u64,
         tokens_30d: tokens_30d as u64,
         cost_total,
+        cost_month,
         cost_5h,
         cost_7d,
         cost_30d,
@@ -199,6 +247,7 @@ pub fn windowed_details(conn: &Connection, provider: &str, window: &str) -> Opti
     };
 
     let pricing = load_pricing(conn);
+    let month_cutoff = local_month_cutoff(conn);
 
     let tokens_total: i64 = conn
         .query_row(
@@ -250,6 +299,7 @@ pub fn windowed_details(conn: &Connection, provider: &str, window: &str) -> Opti
     let cost_5h = windowed_cost(conn, provider, t5h, &pricing);
     let cost_7d = windowed_cost(conn, provider, t7d, &pricing);
     let cost_30d = windowed_cost(conn, provider, t30d, &pricing);
+    let cost_month = windowed_cost(conn, provider, month_cutoff, &pricing);
 
     let top_models = query_top_models_since(conn, provider, cutoff, &pricing);
     let top_tasks = query_top_tasks_since(conn, provider, cutoff, &pricing);
@@ -267,6 +317,7 @@ pub fn windowed_details(conn: &Connection, provider: &str, window: &str) -> Opti
         tokens_7d: tokens_7d as u64,
         tokens_30d: tokens_30d as u64,
         cost_total: cost_window,
+        cost_month,
         cost_5h,
         cost_7d,
         cost_30d,
@@ -276,52 +327,69 @@ pub fn windowed_details(conn: &Connection, provider: &str, window: &str) -> Opti
     })
 }
 
-fn query_top_models(conn: &Connection, provider: &str, pricing: &HashMap<String, ModelPricing>) -> Vec<UsageNamedTokens> {
+fn query_top_models(conn: &Connection, provider: &str, pricing: &PricingMap) -> Vec<UsageNamedTokens> {
     query_top_models_since(conn, provider, 0, pricing)
 }
 
-fn query_top_models_since(conn: &Connection, provider: &str, since: i64, pricing: &HashMap<String, ModelPricing>) -> Vec<UsageNamedTokens> {
+fn query_top_models_since(conn: &Connection, provider: &str, since: i64, pricing: &PricingMap) -> Vec<UsageNamedTokens> {
     let mut stmt = match conn
         .prepare(
-            "SELECT COALESCE(model, 'unknown'), SUM(tokens_total), SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts)
+            "SELECT COALESCE(pricing_provider, provider), COALESCE(model, 'unknown'), SUM(tokens_total),
+                    SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts),
+                    COALESCE(SUM(recorded_cost), 0), MAX(CASE WHEN recorded_cost IS NOT NULL THEN 1 ELSE 0 END)
              FROM usage_messages WHERE provider = ?1 AND timestamp >= ?2
-             GROUP BY model ORDER BY 2 DESC LIMIT 5",
+             GROUP BY COALESCE(pricing_provider, provider), model ORDER BY 3 DESC LIMIT 5",
         ) {
         Ok(s) => s,
         Err(_) => return Vec::new(),
     };
 
     let rows = match stmt.query_map(params![provider, since], |row| {
-        let name: String = row.get(0)?;
-        let tokens = row.get::<_, i64>(1)? as u64;
-        let input: i64 = row.get(2)?;
-        let output: i64 = row.get(3)?;
-        let cache_read: i64 = row.get(4)?;
-        let cache_write: i64 = row.get(5)?;
-        let thoughts: i64 = row.get(6)?;
-        Ok((name, tokens, input, output, cache_read, cache_write, thoughts))
+        let pricing_provider: String = row.get(0)?;
+        let name: String = row.get(1)?;
+        let tokens = row.get::<_, i64>(2)? as u64;
+        let input: i64 = row.get(3)?;
+        let output: i64 = row.get(4)?;
+        let cache_read: i64 = row.get(5)?;
+        let cache_write: i64 = row.get(6)?;
+        let thoughts: i64 = row.get(7)?;
+        let recorded_cost: f64 = row.get(8)?;
+        let has_recorded_cost: i64 = row.get(9)?;
+        Ok((pricing_provider, name, tokens, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost))
     }) {
         Ok(rows) => rows,
         Err(_) => return Vec::new(),
     };
     rows.filter_map(|r| r.ok())
-    .map(|(name, tokens, input, output, cache_read, cache_write, thoughts)| {
-        let cost = find_pricing(&name, pricing)
-            .map(|p| calculate_cost(p, input, output, cache_read, cache_write, thoughts));
+    .map(|(pricing_provider, name, tokens, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost)| {
+        let cost = resolved_cost(
+            &pricing_provider,
+            &name,
+            input,
+            output,
+            cache_read,
+            cache_write,
+            thoughts,
+            recorded_cost,
+            has_recorded_cost != 0,
+            pricing,
+        );
         UsageNamedTokens { name, tokens, cost }
     })
     .collect()
 }
 
-fn query_top_tasks(conn: &Connection, provider: &str, pricing: &HashMap<String, ModelPricing>) -> Vec<UsageTask> {
+fn query_top_tasks(conn: &Connection, provider: &str, pricing: &PricingMap) -> Vec<UsageTask> {
     query_top_tasks_since(conn, provider, 0, pricing)
 }
 
-fn query_top_tasks_since(conn: &Connection, provider: &str, since: i64, pricing: &HashMap<String, ModelPricing>) -> Vec<UsageTask> {
+fn query_top_tasks_since(conn: &Connection, provider: &str, since: i64, pricing: &PricingMap) -> Vec<UsageTask> {
     let mut stmt = match conn
         .prepare(
             "SELECT session_id, COALESCE(project, ''), SUM(tokens_total), MAX(model), MAX(timestamp),
-                    SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts)
+                    COALESCE(MAX(pricing_provider), provider),
+                    SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts),
+                    COALESCE(SUM(recorded_cost), 0), MAX(CASE WHEN recorded_cost IS NOT NULL THEN 1 ELSE 0 END)
              FROM usage_messages WHERE provider = ?1 AND timestamp >= ?2
              GROUP BY session_id ORDER BY 3 DESC LIMIT 5",
         ) {
@@ -335,21 +403,33 @@ fn query_top_tasks_since(conn: &Connection, provider: &str, since: i64, pricing:
         let tokens: i64 = row.get(2)?;
         let model: Option<String> = row.get(3)?;
         let updated_at: Option<i64> = row.get(4)?;
-        let input: i64 = row.get(5)?;
-        let output: i64 = row.get(6)?;
-        let cache_read: i64 = row.get(7)?;
-        let cache_write: i64 = row.get(8)?;
-        let thoughts: i64 = row.get(9)?;
-        Ok((session_id, project, tokens, model, updated_at, input, output, cache_read, cache_write, thoughts))
+        let pricing_provider: String = row.get(5)?;
+        let input: i64 = row.get(6)?;
+        let output: i64 = row.get(7)?;
+        let cache_read: i64 = row.get(8)?;
+        let cache_write: i64 = row.get(9)?;
+        let thoughts: i64 = row.get(10)?;
+        let recorded_cost: f64 = row.get(11)?;
+        let has_recorded_cost: i64 = row.get(12)?;
+        Ok((session_id, project, tokens, model, updated_at, pricing_provider, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost))
     }) {
         Ok(rows) => rows,
         Err(_) => return Vec::new(),
     };
     rows.filter_map(|r| r.ok())
-    .map(|(session_id, project, tokens, model, updated_at, input, output, cache_read, cache_write, thoughts)| {
-        let cost = model.as_deref()
-            .and_then(|m| find_pricing(m, pricing))
-            .map(|p| calculate_cost(p, input, output, cache_read, cache_write, thoughts));
+    .map(|(session_id, project, tokens, model, updated_at, pricing_provider, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost)| {
+        let cost = model.as_deref().and_then(|name| resolved_cost(
+            &pricing_provider,
+            name,
+            input,
+            output,
+            cache_read,
+            cache_write,
+            thoughts,
+            recorded_cost,
+            has_recorded_cost != 0,
+            pricing,
+        ));
         UsageTask {
             id: session_id.clone(),
             label: session_id,
@@ -363,11 +443,11 @@ fn query_top_tasks_since(conn: &Connection, provider: &str, since: i64, pricing:
     .collect()
 }
 
-fn query_top_projects(conn: &Connection, provider: &str, pricing: &HashMap<String, ModelPricing>) -> Vec<UsageProject> {
+fn query_top_projects(conn: &Connection, provider: &str, pricing: &PricingMap) -> Vec<UsageProject> {
     query_top_projects_since(conn, provider, 0, pricing)
 }
 
-fn query_top_projects_since(conn: &Connection, provider: &str, since: i64, pricing: &HashMap<String, ModelPricing>) -> Vec<UsageProject> {
+fn query_top_projects_since(conn: &Connection, provider: &str, since: i64, pricing: &PricingMap) -> Vec<UsageProject> {
     let mut stmt = match conn
         .prepare(
             "SELECT COALESCE(project, 'unknown'), SUM(tokens_total), COUNT(DISTINCT session_id),
@@ -408,11 +488,13 @@ fn query_top_projects_since(conn: &Connection, provider: &str, since: i64, prici
 }
 
 /// Calculate cost for a specific project by summing per-model costs.
-fn windowed_cost_for_project(conn: &Connection, provider: &str, since: i64, project: &str, pricing: &HashMap<String, ModelPricing>) -> Option<f64> {
+fn windowed_cost_for_project(conn: &Connection, provider: &str, since: i64, project: &str, pricing: &PricingMap) -> Option<f64> {
     let mut stmt = conn.prepare(
-        "SELECT COALESCE(model, 'unknown'), SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts)
+        "SELECT COALESCE(pricing_provider, provider), COALESCE(model, 'unknown'),
+                SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts),
+                COALESCE(SUM(recorded_cost), 0), MAX(CASE WHEN recorded_cost IS NOT NULL THEN 1 ELSE 0 END)
          FROM usage_messages WHERE provider = ?1 AND timestamp >= ?2 AND COALESCE(project, 'unknown') = ?3
-         GROUP BY model"
+         GROUP BY COALESCE(pricing_provider, provider), model"
     ).ok()?;
 
     let mut total_cost = 0.0;
@@ -421,18 +503,32 @@ fn windowed_cost_for_project(conn: &Connection, provider: &str, since: i64, proj
     let rows = stmt.query_map(params![provider, since, project], |row| {
         Ok((
             row.get::<_, String>(0)?,
-            row.get::<_, i64>(1)?,
+            row.get::<_, String>(1)?,
             row.get::<_, i64>(2)?,
             row.get::<_, i64>(3)?,
             row.get::<_, i64>(4)?,
             row.get::<_, i64>(5)?,
+            row.get::<_, i64>(6)?,
+            row.get::<_, f64>(7)?,
+            row.get::<_, i64>(8)?,
         ))
     }).ok()?;
 
     for row in rows.flatten() {
-        let (model, input, output, cache_read, cache_write, thoughts) = row;
-        if let Some(p) = find_pricing(&model, pricing) {
-            total_cost += calculate_cost(p, input, output, cache_read, cache_write, thoughts);
+        let (pricing_provider, model, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost) = row;
+        if let Some(cost) = resolved_cost(
+            &pricing_provider,
+            &model,
+            input,
+            output,
+            cache_read,
+            cache_write,
+            thoughts,
+            recorded_cost,
+            has_recorded_cost != 0,
+            pricing,
+        ) {
+            total_cost += cost;
             has_any = true;
         }
     }
@@ -477,7 +573,7 @@ pub fn usage_overview(conn: &Connection, window: &str) -> Option<UsageOverview> 
 fn query_provider_summaries(
     conn: &Connection,
     since: i64,
-    pricing: &HashMap<String, ModelPricing>,
+    pricing: &PricingMap,
     trend: &[UsageTrendBucket],
 ) -> Vec<UsageOverviewProvider> {
     let mut stmt = match conn
@@ -535,7 +631,7 @@ fn query_trend(
     since: i64,
     bucket_count: i64,
     mode: BucketMode,
-    pricing: &HashMap<String, ModelPricing>,
+    pricing: &PricingMap,
 ) -> Vec<UsageTrendBucket> {
     match mode {
         BucketMode::Hourly => query_trend_hourly(conn, since, bucket_count, pricing),
@@ -546,17 +642,19 @@ fn query_trend(
 fn query_top_models_all(
     conn: &Connection,
     since: i64,
-    pricing: &HashMap<String, ModelPricing>,
+    pricing: &PricingMap,
     bucket_count: i64,
     mode: BucketMode,
 ) -> Vec<UsageBreakdownItem> {
     let mut stmt = match conn
         .prepare(
-            "SELECT provider, COALESCE(model, 'unknown'), SUM(tokens_total), SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts)
+            "SELECT provider, COALESCE(pricing_provider, provider), COALESCE(model, 'unknown'), SUM(tokens_total),
+                    SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts),
+                    COALESCE(SUM(recorded_cost), 0), MAX(CASE WHEN recorded_cost IS NOT NULL THEN 1 ELSE 0 END)
              FROM usage_messages
              WHERE timestamp >= ?1
-             GROUP BY provider, model
-             ORDER BY 3 DESC
+             GROUP BY provider, COALESCE(pricing_provider, provider), model
+             ORDER BY 4 DESC
              LIMIT 6",
         ) {
         Ok(s) => s,
@@ -567,21 +665,34 @@ fn query_top_models_all(
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,
-            row.get::<_, i64>(2)?,
+            row.get::<_, String>(2)?,
             row.get::<_, i64>(3)?,
             row.get::<_, i64>(4)?,
             row.get::<_, i64>(5)?,
             row.get::<_, i64>(6)?,
             row.get::<_, i64>(7)?,
+            row.get::<_, i64>(8)?,
+            row.get::<_, f64>(9)?,
+            row.get::<_, i64>(10)?,
         ))
     }) {
         Ok(rows) => rows,
         Err(_) => return Vec::new(),
     };
     rows.filter_map(|r| r.ok())
-    .map(|(provider, label, tokens, input, output, cache_read, cache_write, thoughts)| {
-        let cost = find_pricing(&label, pricing)
-            .map(|p| calculate_cost(p, input, output, cache_read, cache_write, thoughts));
+    .map(|(provider, pricing_provider, label, tokens, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost)| {
+        let cost = resolved_cost(
+            &pricing_provider,
+            &label,
+            input,
+            output,
+            cache_read,
+            cache_write,
+            thoughts,
+            recorded_cost,
+            has_recorded_cost != 0,
+            pricing,
+        );
         let trend = query_named_trend(conn, since, bucket_count, mode, "model", &provider, &label);
         UsageBreakdownItem {
             provider,
@@ -598,7 +709,7 @@ fn query_top_models_all(
 fn query_top_projects_all(
     conn: &Connection,
     since: i64,
-    pricing: &HashMap<String, ModelPricing>,
+    pricing: &PricingMap,
     bucket_count: i64,
     mode: BucketMode,
 ) -> Vec<UsageBreakdownItem> {
@@ -657,12 +768,14 @@ fn query_named_trend(
     }
 }
 
-fn windowed_cost_for_provider(conn: &Connection, provider: &str, since: i64, pricing: &HashMap<String, ModelPricing>) -> Option<f64> {
+fn windowed_cost_for_provider(conn: &Connection, provider: &str, since: i64, pricing: &PricingMap) -> Option<f64> {
     let mut stmt = conn.prepare(
-        "SELECT COALESCE(model, 'unknown'), SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts)
+        "SELECT COALESCE(pricing_provider, provider), COALESCE(model, 'unknown'),
+                SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts),
+                COALESCE(SUM(recorded_cost), 0), MAX(CASE WHEN recorded_cost IS NOT NULL THEN 1 ELSE 0 END)
          FROM usage_messages
          WHERE provider = ?1 AND timestamp >= ?2
-         GROUP BY model"
+         GROUP BY COALESCE(pricing_provider, provider), model"
     ).ok()?;
 
     let mut total_cost = 0.0;
@@ -671,18 +784,32 @@ fn windowed_cost_for_provider(conn: &Connection, provider: &str, since: i64, pri
     let rows = stmt.query_map(params![provider, since], |row| {
         Ok((
             row.get::<_, String>(0)?,
-            row.get::<_, i64>(1)?,
+            row.get::<_, String>(1)?,
             row.get::<_, i64>(2)?,
             row.get::<_, i64>(3)?,
             row.get::<_, i64>(4)?,
             row.get::<_, i64>(5)?,
+            row.get::<_, i64>(6)?,
+            row.get::<_, f64>(7)?,
+            row.get::<_, i64>(8)?,
         ))
     }).ok()?;
 
     for row in rows.flatten() {
-        let (model, input, output, cache_read, cache_write, thoughts) = row;
-        if let Some(p) = find_pricing(&model, pricing) {
-            total_cost += calculate_cost(p, input, output, cache_read, cache_write, thoughts);
+        let (pricing_provider, model, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost) = row;
+        if let Some(cost) = resolved_cost(
+            &pricing_provider,
+            &model,
+            input,
+            output,
+            cache_read,
+            cache_write,
+            thoughts,
+            recorded_cost,
+            has_recorded_cost != 0,
+            pricing,
+        ) {
+            total_cost += cost;
             has_any = true;
         }
     }
@@ -768,7 +895,7 @@ fn query_trend_hourly(
     conn: &Connection,
     since: i64,
     bucket_count: i64,
-    pricing: &HashMap<String, ModelPricing>,
+    pricing: &PricingMap,
 ) -> Vec<UsageTrendBucket> {
     let hour_start = align_to_local_hour(conn, since);
     let mut bucket_map: BTreeMap<i64, BTreeMap<String, (u64, f64, bool)>> = BTreeMap::new();
@@ -776,16 +903,19 @@ fn query_trend_hourly(
         .prepare(
             "SELECT provider,
                     CAST((strftime('%s', strftime('%Y-%m-%d %H:00:00', timestamp, 'unixepoch', 'localtime')) - ?1) / 3600 AS INTEGER) as bucket_idx,
+                    COALESCE(pricing_provider, provider),
                     COALESCE(model, 'unknown'),
                     SUM(tokens_total),
                     SUM(tokens_input),
                     SUM(tokens_output),
                     SUM(tokens_cache_read),
                     SUM(tokens_cache_write),
-                    SUM(tokens_thoughts)
+                    SUM(tokens_thoughts),
+                    COALESCE(SUM(recorded_cost), 0),
+                    MAX(CASE WHEN recorded_cost IS NOT NULL THEN 1 ELSE 0 END)
              FROM usage_messages
              WHERE timestamp >= ?2
-             GROUP BY provider, bucket_idx, model",
+             GROUP BY provider, bucket_idx, COALESCE(pricing_provider, provider), model",
         ) {
         Ok(s) => s,
         Err(_) => return build_trend_buckets(bucket_count, hour_start, 3600, bucket_map),
@@ -796,12 +926,15 @@ fn query_trend_hourly(
             row.get::<_, String>(0)?,
             row.get::<_, i64>(1)?,
             row.get::<_, String>(2)?,
-            row.get::<_, i64>(3)?,
+            row.get::<_, String>(3)?,
             row.get::<_, i64>(4)?,
             row.get::<_, i64>(5)?,
             row.get::<_, i64>(6)?,
             row.get::<_, i64>(7)?,
             row.get::<_, i64>(8)?,
+            row.get::<_, i64>(9)?,
+            row.get::<_, f64>(10)?,
+            row.get::<_, i64>(11)?,
         ))
     }) {
         Ok(rows) => rows,
@@ -809,15 +942,26 @@ fn query_trend_hourly(
     };
 
     for row in rows.flatten() {
-        let (provider, bucket_idx, model, tokens, input, output, cache_read, cache_write, thoughts) = row;
+        let (provider, bucket_idx, pricing_provider, model, tokens, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost) = row;
         if bucket_idx < 0 || bucket_idx >= bucket_count {
             continue;
         }
         let provider_map = bucket_map.entry(bucket_idx).or_default();
         let entry = provider_map.entry(provider).or_insert((0, 0.0, false));
         entry.0 += tokens as u64;
-        if let Some(p) = find_pricing(&model, pricing) {
-            entry.1 += calculate_cost(p, input, output, cache_read, cache_write, thoughts);
+        if let Some(cost) = resolved_cost(
+            &pricing_provider,
+            &model,
+            input,
+            output,
+            cache_read,
+            cache_write,
+            thoughts,
+            recorded_cost,
+            has_recorded_cost != 0,
+            pricing,
+        ) {
+            entry.1 += cost;
             entry.2 = true;
         }
     }
@@ -829,7 +973,7 @@ fn query_trend_daily(
     conn: &Connection,
     since: i64,
     bucket_count: i64,
-    pricing: &HashMap<String, ModelPricing>,
+    pricing: &PricingMap,
 ) -> Vec<UsageTrendBucket> {
     let day_start = cutoff_local_date(conn, since);
     let cutoff_date = day_start.clone();
@@ -838,25 +982,28 @@ fn query_trend_daily(
         .prepare(
             "SELECT provider,
                     CAST(julianday(bucket_day) - julianday(?1) AS INTEGER) as bucket_idx,
+                    pricing_provider,
                     COALESCE(model, 'unknown'),
                     SUM(tokens_total),
                     SUM(tokens_input),
                     SUM(tokens_output),
                     SUM(tokens_cache_read),
                     SUM(tokens_cache_write),
-                    SUM(tokens_thoughts)
+                    SUM(tokens_thoughts),
+                    COALESCE(SUM(recorded_cost), 0),
+                    MAX(CASE WHEN recorded_cost IS NOT NULL THEN 1 ELSE 0 END)
              FROM (
-                SELECT provider, date(timestamp, 'unixepoch', 'localtime') as bucket_day, model,
-                       tokens_total, tokens_input, tokens_output, tokens_cache_read, tokens_cache_write, tokens_thoughts
+                SELECT provider, date(timestamp, 'unixepoch', 'localtime') as bucket_day, COALESCE(pricing_provider, provider) as pricing_provider, model,
+                       tokens_total, tokens_input, tokens_output, tokens_cache_read, tokens_cache_write, tokens_thoughts, recorded_cost
                 FROM usage_messages
                 WHERE timestamp >= ?2
                 UNION ALL
-                SELECT provider, date as bucket_day, model,
-                       tokens_total, tokens_input, tokens_output, tokens_cache_read, tokens_cache_write, tokens_thoughts
+                SELECT provider, date as bucket_day, COALESCE(pricing_provider, provider) as pricing_provider, model,
+                       tokens_total, tokens_input, tokens_output, tokens_cache_read, tokens_cache_write, tokens_thoughts, recorded_cost
                 FROM usage_daily
                 WHERE date >= ?1
              )
-             GROUP BY provider, bucket_idx, model",
+             GROUP BY provider, bucket_idx, pricing_provider, model",
         ) {
         Ok(s) => s,
         Err(_) => {
@@ -870,12 +1017,15 @@ fn query_trend_daily(
             row.get::<_, String>(0)?,
             row.get::<_, i64>(1)?,
             row.get::<_, String>(2)?,
-            row.get::<_, i64>(3)?,
+            row.get::<_, String>(3)?,
             row.get::<_, i64>(4)?,
             row.get::<_, i64>(5)?,
             row.get::<_, i64>(6)?,
             row.get::<_, i64>(7)?,
             row.get::<_, i64>(8)?,
+            row.get::<_, i64>(9)?,
+            row.get::<_, f64>(10)?,
+            row.get::<_, i64>(11)?,
         ))
     }) {
         Ok(rows) => rows,
@@ -886,15 +1036,26 @@ fn query_trend_daily(
     };
 
     for row in rows.flatten() {
-        let (provider, bucket_idx, model, tokens, input, output, cache_read, cache_write, thoughts) = row;
+        let (provider, bucket_idx, pricing_provider, model, tokens, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost) = row;
         if bucket_idx < 0 || bucket_idx >= bucket_count {
             continue;
         }
         let provider_map = bucket_map.entry(bucket_idx).or_default();
         let entry = provider_map.entry(provider).or_insert((0, 0.0, false));
         entry.0 += tokens as u64;
-        if let Some(p) = find_pricing(&model, pricing) {
-            entry.1 += calculate_cost(p, input, output, cache_read, cache_write, thoughts);
+        if let Some(cost) = resolved_cost(
+            &pricing_provider,
+            &model,
+            input,
+            output,
+            cache_read,
+            cache_write,
+            thoughts,
+            recorded_cost,
+            has_recorded_cost != 0,
+            pricing,
+        ) {
+            entry.1 += cost;
             entry.2 = true;
         }
     }

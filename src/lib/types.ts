@@ -46,6 +46,14 @@ export interface TerminalSettings {
   fontSize: number;
 }
 
+export interface ImportedFont {
+  id: string;
+  label: string;
+  family: string;
+  fileName: string;
+  format: string;
+}
+
 // ── Runtime state types ─────────────────────────────────────────────
 
 export type CommandStatus = "stopped" | "running" | "crashed";
@@ -62,15 +70,42 @@ export interface CommandState {
 
 export type SessionMode = "standard" | "yolo";
 
-export interface TerminalTab {
+// ── Unified tab model ──────────────────────────────────────────────
+
+export type PanelTabKind = "git" | "commands" | "launcher";
+export type TabKind = "terminal" | "assistant" | PanelTabKind;
+
+interface TabBase {
   id: string;
+  kind: TabKind;
   label: string;
+}
+
+export interface TerminalTabData extends TabBase {
+  kind: "terminal" | "assistant";
   ptyId: number;
   repoPath: string;
-  commandName: string | null; // null = blank shell or assistant
-  assistantId: string | null; // null = not an assistant tab
-  sessionMode: SessionMode | null; // null = not an assistant tab
+  commandName: string | null;
+  assistantId: string | null;
+  sessionMode: SessionMode | null;
 }
+
+export interface PanelTabData extends TabBase {
+  kind: PanelTabKind;
+}
+
+export type UnifiedTab = TerminalTabData | PanelTabData;
+
+export function panelTabId(kind: PanelTabKind): string {
+  return `panel-${kind}`;
+}
+
+export const panelTabDefaults: Record<PanelTabKind, { label: string }> = {
+  git: { label: "Git" },
+  commands: { label: "Commands" },
+  launcher: { label: "New Agent" },
+};
+
 
 // ── Tab activity tracking ────────────────────────────────────────────
 
@@ -90,12 +125,7 @@ export interface CodingAssistant {
   yoloFlag: string | null;
 }
 
-export interface AssistantConfig {
-  id: string;
-  name: string;
-  command: string;
-  yoloFlag: string | null;
-}
+export type AssistantConfig = CodingAssistant;
 
 // ── Git status ──────────────────────────────────────────────────────
 
@@ -160,12 +190,21 @@ export interface PtyColorTheme {
 
 // ── Usage ──────────────────────────────────────────────────────────
 
-export type UsageProvider = "codex" | "claude" | "gemini";
+export type UsageProvider = "codex" | "claude" | "gemini" | "opencode";
+
+export type BudgetMode = "subscription" | "custom";
+
+export interface ProviderBudgetConfig {
+  show: boolean;
+  budgetMode: BudgetMode;
+  monthlyBudget: number | null;
+}
 
 export interface UsageSettings {
-  showClaude: boolean;
-  showCodex: boolean;
-  showGemini: boolean;
+  claude: ProviderBudgetConfig;
+  codex: ProviderBudgetConfig;
+  gemini: ProviderBudgetConfig;
+  opencode: ProviderBudgetConfig;
 }
 export type UsageSourceType = "provider" | "local";
 export type UsageConfidence = "official" | "observed" | "estimated";
@@ -262,6 +301,7 @@ export interface LocalUsageDetails {
   tokens7d: number;
   tokens30d: number;
   costTotal: number | null;
+  costMonth: number | null;
   cost5h: number | null;
   cost7d: number | null;
   cost30d: number | null;

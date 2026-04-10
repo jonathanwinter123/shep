@@ -1,10 +1,14 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::config::{
-    CommandConfig, EditorSettings, GlobalConfig, KeybindingSettings, RegisteredRepo, RepoEntry,
-    RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
+    CommandConfig, EditorSettings, GlobalConfig, ImportedFont, KeybindingSettings,
+    RegisteredRepo, RepoEntry, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
 };
+
+static CONFIG_CACHE: Mutex<Option<(GlobalConfig, SystemTime)>> = Mutex::new(None);
 
 // ── Paths ───────────────────────────────────────────────────────────
 
@@ -16,6 +20,10 @@ fn shep_home() -> Result<PathBuf, String> {
 
 fn global_config_path() -> Result<PathBuf, String> {
     Ok(shep_home()?.join("config.yml"))
+}
+
+fn imported_fonts_dir() -> Result<PathBuf, String> {
+    Ok(shep_home()?.join("fonts"))
 }
 
 fn old_projects_dir() -> Result<PathBuf, String> {
@@ -37,9 +45,29 @@ pub fn load_global_config() -> Result<GlobalConfig, String> {
     if !path.exists() {
         return Ok(GlobalConfig::default());
     }
+
+    let mtime = fs::metadata(&path)
+        .and_then(|m| m.modified())
+        .unwrap_or(UNIX_EPOCH);
+
+    if let Ok(guard) = CONFIG_CACHE.lock() {
+        if let Some((ref cached, ref cached_mtime)) = *guard {
+            if *cached_mtime == mtime {
+                return Ok(cached.clone());
+            }
+        }
+    }
+
     let content =
         fs::read_to_string(&path).map_err(|e| format!("Failed to read global config: {e}"))?;
-    serde_yaml::from_str(&content).map_err(|e| format!("Failed to parse global config: {e}"))
+    let config: GlobalConfig =
+        serde_yaml::from_str(&content).map_err(|e| format!("Failed to parse global config: {e}"))?;
+
+    if let Ok(mut guard) = CONFIG_CACHE.lock() {
+        *guard = Some((config.clone(), mtime));
+    }
+
+    Ok(config)
 }
 
 pub fn save_global_config(config: &GlobalConfig) -> Result<(), String> {
@@ -49,7 +77,16 @@ pub fn save_global_config(config: &GlobalConfig) -> Result<(), String> {
     let path = global_config_path()?;
     let yaml =
         serde_yaml::to_string(config).map_err(|e| format!("Failed to serialize config: {e}"))?;
-    fs::write(&path, yaml).map_err(|e| format!("Failed to write global config: {e}"))
+    fs::write(&path, &yaml).map_err(|e| format!("Failed to write global config: {e}"))?;
+
+    // Update cache with the config we just wrote
+    if let Ok(mtime) = fs::metadata(&path).and_then(|m| m.modified()) {
+        if let Ok(mut guard) = CONFIG_CACHE.lock() {
+            *guard = Some((config.clone(), mtime));
+        }
+    }
+
+    Ok(())
 }
 
 pub fn load_editor_settings() -> Result<EditorSettings, String> {
@@ -80,6 +117,84 @@ pub fn save_terminal_settings(settings: &TerminalSettings) -> Result<(), String>
     let mut config = load_global_config()?;
     config.terminal = settings.clone();
     save_global_config(&config)
+}
+
+pub fn list_imported_fonts() -> Result<Vec<ImportedFont>, String> {
+    Ok(load_global_config()?.fonts)
+}
+
+pub fn import_font(source_path: &str) -> Result<ImportedFont, String> {
+    let source = Path::new(source_path);
+    if !source.is_file() {
+        return Err(format!("Font file does not exist: {source_path}"));
+    }
+
+    let extension = source
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+        .ok_or_else(|| "Font file must have a .ttf, .otf, .woff, or .woff2 extension".to_string())?;
+
+    if !matches!(extension.as_str(), "ttf" | "otf" | "woff" | "woff2") {
+        return Err("Only .ttf, .otf, .woff, and .woff2 font files are supported".to_string());
+    }
+
+    let label = source
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .map(|stem| stem.trim().to_string())
+        .filter(|stem| !stem.is_empty())
+        .ok_or_else(|| "Could not determine a font name from the selected file".to_string())?;
+
+    let id = format!(
+        "font-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| format!("System clock error: {e}"))?
+            .as_millis()
+    );
+    let file_name = format!("{id}.{extension}");
+    let family = format!("Shep User Font {id}");
+    let format = match extension.as_str() {
+        "ttf" => "truetype",
+        "otf" => "opentype",
+        "woff" => "woff",
+        "woff2" => "woff2",
+        _ => unreachable!(),
+    }
+    .to_string();
+
+    let fonts_dir = imported_fonts_dir()?;
+    fs::create_dir_all(&fonts_dir).map_err(|e| format!("Failed to create fonts directory: {e}"))?;
+
+    let destination = fonts_dir.join(&file_name);
+    fs::copy(source, &destination).map_err(|e| format!("Failed to copy font file: {e}"))?;
+
+    let imported_font = ImportedFont {
+        id,
+        label,
+        family,
+        file_name,
+        format,
+    };
+
+    let mut config = load_global_config()?;
+    config.fonts.push(imported_font.clone());
+    save_global_config(&config)?;
+
+    Ok(imported_font)
+}
+
+pub fn read_imported_font(font_id: &str) -> Result<Vec<u8>, String> {
+    let config = load_global_config()?;
+    let font = config
+        .fonts
+        .iter()
+        .find(|font| font.id == font_id)
+        .ok_or_else(|| format!("Unknown imported font: {font_id}"))?;
+
+    let path = imported_fonts_dir()?.join(&font.file_name);
+    fs::read(&path).map_err(|e| format!("Failed to read imported font: {e}"))
 }
 
 pub fn load_usage_settings() -> Result<UsageSettings, String> {

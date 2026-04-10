@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { TerminalTab, TabActivity } from "../../lib/types";
+import type { TerminalTabData, TabActivity } from "../../lib/types";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { handleActionKey } from "../../lib/a11y";
@@ -8,7 +8,7 @@ import ContextMenu from "../shared/ContextMenu";
 import type { ContextMenuItem } from "../shared/ContextMenu";
 
 interface AssistantButtonProps {
-  tab: TerminalTab;
+  tab: TerminalTabData;
   isActive: boolean;
   onClick: () => void;
   onClose: () => void;

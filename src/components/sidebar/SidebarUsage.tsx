@@ -2,40 +2,22 @@ import { useMemo } from "react";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUIStore } from "../../stores/useUIStore";
-import type { UsageProvider } from "../../lib/types";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
-import { formatPercent, formatTokenCount, formatCost, computePace } from "../usage/usageHelpers";
-
-const ALL_PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini"];
+import {
+  ALL_USAGE_PROVIDERS,
+  TONE_COLORS,
+  TONE_TRACK,
+  barTone,
+  formatPercent,
+  formatTokenCount,
+  formatCost,
+  computePace,
+  syntheticBudgetWindow,
+} from "../usage/usageHelpers";
 const WINDOWS: { key: TimeWindow; label: string }[] = [
   { key: "5h", label: "5h" },
   { key: "7d", label: "7d" },
 ];
-
-const TONE_COLORS: Record<string, string> = {
-  low: "rgba(52, 211, 153, 0.75)",
-  medium: "rgba(245, 158, 11, 0.75)",
-  high: "rgba(251, 146, 60, 0.85)",
-  critical: "rgba(248, 113, 113, 0.9)",
-  local: "rgba(96, 165, 250, 0.5)",
-};
-
-const TONE_TRACK: Record<string, string> = {
-  low: "rgba(52, 211, 153, 0.1)",
-  medium: "rgba(245, 158, 11, 0.1)",
-  high: "rgba(251, 146, 60, 0.12)",
-  critical: "rgba(248, 113, 113, 0.14)",
-  local: "rgba(96, 165, 250, 0.08)",
-};
-
-function barTone(pace: ReturnType<typeof computePace>, pct: number | null | undefined): string {
-  if (pct == null) return "local";
-  if (pct >= 90) return "critical";
-  if (pace?.status === "over") return pct >= 50 ? "high" : "medium";
-  if (pct >= 75) return "high";
-  if (pct >= 50) return "medium";
-  return "low";
-}
 
 export default function SidebarUsage() {
   const snapshots = useUsageStore((s) => s.snapshots);
@@ -44,12 +26,7 @@ export default function SidebarUsage() {
   const { setWindow } = useUsageStore.getState();
   const { toggleUsagePanel } = useUIStore.getState();
 
-  const providers = useMemo(() => ALL_PROVIDERS.filter((p) => {
-    if (p === "claude") return usageSettings.showClaude;
-    if (p === "codex") return usageSettings.showCodex;
-    if (p === "gemini") return usageSettings.showGemini;
-    return true;
-  }), [usageSettings]);
+  const providers = useMemo(() => ALL_USAGE_PROVIDERS.filter((p) => usageSettings[p].show), [usageSettings]);
 
   const hasData = Object.keys(snapshots).length > 0;
   if (!hasData || providers.length === 0) return null;
@@ -77,7 +54,27 @@ export default function SidebarUsage() {
           const snapshot = snapshots[provider] ?? null;
           if (!snapshot) return null;
 
-          const w = snapshot.summaryWindows.find((sw) => sw.window === window) ?? null;
+          const local = snapshot.localDetails;
+          const budgetWindow = window === "5h" || window === "7d" ? window : null;
+          const providerConfig = usageSettings[provider];
+          const syntheticWindow = providerConfig.budgetMode === "custom"
+            && budgetWindow
+            ? syntheticBudgetWindow(
+                provider,
+                budgetWindow,
+                local ? budgetWindow === "5h" ? local.cost5h : local.cost7d : null,
+                providerConfig.monthlyBudget,
+              )
+            : null;
+          // For providers with 24h quota windows (Gemini), pick the most-used tier
+          const quota24h = providerConfig.budgetMode === "subscription"
+            ? snapshot.summaryWindows
+                .filter((sw) => sw.window.startsWith("24h_") && sw.usedPercent != null)
+                .sort((a, b) => (b.usedPercent ?? 0) - (a.usedPercent ?? 0))[0] ?? null
+            : null;
+          const providerWindow = snapshot.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null)
+            ?? quota24h;
+          const w = providerWindow ?? syntheticWindow ?? snapshot.summaryWindows.find((sw) => sw.window === window) ?? null;
           const pct = w?.usedPercent;
           const hasPercent = pct != null;
           const clampedPct = hasPercent ? Math.min(pct, 100) : 0;
@@ -85,7 +82,6 @@ export default function SidebarUsage() {
           const pace = computePace(w);
           const tone = barTone(pace, pct);
 
-          const local = snapshot.localDetails;
           const tokens = local
             ? window === "5h" ? local.tokens5h : window === "7d" ? local.tokens7d : local.tokens30d
             : w?.tokenTotal ?? null;
@@ -132,7 +128,7 @@ export default function SidebarUsage() {
               </div>
 
               <span className="sidebar-usage__value">
-                {hasPercent && pct > 0 ? formatPercent(pct) : ""}
+                {hasPercent ? formatPercent(pct) : ""}
               </span>
               <span className="sidebar-usage__cost">
                 {cost != null && cost > 0 ? formatCost(cost) : ""}

@@ -9,8 +9,21 @@ import type {
 } from "../../lib/types";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
-import { formatCost, formatPercent, formatReset, formatTokenCount, getProviderLabel, computePace, paceLabel } from "./usageHelpers";
-import type { UsageProvider, ProviderUsageSnapshot, UsageWindowSnapshot } from "../../lib/types";
+import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
+import {
+  ALL_USAGE_PROVIDERS,
+  TONE_COLORS,
+  TONE_TRACK,
+  barTone,
+  formatCost,
+  formatPercent,
+  formatReset,
+  formatTokenCount,
+  getProviderLabel,
+  computePace,
+  paceLabel,
+} from "./usageHelpers";
+import type { UsageSettings, ProviderUsageSnapshot, UsageWindowSnapshot } from "../../lib/types";
 
 const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
   { key: "5h", label: "5 hour" },
@@ -374,36 +387,82 @@ function BreakdownList({
   );
 }
 
-const TONE_COLORS: Record<string, string> = {
-  low: "rgba(52, 211, 153, 0.75)",
-  medium: "rgba(245, 158, 11, 0.75)",
-  high: "rgba(251, 146, 60, 0.85)",
-  critical: "rgba(248, 113, 113, 0.9)",
-  local: "rgba(96, 165, 250, 0.5)",
-};
-
-const TONE_TRACK: Record<string, string> = {
-  low: "rgba(52, 211, 153, 0.1)",
-  medium: "rgba(245, 158, 11, 0.1)",
-  high: "rgba(251, 146, 60, 0.12)",
-  critical: "rgba(248, 113, 113, 0.14)",
-  local: "rgba(96, 165, 250, 0.08)",
-};
-
-function barTone(pace: ReturnType<typeof computePace>, pct: number | null | undefined): string {
-  if (pct == null) return "local";
-  if (pct >= 90) return "critical";
-  if (pace?.status === "over") return pct >= 50 ? "high" : "medium";
-  if (pct >= 75) return "high";
-  if (pct >= 50) return "medium";
-  return "low";
-}
-
 const PACE_LABEL_COLORS: Record<string, string> = {
   under: "rgba(52, 211, 153, 0.8)",
   on: "var(--text-muted)",
   over: "rgba(248, 113, 113, 0.8)",
 };
+
+function CustomBudgets({ snapshots, settings }: { snapshots: Record<string, ProviderUsageSnapshot>; settings: UsageSettings }) {
+  const budgetProviders = ALL_USAGE_PROVIDERS.filter((p) => {
+    const config = settings[p];
+    if (!config.show || config.budgetMode !== "custom" || config.monthlyBudget == null || config.monthlyBudget <= 0) return false;
+    const snap = snapshots[p];
+    return snap?.localDetails?.costMonth != null;
+  });
+
+  if (budgetProviders.length === 0) return null;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const elapsedPct = Math.min(Math.max(((now.getTime() - monthStart.getTime()) / (nextMonth.getTime() - monthStart.getTime())) * 100, 0), 100);
+
+  return (
+    <>
+      <hr className="settings-divider" />
+      <section className="usage-section">
+        <div className="usage-section__header">
+          <h3 className="section-label !p-0">Monthly Budgets</h3>
+          <span className="usage-section__hint">Current month</span>
+        </div>
+        <div className="usage-limits">
+          {budgetProviders.map((provider) => {
+            const config = settings[provider];
+            const budget = config.monthlyBudget!;
+            const snap = snapshots[provider]!;
+            const currentMonthCost = snap.localDetails!.costMonth!;
+            const usedPct = Math.min((currentMonthCost / budget) * 100, 999);
+            const delta = usedPct - elapsedPct;
+            const paceStatus = delta <= -10 ? "under" : delta >= 10 ? "over" : "on";
+            const tone = barTone({ status: paceStatus, elapsedPct }, usedPct);
+            const logoSrc = assistantLogoSrc[provider];
+
+            return (
+              <div key={provider} className="usage-limit">
+                <div className="usage-limit__header">
+                  <span className="usage-limit__provider">
+                    {logoSrc && <img src={logoSrc} alt="" className={`usage-list__icon ${getAssistantLogoClass(provider) ?? ""}`} />}
+                    {getProviderLabel(provider)}
+                  </span>
+                  <span className="usage-limit__pct">{formatPercent(usedPct)} of budget</span>
+                </div>
+                <div className="usage-limit__bar">
+                  <div className="usage-limit__bar-track" style={{ background: TONE_TRACK[tone] }} />
+                  <div
+                    className="usage-limit__bar-fill"
+                    style={{
+                      width: `${Math.min(usedPct, 100)}%`,
+                      background: TONE_COLORS[tone],
+                    }}
+                  />
+                  <div
+                    className="usage-limit__bar-pace"
+                    style={{ left: `${Math.min(elapsedPct, 100)}%` }}
+                  />
+                </div>
+                <div className="usage-limit__meta">
+                  <span>{presentCost(currentMonthCost)} spent of {presentCost(budget)}</span>
+                  <span style={{ color: PACE_LABEL_COLORS[paceStatus] }}>{paceLabel(paceStatus)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </>
+  );
+}
 
 function ProviderLimits({
   snapshots,
@@ -414,10 +473,12 @@ function ProviderLimits({
 }) {
   if (window !== "5h" && window !== "7d") return null;
 
-  const providers = (["claude", "codex", "gemini"] as UsageProvider[]).filter((p) => {
+  const providers = ALL_USAGE_PROVIDERS.filter((p) => {
     const snap = snapshots[p];
     if (!snap) return false;
-    const w = snap.summaryWindows.find((sw) => sw.window === window);
+    // Rate Limits only shows providers with actual provider API data, not synthetic budget windows
+    const w = snap.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null && sw.sourceType === "provider")
+      ?? snap.summaryWindows.find((sw) => sw.window.startsWith("24h_") && sw.usedPercent != null && sw.sourceType === "provider");
     return w?.usedPercent != null;
   });
 
@@ -434,7 +495,8 @@ function ProviderLimits({
       <div className="usage-limits">
         {providers.map((provider) => {
           const snap = snapshots[provider]!;
-          const w = snap.summaryWindows.find((sw) => sw.window === window) as UsageWindowSnapshot;
+          const w = (snap.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null && sw.sourceType === "provider")
+            ?? snap.summaryWindows.find((sw) => sw.window.startsWith("24h_") && sw.usedPercent != null && sw.sourceType === "provider")) as UsageWindowSnapshot;
           const pct = w.usedPercent ?? 0;
           const remaining = w.remainingPercent;
           const pace = computePace(w);
@@ -492,6 +554,7 @@ function ProviderLimits({
 }
 
 function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snapshots: Record<string, ProviderUsageSnapshot> }) {
+  const usageSettings = useUsageSettingsStore((s) => s.settings);
   const chart = overview.window === "30d" || overview.window === "365d"
     ? <ActivityHeatmap trend={overview.trend} window={overview.window as TimeWindow} />
     : <ActivityBarChart trend={overview.trend} window={overview.window as TimeWindow} />;
@@ -548,7 +611,15 @@ function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snaps
         </div>
       </section>
 
-      <ProviderLimits snapshots={snapshots} window={overview.window as TimeWindow} />
+      <CustomBudgets
+        snapshots={snapshots}
+        settings={usageSettings}
+      />
+
+      <ProviderLimits
+        snapshots={snapshots}
+        window={overview.window as TimeWindow}
+      />
 
       <hr className="settings-divider" />
 

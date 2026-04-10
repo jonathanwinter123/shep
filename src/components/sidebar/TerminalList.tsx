@@ -1,8 +1,8 @@
-import type { TerminalTab } from "../../lib/types";
+import type { TerminalTabData } from "../../lib/types";
 import TerminalItem from "./TerminalItem";
 
 interface TerminalListProps {
-  tabs: TerminalTab[];
+  tabs: TerminalTabData[];
   activeTabId: string | null;
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;

@@ -3,18 +3,18 @@ import { useUIStore } from "../../stores/useUIStore";
 import GearIcon from "./icons/GearIcon";
 
 export default function SidebarFooter() {
-  const settingsTabOpen = useUIStore((s) => s.settingsTabOpen);
-  const usageTabOpen = useUIStore((s) => s.usageTabOpen);
-  const portsPanelOpen = useUIStore((s) => s.portsPanelOpen);
+  const settingsActive = useUIStore((s) => s.settingsActive);
+  const usageActive = useUIStore((s) => s.usagePanelActive);
+  const portsActive = useUIStore((s) => s.portsPanelActive);
   const { toggleSettings, toggleUsagePanel, togglePortsPanel } = useUIStore.getState();
-  const footerButtonClass = "tab !flex-1 !shrink !justify-center !gap-0.5 !px-2 !py-1.5 flex-col min-w-0";
+  const base = "sidebar-footer-btn";
 
   return (
     <div className="border-t border-[var(--glass-border)] px-2 pt-2 pb-1.5">
       <div className="flex items-stretch gap-1">
         <button
           onClick={toggleSettings}
-          className={`${footerButtonClass} ${settingsTabOpen ? "active" : ""}`}
+          className={`${base} ${settingsActive ? "active" : ""}`}
           aria-label="Open settings"
         >
           <GearIcon size={20} />
@@ -22,7 +22,7 @@ export default function SidebarFooter() {
         </button>
         <button
           onClick={toggleUsagePanel}
-          className={`${footerButtonClass} ${usageTabOpen ? "active" : ""}`}
+          className={`${base} ${usageActive ? "active" : ""}`}
           aria-label="Open usage"
         >
           <ChartNoAxesCombined size={18} />
@@ -30,7 +30,7 @@ export default function SidebarFooter() {
         </button>
         <button
           onClick={togglePortsPanel}
-          className={`${footerButtonClass} ${portsPanelOpen ? "active" : ""}`}
+          className={`${base} ${portsActive ? "active" : ""}`}
           aria-label="Open ports"
         >
           <Radio size={18} />

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { GitBranch, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
+import tabKindMeta from "../../lib/tabKindMeta";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import {
-  gitChangedFiles, gitFileDiff, gitStageFile, gitUnstageFile,
+  gitChangedFiles, gitFileDiff, gitStageFile, gitUnstageAll, gitUnstageFile,
   gitStageAll, gitCommit, gitPushBranch,
 } from "../../lib/tauri";
 import type { ChangedFile } from "../../lib/types";
@@ -112,15 +113,13 @@ export default function GitPanel() {
 
   const handleUnstageAll = useCallback(async () => {
     if (!activeProjectPath) return;
-    // Unstage each staged file
-    const staged = files.filter((f) => f.area === "staged");
     try {
-      for (const f of staged) await gitUnstageFile(activeProjectPath, f.path);
+      await gitUnstageAll(activeProjectPath);
       await refreshAfterChange();
     } catch (error) {
       pushNotice({ tone: "error", title: "Couldn't unstage all", message: getErrorMessage(error) });
     }
-  }, [activeProjectPath, files, refreshAfterChange, pushNotice]);
+  }, [activeProjectPath, refreshAfterChange, pushNotice]);
 
   const handleCommit = useCallback(async () => {
     if (!activeProjectPath || !commitMsg.trim() || committing) return;
@@ -184,7 +183,7 @@ export default function GitPanel() {
   return (
     <div className="git-panel">
       <div className="git-panel__header">
-        <GitBranch size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
+        <span style={{ opacity: 0.5, flexShrink: 0 }}>{tabKindMeta.git.icon(14)}</span>
         <BranchDropdown
           repoPath={activeProjectPath}
           currentBranch={gitStatus.branch}
@@ -194,7 +193,7 @@ export default function GitPanel() {
         <span
           style={{
             width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-            backgroundColor: activeStatus.dirty ? "rgb(251, 191, 36)" : "rgb(74, 222, 128)",
+            backgroundColor: activeStatus.dirty ? "var(--status-attention)" : "var(--status-clean)",
           }}
         />
         {showPush && (

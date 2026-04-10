@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import { getUsageSettings, saveUsageSettings } from "../lib/tauri";
-import type { UsageSettings, UsageProvider } from "../lib/types";
+import type { UsageSettings, UsageProvider, ProviderBudgetConfig } from "../lib/types";
+
+const DEFAULT_SETTINGS: UsageSettings = {
+  claude: { show: true, budgetMode: "subscription", monthlyBudget: null },
+  codex: { show: true, budgetMode: "subscription", monthlyBudget: null },
+  gemini: { show: false, budgetMode: "subscription", monthlyBudget: null },
+  opencode: { show: true, budgetMode: "custom", monthlyBudget: 100 },
+};
 
 interface UsageSettingsStore {
   settings: UsageSettings;
@@ -8,18 +15,13 @@ interface UsageSettingsStore {
   isSaving: boolean;
   error: string | null;
   loadSettings: () => Promise<void>;
-  setProviderEnabled: (provider: UsageProvider, enabled: boolean) => Promise<void>;
+  updateProvider: (provider: UsageProvider, patch: Partial<ProviderBudgetConfig>) => Promise<void>;
   isProviderEnabled: (provider: UsageProvider) => boolean;
+  getProviderConfig: (provider: UsageProvider) => ProviderBudgetConfig;
 }
 
-const KEY_MAP: Record<UsageProvider, keyof UsageSettings> = {
-  claude: "showClaude",
-  codex: "showCodex",
-  gemini: "showGemini",
-};
-
 export const useUsageSettingsStore = create<UsageSettingsStore>((set, get) => ({
-  settings: { showClaude: true, showCodex: true, showGemini: true },
+  settings: DEFAULT_SETTINGS,
   hasLoaded: false,
   isSaving: false,
   error: null,
@@ -34,10 +36,9 @@ export const useUsageSettingsStore = create<UsageSettingsStore>((set, get) => ({
       });
     }
   },
-  setProviderEnabled: async (provider, enabled) => {
+  updateProvider: async (provider, patch) => {
     const prev = get().settings;
-    const key = KEY_MAP[provider];
-    const next = { ...prev, [key]: enabled };
+    const next = { ...prev, [provider]: { ...prev[provider], ...patch } };
     set({ settings: next, isSaving: true });
     try {
       await saveUsageSettings(next);
@@ -50,8 +51,6 @@ export const useUsageSettingsStore = create<UsageSettingsStore>((set, get) => ({
       });
     }
   },
-  isProviderEnabled: (provider) => {
-    const key = KEY_MAP[provider];
-    return get().settings[key];
-  },
+  isProviderEnabled: (provider) => get().settings[provider].show,
+  getProviderConfig: (provider) => get().settings[provider],
 }));

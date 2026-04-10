@@ -541,6 +541,19 @@ pub fn unstage_file(path: &str, file_path: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn unstage_all(path: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["-C", path, "restore", "--staged", "."])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+
+    Ok(())
+}
+
 pub fn switch_branch(path: &str, branch_name: &str) -> Result<(), String> {
     let output = Command::new("git")
         .args(["-C", path, "switch", branch_name])

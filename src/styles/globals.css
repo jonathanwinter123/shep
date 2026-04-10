@@ -89,6 +89,7 @@ body,
   --status-stopped: #414868;
   --status-crashed: #f7768e;
   --status-attention: #e0af68;
+  --status-clean: #9ece6a;
 }
 
 .logo-unavailable {
@@ -267,6 +268,12 @@ select {
   align-items: center;
   width: 16px;
 }
+.context-menu__shortcut {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
 
 /* Sidebar status dots — unified right-aligned indicator */
 .sidebar-status-dot {
@@ -326,6 +333,37 @@ select {
 .option-card--compact {
   padding: 6px 14px;
   font-size: 13px;
+}
+
+/* Usage provider rows */
+.usage-provider-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.usage-provider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+.usage-provider-row__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.usage-provider-row__budget-input {
+  width: 100px;
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--text-primary), transparent 82%);
+  background: color-mix(in srgb, var(--bg-primary), white 2%);
+  font-size: 13px;
+  color: var(--text-primary);
 }
 
 /* Settings layout helpers */
@@ -449,8 +487,7 @@ select {
 .settings-info-tip__bubble {
   position: absolute;
   bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 12px;
@@ -458,10 +495,13 @@ select {
   color: var(--text-primary);
   background: var(--glass-panel-strong);
   border: 1px solid var(--border-hover);
-  white-space: nowrap;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 48px));
+  white-space: normal;
   pointer-events: none;
   z-index: 50;
   backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 
 /* Primary action button */
@@ -619,19 +659,28 @@ select {
   position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  min-height: 32px;
+  width: 192px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   font-size: var(--text-body);
-  border: 1px solid transparent;
+  border: none;
+  background: var(--surface-hover);
   color: var(--text-secondary);
   cursor: pointer;
   user-select: none;
+  flex-shrink: 1;
+  flex-grow: 0;
+  transition: background 160ms ease, color 160ms ease;
+}
+.tab.tab-auto {
+  width: auto;
   flex-shrink: 0;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 .tab:hover {
-  background: var(--surface-hover);
+  background: var(--surface-active);
   color: var(--text-primary);
 }
 .tab:focus-visible {
@@ -639,8 +688,35 @@ select {
   outline-offset: 2px;
 }
 .tab.active {
-  background: var(--surface-active);
-  border-color: var(--border-active);
+  background: color-mix(in srgb, var(--overlay) 10%, transparent);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  border-bottom: none;
+}
+/* Close button: hidden by default, shown on hover inside tab at right */
+.tab .tab-close {
+  position: absolute;
+  right: 6px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-secondary);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, background 120ms ease;
+}
+.tab:hover .tab-close {
+  opacity: 1;
+  pointer-events: auto;
+}
+.tab .tab-close:hover {
+  background: color-mix(in srgb, var(--overlay) 12%, transparent);
   color: var(--text-primary);
 }
 .tab.dragging {
@@ -719,6 +795,39 @@ select {
 .section-toggle:focus-visible {
   outline: 2px solid rgba(122, 162, 247, 0.75);
   outline-offset: 2px;
+}
+
+/* Sidebar footer buttons (Settings, Usage, Ports) — visually distinct from tabs */
+.sidebar-footer-btn {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 8px;
+  min-width: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-body);
+  cursor: pointer;
+  user-select: none;
+  transition: background 160ms ease, color 160ms ease;
+}
+.sidebar-footer-btn:hover {
+  background: color-mix(in srgb, var(--overlay) 4%, transparent);
+  color: var(--text-secondary);
+}
+.sidebar-footer-btn:focus-visible {
+  outline: 2px solid rgba(122, 162, 247, 0.75);
+  outline-offset: 2px;
+}
+.sidebar-footer-btn.active {
+  background: color-mix(in srgb, var(--overlay) 10%, transparent);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
 }
 
 .command-item__status {
@@ -920,6 +1029,16 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.drag-region__title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  pointer-events: none;
+  user-select: none;
 }
 
 /* ── Sidebar usage section ─────────────────────────────── */
@@ -1698,13 +1817,40 @@ select {
 }
 
 .tab-bar {
+  position: relative;
   display: flex;
-  min-height: 40px;
   align-items: center;
-  gap: 12px;
   overflow: hidden;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--glass-border);
+  padding: 6px 0 0;
+  margin-bottom: 8px;
+}
+.tab-bar::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
+}
+.tab-bar__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-body);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 8px;
+}
+.tab-bar__breadcrumb-on {
+  opacity: 0.4;
+}
+.tab-bar__breadcrumb-icon {
+  opacity: 0.8;
+  align-self: flex-end;
+  margin-bottom: 1px;
 }
 
 /* ── Git Panel ─────────────────────────────────────────── */

@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from "react";
-import type { RepoInfo, CommandState } from "../../lib/types";
+import { useEffect, useMemo, useState } from "react";
+import type { RepoInfo, CommandState, TerminalTabData } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Sparkles, SquareTerminal } from "lucide-react";
+import tabKindMeta from "../../lib/tabKindMeta";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
 import ProjectItem from "./ProjectItem";
@@ -46,14 +46,13 @@ export default function ProjectList({
     () => new Set(activeRepoPath ? [activeRepoPath] : []),
   );
 
-  // Auto-expand a newly selected project
-  const prevActiveRef = useRef(activeRepoPath);
-  if (activeRepoPath && activeRepoPath !== prevActiveRef.current) {
-    prevActiveRef.current = activeRepoPath;
-    if (!expandedPaths.has(activeRepoPath)) {
-      setExpandedPaths((prev) => new Set(prev).add(activeRepoPath));
-    }
-  }
+  useEffect(() => {
+    if (!activeRepoPath) return;
+    setExpandedPaths((prev) => {
+      if (prev.has(activeRepoPath)) return prev;
+      return new Set(prev).add(activeRepoPath);
+    });
+  }, [activeRepoPath]);
 
   const handleProjectClick = (repoPath: string) => {
     if (repoPath === activeRepoPath) {
@@ -86,12 +85,12 @@ export default function ProjectList({
 
   const assistantTabs = useMemo(() => {
     if (!projectTabs) return [];
-    return projectTabs.filter((t) => t.assistantId !== null);
+    return projectTabs.filter((t): t is TerminalTabData => t.kind === "assistant");
   }, [projectTabs]);
 
   const shellTabs = useMemo(() => {
     if (!projectTabs) return [];
-    return projectTabs.filter((t) => !t.assistantId);
+    return projectTabs.filter((t): t is TerminalTabData => t.kind === "terminal");
   }, [projectTabs]);
 
   const commandsBadge = commands.length > 0 ? String(commands.length) : null;
@@ -137,8 +136,8 @@ export default function ProjectList({
             {isExpanded && (
               <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
                 <CollapsibleSection
-                  label="AI Assistants"
-                  icon={<Sparkles size={14} />}
+                  label={tabKindMeta.assistant.label + "s"}
+                  icon={tabKindMeta.assistant.icon(14)}
                   badge={assistantTabs.length || null}
                   hasItems={assistantTabs.length > 0}
                   onAdd={onNewAssistant}
@@ -152,8 +151,8 @@ export default function ProjectList({
                 </CollapsibleSection>
 
                 <CollapsibleSection
-                  label="Terminals"
-                  icon={<SquareTerminal size={14} />}
+                  label={tabKindMeta.terminal.label + "s"}
+                  icon={tabKindMeta.terminal.icon(14)}
                   badge={shellTabs.length || null}
                   hasItems={shellTabs.length > 0}
                   onAdd={onNewShell}

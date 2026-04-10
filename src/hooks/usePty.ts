@@ -234,6 +234,7 @@ export function usePty() {
           const id = nextTabId();
           addTab({
             id,
+            kind: "terminal",
             label: commandName,
             ptyId,
             repoPath: activeRepoPath,
@@ -275,7 +276,7 @@ export function usePty() {
       const state = useTerminalStore.getState();
       const commands = useCommandStore.getState().projectCommands[path] ?? [];
       const command = commands.find((c) => c.name === commandName);
-      const tab = state.getAllProjectTabs(path).find((t) => t.commandName === commandName);
+      const tab = state.getAllProjectTabs(path).find((t) => (t.kind === "terminal" || t.kind === "assistant") && t.commandName === commandName);
       if (command?.ptyId) {
         cleanupActivityState(command.ptyId);
         stoppingPtys.add(command.ptyId);
@@ -321,6 +322,7 @@ export function usePty() {
         const id = nextTabId();
         addTab({
           id,
+          kind: "terminal",
           label: "Terminal",
           ptyId,
           repoPath: activeRepoPath,
@@ -375,6 +377,7 @@ export function usePty() {
         const id = nextTabId();
         addTab({
           id,
+          kind: "assistant",
           label: assistant.name,
           ptyId,
           repoPath: activeRepoPath,
@@ -406,7 +409,7 @@ export function usePty() {
       if (!path) return;
       const tabs = state.projectState[path]?.tabs ?? [];
       const tab = tabs.find((t) => t.id === tabId);
-      if (!tab) return;
+      if (!tab || (tab.kind !== "terminal" && tab.kind !== "assistant")) return;
 
       cleanupActivityState(tab.ptyId);
       stoppingPtys.add(tab.ptyId);
@@ -431,6 +434,7 @@ export function usePty() {
     const tabs = state.getAllProjectTabs(repoPath);
 
     for (const tab of tabs) {
+      if (tab.kind !== "terminal" && tab.kind !== "assistant") continue;
       cleanupActivityState(tab.ptyId);
       stoppingPtys.add(tab.ptyId);
       await killPty(tab.ptyId).catch(() => {
