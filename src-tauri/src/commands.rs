@@ -156,6 +156,80 @@ pub fn open_url(url: &str) -> Result<(), String> {
     }
 }
 
+// ── File explorer commands ────────────────────────────────────────
+
+#[derive(serde::Serialize, Clone)]
+pub struct FileEntry {
+    pub path: String,
+    pub name: String,
+    pub is_dir: bool,
+    pub size: u64,
+    pub depth: u32,
+}
+
+#[tauri::command]
+pub async fn list_directory(path: String, depth: u32) -> Result<Vec<FileEntry>, String> {
+    let dir = Path::new(&path);
+    if !dir.is_dir() {
+        return Err(format!("Not a directory: {path}"));
+    }
+
+    let mut entries = Vec::new();
+    collect_entries(dir, 0, depth, &mut entries)
+        .map_err(|e| format!("Failed to read directory: {e}"))?;
+
+    Ok(entries)
+}
+
+fn collect_entries(
+    dir: &Path,
+    current_depth: u32,
+    max_depth: u32,
+    entries: &mut Vec<FileEntry>,
+) -> std::io::Result<()> {
+    let mut dir_entries: Vec<std::fs::DirEntry> = std::fs::read_dir(dir)?
+        .filter_map(|e| e.ok())
+        .collect();
+
+    dir_entries.sort_by(|a, b| {
+        let a_is_dir = a.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+        let b_is_dir = b.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+        b_is_dir
+            .cmp(&a_is_dir)
+            .then_with(|| {
+                a.file_name()
+                    .to_string_lossy()
+                    .to_lowercase()
+                    .cmp(&b.file_name().to_string_lossy().to_lowercase())
+            })
+    });
+
+    for entry in dir_entries {
+        let ft = match entry.file_type() {
+            Ok(ft) => ft,
+            Err(_) => continue,
+        };
+        let is_dir = ft.is_dir();
+        let name = entry.file_name().to_string_lossy().to_string();
+        let entry_path = entry.path().to_string_lossy().to_string();
+        let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+
+        entries.push(FileEntry {
+            path: entry_path,
+            name,
+            is_dir,
+            size,
+            depth: current_depth,
+        });
+
+        if is_dir && current_depth < max_depth {
+            let _ = collect_entries(&entry.path(), current_depth + 1, max_depth, entries);
+        }
+    }
+
+    Ok(())
+}
+
 // ── PTY commands ────────────────────────────────────────────────────
 
 #[tauri::command]
