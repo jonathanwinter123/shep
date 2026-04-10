@@ -335,12 +335,35 @@ select {
   font-size: 13px;
 }
 
-/* Usage provider card */
-.usage-provider-card {
-  padding: 12px 16px;
+/* Usage provider rows */
+.usage-provider-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.usage-provider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+.usage-provider-row__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.usage-provider-row__budget-input {
+  width: 100px;
+  padding: 5px 10px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--glass-border);
-  background: var(--surface-card);
+  border: 1px solid color-mix(in srgb, var(--text-primary), transparent 82%);
+  background: color-mix(in srgb, var(--bg-primary), white 2%);
+  font-size: 13px;
+  color: var(--text-primary);
 }
 
 /* Settings layout helpers */

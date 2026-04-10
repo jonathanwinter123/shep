@@ -451,7 +451,7 @@ export default function SettingsPanel() {
       {/* ── Usage ──────────────────────────────────────────── */}
       <h2 className="section-label !p-0 mb-4">Usage Providers</h2>
 
-      <div className="flex flex-col gap-4">
+      <div className="usage-provider-grid">
         {(["claude", "codex", "gemini", "opencode"] as UsageProvider[]).map((provider) => {
           const config = usageSettings[provider];
           const logo = assistantLogoSrc[provider];
@@ -464,64 +464,58 @@ export default function SettingsPanel() {
                 : "OpenCode";
           const budgetInput = budgetInputs[provider] ?? (config.monthlyBudget != null ? String(config.monthlyBudget) : "");
           return (
-            <div key={provider} className="usage-provider-card">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  {logo && <img src={logo} alt="" width={20} height={20} className={`shrink-0 ${getAssistantLogoClass(provider) ?? ""}`} />}
-                  <span className="text-sm font-medium">{label}</span>
-                </span>
-                <button
-                  onClick={() => void updateProvider(provider, { show: !config.show })}
-                  className={`option-card option-card--compact ${config.show ? "selected" : ""}`}
-                >
-                  {config.show ? "On" : "Off"}
-                </button>
-              </div>
+            <div key={provider} className="usage-provider-row">
+              <span className="usage-provider-row__name">
+                {logo && <img src={logo} alt="" width={18} height={18} className={`shrink-0 ${getAssistantLogoClass(provider) ?? ""}`} />}
+                <span>{label}</span>
+              </span>
+
+              <button
+                onClick={() => void updateProvider(provider, { show: !config.show })}
+                className={`option-card option-card--compact ${config.show ? "selected" : ""}`}
+              >
+                {config.show ? "On" : "Off"}
+              </button>
 
               {config.show && (
-                <div className="mt-3">
-                  <span className="text-xs text-[var(--text-muted)] block mb-2">Budget</span>
-                  <div className="flex flex-wrap gap-2">
-                    {(["subscription", "custom"] as BudgetMode[]).map((mode) => (
-                      <button
-                        key={mode}
-                        onClick={() => void updateProvider(provider, { budgetMode: mode })}
-                        className={`option-card option-card--compact ${config.budgetMode === mode ? "selected" : ""}`}
-                      >
-                        <span className="capitalize">{mode}</span>
-                      </button>
-                    ))}
-                  </div>
+                <>
+                  {(["subscription", "custom"] as BudgetMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => void updateProvider(provider, { budgetMode: mode })}
+                      className={`option-card option-card--compact ${config.budgetMode === mode ? "selected" : ""}`}
+                    >
+                      <span className="capitalize">{mode}</span>
+                    </button>
+                  ))}
 
                   {config.budgetMode === "custom" && (
-                    <div className="mt-3 max-w-xs">
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        inputMode="decimal"
-                        placeholder="Monthly budget ($)"
-                        value={budgetInput}
-                        onChange={(event) =>
-                          setBudgetInputs((prev) => ({ ...prev, [provider]: event.target.value }))
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputMode="decimal"
+                      placeholder="$ / month"
+                      value={budgetInput}
+                      onChange={(event) =>
+                        setBudgetInputs((prev) => ({ ...prev, [provider]: event.target.value }))
+                      }
+                      onBlur={() => {
+                        const trimmed = budgetInput.trim();
+                        const nextBudget = trimmed === "" ? null : Number(trimmed);
+                        if (nextBudget == null || Number.isFinite(nextBudget)) {
+                          void updateProvider(provider, { monthlyBudget: nextBudget });
                         }
-                        onBlur={() => {
-                          const trimmed = budgetInput.trim();
-                          const nextBudget = trimmed === "" ? null : Number(trimmed);
-                          if (nextBudget == null || Number.isFinite(nextBudget)) {
-                            void updateProvider(provider, { monthlyBudget: nextBudget });
-                          }
-                          setBudgetInputs((prev) => {
-                            const next = { ...prev };
-                            delete next[provider];
-                            return next;
-                          });
-                        }}
-                        className="w-full rounded-md border border-[color-mix(in_srgb,var(--text-primary),transparent_82%)] bg-[color-mix(in_srgb,var(--bg-primary),white_2%)] px-3 py-2 text-sm"
-                      />
-                    </div>
+                        setBudgetInputs((prev) => {
+                          const next = { ...prev };
+                          delete next[provider];
+                          return next;
+                        });
+                      }}
+                      className="usage-provider-row__budget-input"
+                    />
                   )}
-                </div>
+                </>
               )}
             </div>
           );
