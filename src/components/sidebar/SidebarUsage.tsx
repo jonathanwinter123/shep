@@ -84,7 +84,14 @@ export default function SidebarUsage() {
                 providerConfig.monthlyBudget,
               )
             : null;
-          const providerWindow = snapshot.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null);
+          // For providers with 24h quota windows (Gemini), pick the most-used tier
+          const quota24h = providerConfig.budgetMode === "subscription"
+            ? snapshot.summaryWindows
+                .filter((sw) => sw.window.startsWith("24h_") && sw.usedPercent != null)
+                .sort((a, b) => (b.usedPercent ?? 0) - (a.usedPercent ?? 0))[0] ?? null
+            : null;
+          const providerWindow = snapshot.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null)
+            ?? quota24h;
           const w = providerWindow ?? syntheticWindow ?? snapshot.summaryWindows.find((sw) => sw.window === window) ?? null;
           const pct = w?.usedPercent;
           const hasPercent = pct != null;
@@ -139,7 +146,7 @@ export default function SidebarUsage() {
               </div>
 
               <span className="sidebar-usage__value">
-                {hasPercent && pct > 0 ? formatPercent(pct) : ""}
+                {hasPercent ? formatPercent(pct) : ""}
               </span>
               <span className="sidebar-usage__cost">
                 {cost != null && cost > 0 ? formatCost(cost) : ""}

@@ -178,8 +178,11 @@ impl Default for UsageSettings {
         UsageSettings {
             claude: ProviderBudgetConfig::default_subscription(),
             codex: ProviderBudgetConfig::default_subscription(),
-            gemini: ProviderBudgetConfig::default_subscription(),
-            opencode: ProviderBudgetConfig::default_custom(),
+            gemini: ProviderBudgetConfig { show: false, ..ProviderBudgetConfig::default_subscription() },
+            opencode: ProviderBudgetConfig {
+                monthly_budget: Some(100.0),
+                ..ProviderBudgetConfig::default_custom()
+            },
         }
     }
 }

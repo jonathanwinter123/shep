@@ -2,12 +2,11 @@ import { create } from "zustand";
 import { getUsageSettings, saveUsageSettings } from "../lib/tauri";
 import type { UsageSettings, UsageProvider, ProviderBudgetConfig } from "../lib/types";
 
-const DEFAULT_PROVIDER: ProviderBudgetConfig = { show: true, budgetMode: "subscription", monthlyBudget: null };
 const DEFAULT_SETTINGS: UsageSettings = {
-  claude: { ...DEFAULT_PROVIDER },
-  codex: { ...DEFAULT_PROVIDER },
-  gemini: { ...DEFAULT_PROVIDER },
-  opencode: { show: true, budgetMode: "custom", monthlyBudget: null },
+  claude: { show: true, budgetMode: "subscription", monthlyBudget: null },
+  codex: { show: true, budgetMode: "subscription", monthlyBudget: null },
+  gemini: { show: false, budgetMode: "subscription", monthlyBudget: null },
+  opencode: { show: true, budgetMode: "custom", monthlyBudget: 100 },
 };
 
 interface UsageSettingsStore {

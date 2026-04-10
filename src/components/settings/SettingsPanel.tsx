@@ -461,7 +461,7 @@ export default function SettingsPanel() {
               ? "Codex"
               : provider === "gemini"
                 ? "Gemini"
-                : "OpenCode";
+                : "opencode";
           const budgetInput = budgetInputs[provider] ?? (config.monthlyBudget != null ? String(config.monthlyBudget) : "");
           return (
             <div key={provider} className="usage-provider-row">

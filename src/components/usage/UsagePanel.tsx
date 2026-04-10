@@ -10,7 +10,7 @@ import type {
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
-import { formatCost, formatPercent, formatReset, formatTokenCount, getProviderLabel, computePace, paceLabel, syntheticBudgetWindow } from "./usageHelpers";
+import { formatCost, formatPercent, formatReset, formatTokenCount, getProviderLabel, computePace, paceLabel } from "./usageHelpers";
 import type { UsageProvider, UsageSettings, ProviderUsageSnapshot, UsageWindowSnapshot } from "../../lib/types";
 
 const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
@@ -480,27 +480,18 @@ function CustomBudgets({ snapshots, settings }: { snapshots: Record<string, Prov
 function ProviderLimits({
   snapshots,
   window,
-  settings,
 }: {
   snapshots: Record<string, ProviderUsageSnapshot>;
   window: TimeWindow;
-  settings: UsageSettings;
 }) {
   if (window !== "5h" && window !== "7d") return null;
 
   const providers = (["claude", "codex", "gemini", "opencode"] as UsageProvider[]).filter((p) => {
     const snap = snapshots[p];
     if (!snap) return false;
-    const config = settings[p];
-    const synthetic = config.budgetMode === "custom"
-      ? syntheticBudgetWindow(
-          p,
-          window,
-          snap.localDetails ? window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d : null,
-          config.monthlyBudget,
-        )
-      : null;
-    const w = snap.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null) ?? synthetic;
+    // Rate Limits only shows providers with actual provider API data, not synthetic budget windows
+    const w = snap.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null && sw.sourceType === "provider")
+      ?? snap.summaryWindows.find((sw) => sw.window.startsWith("24h_") && sw.usedPercent != null && sw.sourceType === "provider");
     return w?.usedPercent != null;
   });
 
@@ -517,16 +508,8 @@ function ProviderLimits({
       <div className="usage-limits">
         {providers.map((provider) => {
           const snap = snapshots[provider]!;
-          const config = settings[provider];
-          const synthetic = config.budgetMode === "custom"
-            ? syntheticBudgetWindow(
-                provider,
-                window,
-                snap.localDetails ? window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d : null,
-                config.monthlyBudget,
-              )
-            : null;
-          const w = (snap.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null) ?? synthetic) as UsageWindowSnapshot;
+          const w = (snap.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null && sw.sourceType === "provider")
+            ?? snap.summaryWindows.find((sw) => sw.window.startsWith("24h_") && sw.usedPercent != null && sw.sourceType === "provider")) as UsageWindowSnapshot;
           const pct = w.usedPercent ?? 0;
           const remaining = w.remainingPercent;
           const pace = computePace(w);
@@ -568,11 +551,6 @@ function ProviderLimits({
                 {pace && (
                   <span style={{ color: PACE_LABEL_COLORS[pace.status] }}>
                     {paceLabel(pace.status)}
-                  </span>
-                )}
-                {config.budgetMode === "custom" && snap.localDetails && (
-                  <span>
-                    {presentCost(window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d)} spent
                   </span>
                 )}
                 {w.resetAt && (
@@ -654,7 +632,6 @@ function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snaps
       <ProviderLimits
         snapshots={snapshots}
         window={overview.window as TimeWindow}
-        settings={usageSettings}
       />
 
       <hr className="settings-divider" />

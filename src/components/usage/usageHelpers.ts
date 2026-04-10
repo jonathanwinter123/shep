@@ -20,7 +20,7 @@ export function getProviderLabel(provider: UsageProvider): string {
     case "gemini":
       return "Gemini";
     case "opencode":
-      return "OpenCode";
+      return "opencode";
   }
 }
 

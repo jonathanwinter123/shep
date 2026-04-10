@@ -85,16 +85,19 @@ impl ProviderState {
 enum ProviderCacheData {
     Claude(Vec<UsageWindowSnapshot>, Vec<UsageWindowSnapshot>),
     Codex(Vec<UsageWindowSnapshot>),
+    Gemini(Vec<UsageWindowSnapshot>),
 }
 
 struct ProviderCache {
     claude: ProviderState,
     codex: ProviderState,
+    gemini: ProviderState,
 }
 
 static PROVIDER_CACHE: Mutex<ProviderCache> = Mutex::new(ProviderCache {
     claude: ProviderState::new(),
     codex: ProviderState::new(),
+    gemini: ProviderState::new(),
 });
 
 /// Which providers are enabled (passed from frontend settings).
@@ -170,15 +173,16 @@ static PROVIDER_REFRESH_RUNNING: AtomicBool = AtomicBool::new(false);
 /// elapsed. Returns immediately — never blocks the calling thread on network I/O.
 fn spawn_provider_refresh(enabled: &EnabledProviders) {
     let now = now_epoch_seconds();
-    let (refresh_claude, refresh_codex) = {
+    let (refresh_claude, refresh_codex, refresh_gemini) = {
         let cache = PROVIDER_CACHE.lock().unwrap();
         (
             enabled.claude && cache.claude.is_stale(now),
             enabled.codex && cache.codex.is_stale(now),
+            cache.gemini.is_stale(now),
         )
     };
 
-    if !refresh_claude && !refresh_codex {
+    if !refresh_claude && !refresh_codex && !refresh_gemini {
         return;
     }
 
@@ -189,14 +193,15 @@ fn spawn_provider_refresh(enabled: &EnabledProviders) {
 
     let do_claude = refresh_claude;
     let do_codex = refresh_codex;
+    let do_gemini = refresh_gemini;
     std::thread::spawn(move || {
-        refresh_provider_cache_sync(do_claude, do_codex);
+        refresh_provider_cache_sync(do_claude, do_codex, do_gemini);
         PROVIDER_REFRESH_RUNNING.store(false, Ordering::SeqCst);
     });
 }
 
 /// Actual (blocking) provider refresh — only called from background thread.
-fn refresh_provider_cache_sync(do_claude: bool, do_codex: bool) {
+fn refresh_provider_cache_sync(do_claude: bool, do_codex: bool, do_gemini: bool) {
     let now = now_epoch_seconds();
 
     if do_claude {
@@ -230,6 +235,24 @@ fn refresh_provider_cache_sync(do_claude: bool, do_codex: bool) {
                 cache.codex.record_error(now, &e);
                 if should_log {
                     eprintln!("Codex provider API error (using cache): {e}");
+                }
+            }
+        }
+    }
+
+    if do_gemini {
+        match providers::gemini_provider_windows() {
+            Ok(data) => {
+                let mut cache = PROVIDER_CACHE.lock().unwrap();
+                cache.gemini.cache = Some(ProviderCacheData::Gemini(data));
+                cache.gemini.record_success(now);
+            }
+            Err(e) => {
+                let mut cache = PROVIDER_CACHE.lock().unwrap();
+                let should_log = cache.gemini.should_log_error() || cache.gemini.last_error != e;
+                cache.gemini.record_error(now, &e);
+                if should_log {
+                    eprintln!("Gemini provider API error (using cache): {e}");
                 }
             }
         }
@@ -327,7 +350,19 @@ fn claude_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
 fn gemini_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
     let fetched_at = helpers::now_iso_string();
     let local = queries::local_details(conn, "gemini");
+    let cache = PROVIDER_CACHE.lock().unwrap();
+    let cached_windows: Option<Vec<UsageWindowSnapshot>> = match &cache.gemini.cache {
+        Some(ProviderCacheData::Gemini(w)) => Some(w.clone()),
+        _ => None,
+    };
+    drop(cache);
+
     let mut summary_windows = Vec::new();
+    let has_provider = cached_windows.is_some();
+
+    if let Some(ref windows) = cached_windows {
+        summary_windows.extend(windows.clone());
+    }
 
     if let Some(ref details) = local {
         for (window, tokens) in [("5h", details.tokens_5h), ("7d", details.tokens_7d), ("30d", details.tokens_30d)] {
@@ -348,7 +383,7 @@ fn gemini_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
 
     ProviderUsageSnapshot {
         provider: "gemini".to_string(),
-        status: if local.is_some() { "ready".to_string() } else { "unavailable".to_string() },
+        status: if has_provider { "ready".to_string() } else if local.is_some() { "partial".to_string() } else { "unavailable".to_string() },
         fetched_at,
         summary_windows,
         extra_windows: Vec::new(),
