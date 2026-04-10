@@ -129,6 +129,10 @@ pub struct UsageSettings {
     pub show_codex: bool,
     #[serde(default = "default_true", rename = "showGemini")]
     pub show_gemini: bool,
+    #[serde(default = "default_true", rename = "showOpencode")]
+    pub show_opencode: bool,
+    #[serde(default, rename = "opencodeMonthlyBudget")]
+    pub opencode_monthly_budget: Option<f64>,
 }
 
 impl Default for UsageSettings {
@@ -137,6 +141,8 @@ impl Default for UsageSettings {
             show_claude: true,
             show_codex: true,
             show_gemini: true,
+            show_opencode: true,
+            opencode_monthly_budget: None,
         }
     }
 }

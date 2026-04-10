@@ -169,6 +169,7 @@ export default function AppShell() {
     void loadTerminalSettings();
     void loadUsageSettings();
     void fetchUsageSnapshots();
+    void refreshUsageData();
     void initNotifications();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));

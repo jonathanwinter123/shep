@@ -82,6 +82,8 @@ export default function SettingsPanel() {
   const usageError = useUsageSettingsStore((s) => s.error);
   const loadUsageSettings = useUsageSettingsStore((s) => s.loadSettings);
   const setProviderEnabled = useUsageSettingsStore((s) => s.setProviderEnabled);
+  const setOpencodeMonthlyBudget = useUsageSettingsStore((s) => s.setOpencodeMonthlyBudget);
+  const [opencodeBudgetInput, setOpencodeBudgetInput] = useState("");
 
   const updateStatus = useUpdateStore((s) => s.status);
   const availableVersion = useUpdateStore((s) => s.availableVersion);
@@ -99,6 +101,12 @@ export default function SettingsPanel() {
     if (!termHasLoaded) void loadTermSettings();
     if (!usageHasLoaded) void loadUsageSettings();
   }, [hasLoaded, loadSettings, kbHasLoaded, loadKbSettings, termHasLoaded, loadTermSettings, usageHasLoaded, loadUsageSettings]);
+
+  useEffect(() => {
+    setOpencodeBudgetInput(
+      usageSettings.opencodeMonthlyBudget != null ? String(usageSettings.opencodeMonthlyBudget) : "",
+    );
+  }, [usageSettings.opencodeMonthlyBudget]);
 
   useEffect(() => {
     let cancelled = false;
@@ -451,11 +459,23 @@ export default function SettingsPanel() {
       <h2 className="section-label !p-0 mb-4">Usage Providers</h2>
 
       <div className="flex flex-wrap gap-3">
-        {(["claude", "codex", "gemini"] as UsageProvider[]).map((provider) => {
-          const key = provider === "claude" ? "showClaude" : provider === "codex" ? "showCodex" : "showGemini";
+        {(["claude", "codex", "gemini", "opencode"] as UsageProvider[]).map((provider) => {
+          const key = provider === "claude"
+            ? "showClaude"
+            : provider === "codex"
+              ? "showCodex"
+              : provider === "gemini"
+                ? "showGemini"
+                : "showOpencode";
           const active = usageSettings[key];
           const logo = assistantLogoSrc[provider];
-          const label = provider === "claude" ? "Claude" : provider === "codex" ? "Codex" : "Gemini";
+          const label = provider === "claude"
+            ? "Claude"
+            : provider === "codex"
+              ? "Codex"
+              : provider === "gemini"
+                ? "Gemini"
+                : "OpenCode";
           return (
             <button
               key={provider}
@@ -467,6 +487,34 @@ export default function SettingsPanel() {
             </button>
           );
         })}
+      </div>
+
+      <div className="mt-4 max-w-xs">
+        <label className="section-label !p-0 mb-2 block">OpenCode Monthly Budget</label>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          inputMode="decimal"
+          placeholder="250"
+          value={opencodeBudgetInput}
+          onChange={(event) => setOpencodeBudgetInput(event.target.value)}
+          onBlur={() => {
+            const trimmed = opencodeBudgetInput.trim();
+            const nextBudget = trimmed === "" ? null : Number(trimmed);
+            if (nextBudget == null || Number.isFinite(nextBudget)) {
+              void setOpencodeMonthlyBudget(nextBudget);
+            } else {
+              setOpencodeBudgetInput(
+                usageSettings.opencodeMonthlyBudget != null ? String(usageSettings.opencodeMonthlyBudget) : "",
+              );
+            }
+          }}
+          className="w-full rounded-md border border-[color-mix(in_srgb,var(--text-primary),transparent_82%)] bg-[color-mix(in_srgb,var(--bg-primary),white_2%)] px-3 py-2 text-sm"
+        />
+        <p className="mt-2 text-xs text-[var(--text-muted)]">
+          Optional. Used only for OpenCode monthly pace tracking.
+        </p>
       </div>
 
       {usageIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving...</div>}

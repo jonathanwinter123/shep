@@ -4,9 +4,9 @@ import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUIStore } from "../../stores/useUIStore";
 import type { UsageProvider } from "../../lib/types";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
-import { formatPercent, formatTokenCount, formatCost, computePace } from "../usage/usageHelpers";
+import { formatPercent, formatTokenCount, formatCost, computePace, syntheticBudgetWindow } from "../usage/usageHelpers";
 
-const ALL_PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini"];
+const ALL_PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini", "opencode"];
 const WINDOWS: { key: TimeWindow; label: string }[] = [
   { key: "5h", label: "5h" },
   { key: "7d", label: "7d" },
@@ -48,6 +48,7 @@ export default function SidebarUsage() {
     if (p === "claude") return usageSettings.showClaude;
     if (p === "codex") return usageSettings.showCodex;
     if (p === "gemini") return usageSettings.showGemini;
+    if (p === "opencode") return usageSettings.showOpencode;
     return true;
   }), [usageSettings]);
 
@@ -77,7 +78,18 @@ export default function SidebarUsage() {
           const snapshot = snapshots[provider] ?? null;
           if (!snapshot) return null;
 
-          const w = snapshot.summaryWindows.find((sw) => sw.window === window) ?? null;
+          const local = snapshot.localDetails;
+          const budgetWindow = window === "5h" || window === "7d" ? window : null;
+          const syntheticWindow = provider === "opencode"
+            && budgetWindow
+            ? syntheticBudgetWindow(
+                provider,
+                budgetWindow,
+                local ? budgetWindow === "5h" ? local.cost5h : local.cost7d : null,
+                usageSettings.opencodeMonthlyBudget,
+              )
+            : null;
+          const w = snapshot.summaryWindows.find((sw) => sw.window === window) ?? syntheticWindow ?? null;
           const pct = w?.usedPercent;
           const hasPercent = pct != null;
           const clampedPct = hasPercent ? Math.min(pct, 100) : 0;
@@ -85,7 +97,6 @@ export default function SidebarUsage() {
           const pace = computePace(w);
           const tone = barTone(pace, pct);
 
-          const local = snapshot.localDetails;
           const tokens = local
             ? window === "5h" ? local.tokens5h : window === "7d" ? local.tokens7d : local.tokens30d
             : w?.tokenTotal ?? null;

@@ -1,4 +1,5 @@
 use rusqlite::Connection;
+use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -31,6 +32,7 @@ impl UsageDb {
             .map_err(|e| format!("Failed to set DB pragmas: {e}"))?;
 
         migrate(&conn)?;
+        seed_pricing(&conn)?;
 
         Ok(Self { conn: Arc::new(Mutex::new(conn)) })
     }
@@ -123,38 +125,94 @@ fn migrate(conn: &Connection) -> Result<(), String> {
         ).map_err(|e| format!("Failed to run migration v2: {e}"))?;
     }
 
+    let needs_v3 =
+        version < 3
+        || !column_exists(conn, "usage_messages", "pricing_provider")
+        || !column_exists(conn, "usage_messages", "recorded_cost")
+        || !column_exists(conn, "usage_daily", "pricing_provider")
+        || !column_exists(conn, "usage_daily", "recorded_cost");
+
+    if needs_v3 {
+        ensure_column(conn, "usage_messages", "pricing_provider", "TEXT")?;
+        ensure_column(conn, "usage_messages", "recorded_cost", "REAL")?;
+        ensure_column(conn, "usage_daily", "pricing_provider", "TEXT")?;
+        ensure_column(conn, "usage_daily", "recorded_cost", "REAL")?;
+
+        conn.execute_batch(
+            "UPDATE usage_messages
+             SET pricing_provider = provider
+             WHERE pricing_provider IS NULL OR pricing_provider = '';
+             UPDATE usage_daily
+             SET pricing_provider = provider
+             WHERE pricing_provider IS NULL OR pricing_provider = '';
+             INSERT INTO schema_version (version)
+             SELECT 3
+             WHERE COALESCE((SELECT MAX(version) FROM schema_version), 0) < 3;"
+        ).map_err(|e| format!("Failed to run migration v3 data backfill: {e}"))?;
+    }
+
+    Ok(())
+}
+
+fn column_exists(conn: &Connection, table: &str, column: &str) -> bool {
+    let pragma = format!("PRAGMA table_info({table})");
+    let mut stmt = match conn.prepare(&pragma) {
+        Ok(stmt) => stmt,
+        Err(_) => return false,
+    };
+
+    let rows = match stmt.query_map([], |row| row.get::<_, String>(1)) {
+        Ok(rows) => rows,
+        Err(_) => return false,
+    };
+
+    let exists = rows.filter_map(|row| row.ok()).any(|name| name == column);
+    exists
+}
+
+fn ensure_column(conn: &Connection, table: &str, column: &str, definition: &str) -> Result<(), String> {
+    if column_exists(conn, table, column) {
+        return Ok(());
+    }
+
+    let sql = format!("ALTER TABLE {table} ADD COLUMN {column} {definition}");
+    conn.execute(&sql, [])
+        .map_err(|e| format!("Failed adding column {table}.{column}: {e}"))?;
     Ok(())
 }
 
 fn seed_pricing(conn: &Connection) -> Result<(), String> {
-    let prices: &[(&str, &str, f64, f64, f64, f64, f64)] = &[
-        // Claude models — per million tokens
-        ("claude-opus-4-5",   "claude",  5.0,  25.0, 0.50, 6.25, 0.0),
-        ("claude-opus-4-6",   "claude",  5.0,  25.0, 0.50, 6.25, 0.0),
-        ("claude-sonnet-4-5", "claude",  3.0,  15.0, 0.30, 3.75, 0.0),
-        ("claude-sonnet-4-6", "claude",  3.0,  15.0, 0.30, 3.75, 0.0),
-        ("claude-haiku-4-5",  "claude",  1.0,   5.0, 0.10, 1.25, 0.0),
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PricingSeedRow {
+        provider: String,
+        model_pattern: String,
+        input_per_m: f64,
+        output_per_m: f64,
+        cache_read_per_m: f64,
+        cache_write_per_m: f64,
+        thoughts_per_m: f64,
+    }
 
-        // OpenAI / Codex models — per million tokens
-        ("gpt-5.4",           "codex",   2.50, 10.0, 1.25, 0.0, 0.0),
-        ("gpt-5.4-mini",      "codex",   0.40,  1.60, 0.20, 0.0, 0.0),
-        ("gpt-5.4-nano",      "codex",   0.15,  0.60, 0.075, 0.0, 0.0),
-        ("gpt-5.4-pro",       "codex",  10.0,  40.0, 5.0,  0.0, 0.0),
-        ("gpt-5",             "codex",   1.25, 10.0, 0.125, 0.0, 0.0),
-        ("gpt-5-mini",        "codex",   0.30,  1.25, 0.15, 0.0, 0.0),
+    let rows: Vec<PricingSeedRow> = serde_json::from_str(include_str!("model_pricing_snapshot.json"))
+        .map_err(|e| format!("Failed to parse bundled pricing snapshot: {e}"))?;
 
-        // Gemini models — per million tokens
-        ("gemini-3-flash",    "gemini",  0.50,  3.0,  0.05, 1.0, 0.0),
-        ("gemini-3.1-pro",    "gemini",  2.0,  12.0,  0.20, 0.0, 0.0),
-        ("gemini-2.5-pro",    "gemini",  1.25, 10.0,  0.315, 0.0, 0.0),
-        ("gemini-2.5-flash",  "gemini",  0.15,  0.60, 0.0375, 0.0, 0.0),
-    ];
+    conn.execute("DELETE FROM model_pricing", [])
+        .map_err(|e| format!("Failed to clear pricing snapshot: {e}"))?;
 
-    for (pattern, provider, input, output, cache_read, cache_write, thoughts) in prices {
+    for row in rows {
         conn.execute(
             "INSERT OR REPLACE INTO model_pricing (model_pattern, provider, input_per_m, output_per_m, cache_read_per_m, cache_write_per_m, thoughts_per_m)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            rusqlite::params![pattern, provider, input, output, cache_read, cache_write, thoughts],
+            rusqlite::params![
+                row.model_pattern,
+                row.provider,
+                row.input_per_m,
+                row.output_per_m,
+                row.cache_read_per_m,
+                row.cache_write_per_m,
+                row.thoughts_per_m
+            ],
         ).map_err(|e| format!("Failed to seed pricing: {e}"))?;
     }
 

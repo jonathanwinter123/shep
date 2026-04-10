@@ -197,12 +197,14 @@ export interface PtyColorTheme {
 
 // ── Usage ──────────────────────────────────────────────────────────
 
-export type UsageProvider = "codex" | "claude" | "gemini";
+export type UsageProvider = "codex" | "claude" | "gemini" | "opencode";
 
 export interface UsageSettings {
   showClaude: boolean;
   showCodex: boolean;
   showGemini: boolean;
+  showOpencode: boolean;
+  opencodeMonthlyBudget: number | null;
 }
 export type UsageSourceType = "provider" | "local";
 export type UsageConfidence = "official" | "observed" | "estimated";
@@ -299,6 +301,7 @@ export interface LocalUsageDetails {
   tokens7d: number;
   tokens30d: number;
   costTotal: number | null;
+  costMonth: number | null;
   cost5h: number | null;
   cost7d: number | null;
   cost30d: number | null;

@@ -9,7 +9,8 @@ import type {
 } from "../../lib/types";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
-import { formatCost, formatPercent, formatReset, formatTokenCount, getProviderLabel, computePace, paceLabel } from "./usageHelpers";
+import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
+import { formatCost, formatPercent, formatReset, formatTokenCount, getProviderLabel, computePace, paceLabel, syntheticBudgetWindow } from "./usageHelpers";
 import type { UsageProvider, ProviderUsageSnapshot, UsageWindowSnapshot } from "../../lib/types";
 
 const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
@@ -405,19 +406,86 @@ const PACE_LABEL_COLORS: Record<string, string> = {
   over: "rgba(248, 113, 113, 0.8)",
 };
 
+function OpenCodeBudget({ snapshot, budget }: { snapshot: ProviderUsageSnapshot | null; budget: number | null }) {
+  if (!snapshot || budget == null || budget <= 0) return null;
+
+  const currentMonthCost = snapshot.localDetails?.costMonth ?? null;
+  if (currentMonthCost == null) return null;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const elapsedPct = Math.min(Math.max(((now.getTime() - monthStart.getTime()) / (nextMonth.getTime() - monthStart.getTime())) * 100, 0), 100);
+  const usedPct = Math.min((currentMonthCost / budget) * 100, 999);
+  const delta = usedPct - elapsedPct;
+  const paceStatus = delta <= -10 ? "under" : delta >= 10 ? "over" : "on";
+  const tone = barTone({ status: paceStatus, elapsedPct }, usedPct);
+
+  return (
+    <>
+      <hr className="settings-divider" />
+      <section className="usage-section">
+        <div className="usage-section__header">
+          <h3 className="section-label !p-0">OpenCode Budget</h3>
+          <span className="usage-section__hint">Current month</span>
+        </div>
+        <div className="usage-limits">
+          <div className="usage-limit">
+            <div className="usage-limit__header">
+              <span className="usage-limit__provider">
+                <img src={assistantLogoSrc.opencode} alt="" className="usage-list__icon" />
+                OpenCode
+              </span>
+              <span className="usage-limit__pct">{formatPercent(usedPct)} of budget</span>
+            </div>
+            <div className="usage-limit__bar">
+              <div className="usage-limit__bar-track" style={{ background: TONE_TRACK[tone] }} />
+              <div
+                className="usage-limit__bar-fill"
+                style={{
+                  width: `${Math.min(usedPct, 100)}%`,
+                  background: TONE_COLORS[tone],
+                }}
+              />
+              <div
+                className="usage-limit__bar-pace"
+                style={{ left: `${Math.min(elapsedPct, 100)}%` }}
+              />
+            </div>
+            <div className="usage-limit__meta">
+              <span>{presentCost(currentMonthCost)} spent of {presentCost(budget)}</span>
+              <span style={{ color: PACE_LABEL_COLORS[paceStatus] }}>{paceLabel(paceStatus)}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
 function ProviderLimits({
   snapshots,
   window,
+  opencodeMonthlyBudget,
 }: {
   snapshots: Record<string, ProviderUsageSnapshot>;
   window: TimeWindow;
+  opencodeMonthlyBudget: number | null;
 }) {
   if (window !== "5h" && window !== "7d") return null;
 
-  const providers = (["claude", "codex", "gemini"] as UsageProvider[]).filter((p) => {
+  const providers = (["claude", "codex", "gemini", "opencode"] as UsageProvider[]).filter((p) => {
     const snap = snapshots[p];
     if (!snap) return false;
-    const w = snap.summaryWindows.find((sw) => sw.window === window);
+    const syntheticWindow = p === "opencode"
+      ? syntheticBudgetWindow(
+          p,
+          window,
+          snap.localDetails ? window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d : null,
+          opencodeMonthlyBudget,
+        )
+      : null;
+    const w = snap.summaryWindows.find((sw) => sw.window === window) ?? syntheticWindow;
     return w?.usedPercent != null;
   });
 
@@ -434,7 +502,15 @@ function ProviderLimits({
       <div className="usage-limits">
         {providers.map((provider) => {
           const snap = snapshots[provider]!;
-          const w = snap.summaryWindows.find((sw) => sw.window === window) as UsageWindowSnapshot;
+          const syntheticWindow = provider === "opencode"
+            ? syntheticBudgetWindow(
+                provider,
+                window,
+                snap.localDetails ? window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d : null,
+                opencodeMonthlyBudget,
+              )
+            : null;
+          const w = (snap.summaryWindows.find((sw) => sw.window === window) ?? syntheticWindow) as UsageWindowSnapshot;
           const pct = w.usedPercent ?? 0;
           const remaining = w.remainingPercent;
           const pace = computePace(w);
@@ -478,6 +554,11 @@ function ProviderLimits({
                     {paceLabel(pace.status)}
                   </span>
                 )}
+                {provider === "opencode" && snap.localDetails && (
+                  <span>
+                    {presentCost(window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d)} spent
+                  </span>
+                )}
                 {w.resetAt && (
                   <span>resets in {formatReset(w.resetAt)}</span>
                 )}
@@ -492,6 +573,7 @@ function ProviderLimits({
 }
 
 function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snapshots: Record<string, ProviderUsageSnapshot> }) {
+  const usageSettings = useUsageSettingsStore((s) => s.settings);
   const chart = overview.window === "30d" || overview.window === "365d"
     ? <ActivityHeatmap trend={overview.trend} window={overview.window as TimeWindow} />
     : <ActivityBarChart trend={overview.trend} window={overview.window as TimeWindow} />;
@@ -548,7 +630,16 @@ function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snaps
         </div>
       </section>
 
-      <ProviderLimits snapshots={snapshots} window={overview.window as TimeWindow} />
+      <OpenCodeBudget
+        snapshot={snapshots.opencode ?? null}
+        budget={usageSettings.opencodeMonthlyBudget}
+      />
+
+      <ProviderLimits
+        snapshots={snapshots}
+        window={overview.window as TimeWindow}
+        opencodeMonthlyBudget={usageSettings.opencodeMonthlyBudget}
+      />
 
       <hr className="settings-divider" />
 

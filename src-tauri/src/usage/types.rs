@@ -112,6 +112,7 @@ pub struct LocalUsageDetails {
     pub tokens_7d: u64,
     pub tokens_30d: u64,
     pub cost_total: Option<f64>,
+    pub cost_month: Option<f64>,
     pub cost_5h: Option<f64>,
     pub cost_7d: Option<f64>,
     pub cost_30d: Option<f64>,

@@ -19,6 +19,8 @@ export function getProviderLabel(provider: UsageProvider): string {
       return "Claude";
     case "gemini":
       return "Gemini";
+    case "opencode":
+      return "OpenCode";
   }
 }
 
@@ -113,4 +115,66 @@ export function paceLabel(status: PaceStatus): string {
     case "on": return "on pace";
     case "over": return "over pace";
   }
+}
+
+function currentMonthRange(now: Date) {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return { start, end };
+}
+
+function currentFiveHourBlock(now: Date) {
+  const start = new Date(now);
+  const hour = start.getHours();
+  start.setHours(hour - (hour % 5), 0, 0, 0);
+  const end = new Date(start);
+  end.setHours(start.getHours() + 5);
+  return { start, end };
+}
+
+function currentSevenDayBlock(now: Date) {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - start.getDay());
+  const end = new Date(start);
+  end.setDate(start.getDate() + 7);
+  return { start, end };
+}
+
+export function syntheticBudgetWindow(
+  provider: UsageProvider,
+  window: "5h" | "7d",
+  cost: number | null,
+  monthlyBudget: number | null,
+): UsageWindowSnapshot | null {
+  if (provider !== "opencode" || cost == null || monthlyBudget == null || monthlyBudget <= 0) {
+    return null;
+  }
+
+  const now = new Date();
+  const month = currentMonthRange(now);
+  const budgetRange = window === "5h" ? currentFiveHourBlock(now) : currentSevenDayBlock(now);
+  const monthDays = Math.max(Math.round((month.end.getTime() - month.start.getTime()) / (24 * 60 * 60 * 1000)), 1);
+  const monthDurationMs = monthDays * 8 * 60 * 60 * 1000;
+  const rangeDurationMs = window === "5h"
+    ? 5 * 60 * 60 * 1000
+    : 7 * 8 * 60 * 60 * 1000;
+
+  if (monthDurationMs <= 0 || rangeDurationMs <= 0) return null;
+
+  const windowBudget = monthlyBudget * (rangeDurationMs / monthDurationMs);
+  if (windowBudget <= 0) return null;
+
+  return {
+    provider,
+    window,
+    label: window,
+    sourceType: "local",
+    confidence: "estimated",
+    usedPercent: (cost / windowBudget) * 100,
+    remainingPercent: Math.max(100 - (cost / windowBudget) * 100, 0),
+    resetAt: new Date(budgetRange.end).toISOString(),
+    tokenTotal: null,
+    paceStatus: null,
+  };
 }
