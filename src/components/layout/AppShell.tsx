@@ -12,6 +12,7 @@ import NoticeCenter from "../shared/NoticeCenter";
 import UsagePanel from "../usage/UsagePanel";
 import PortsPanel from "../ports/PortsPanel";
 import SessionHistoryPanel from "../session/SessionHistoryPanel";
+import FilePreviewPanel from "../files/FilePreviewPanel";
 import { PanelLeft, PanelLeftOpen } from "lucide-react";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
@@ -144,7 +145,7 @@ export default function AppShell() {
   );
 
   const {
-    settingsActive, gitPanelActive, commandsPanelActive, launcherActive, usagePanelActive, portsPanelActive, sessionHistoryActive, sidebarVisible,
+    settingsActive, gitPanelActive, commandsPanelActive, launcherActive, usagePanelActive, portsPanelActive, sessionHistoryActive, filePreviewActive, sidebarVisible,
   } = useUIStore(useShallow((s) => ({
     settingsActive: s.settingsActive,
     gitPanelActive: s.gitPanelActive,
@@ -153,6 +154,7 @@ export default function AppShell() {
     usagePanelActive: s.usagePanelActive,
     portsPanelActive: s.portsPanelActive,
     sessionHistoryActive: s.sessionHistoryActive,
+    filePreviewActive: s.filePreviewActive,
     sidebarVisible: s.sidebarVisible,
   })));
   const { loadSettings: loadEditorSettings } = useEditorStore.getState();
@@ -534,7 +536,7 @@ export default function AppShell() {
     return () => { unlisten.then((f) => f()); };
   }, [handleNewShell, handleNewAssistant, handleOpenInEditor, pushNotice]);
 
-  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive || portsPanelActive || sessionHistoryActive;
+  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive || portsPanelActive || sessionHistoryActive || filePreviewActive;
 
   return (
     <div className="app-shell">
@@ -611,6 +613,7 @@ export default function AppShell() {
             {usagePanelActive && <UsagePanel />}
             {portsPanelActive && <PortsPanel />}
             {sessionHistoryActive && <SessionHistoryPanel onResumeSession={handleResumeSession} />}
+            {filePreviewActive && <FilePreviewPanel />}
 
             {!showOverlay && tabs.length === 0 && (
               <div className="terminal-empty">

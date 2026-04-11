@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { useShallow } from "zustand/shallow";
-import { GitBranch, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined, Radio, History } from "lucide-react";
+import { GitBranch, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined, Radio, History, FileText } from "lucide-react";
 import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
@@ -162,6 +162,7 @@ export default function TabBar({
     usageTabOpen, usagePanelActive,
     portsPanelOpen, portsPanelActive,
     sessionHistoryOpen, sessionHistoryActive,
+    filePreviewOpen, filePreviewActive,
   } = useUIStore(useShallow((s) => ({
     settingsTabOpen: s.settingsTabOpen,
     settingsActive: s.settingsActive,
@@ -177,6 +178,8 @@ export default function TabBar({
     portsPanelActive: s.portsPanelActive,
     sessionHistoryOpen: s.sessionHistoryOpen,
     sessionHistoryActive: s.sessionHistoryActive,
+    filePreviewOpen: s.filePreviewOpen,
+    filePreviewActive: s.filePreviewActive,
   })));
 
   // Actions are stable — grab via getState() to avoid subscribing
@@ -188,9 +191,10 @@ export default function TabBar({
     activateUsagePanel, closeUsageTab,
     activatePortsPanel, closePortsPanel,
     activateSessionHistory, closeSessionHistory,
+    activateFilePreview, closeFilePreview,
   } = useUIStore.getState();
 
-  const anyOverlay = settingsActive || launcherActive || gitPanelActive || commandsPanelActive || usagePanelActive || portsPanelActive || sessionHistoryActive;
+  const anyOverlay = settingsActive || launcherActive || gitPanelActive || commandsPanelActive || usagePanelActive || portsPanelActive || sessionHistoryActive || filePreviewActive;
 
   const handleSelectTab = (tabId: string) => {
     useUIStore.getState().deactivateSettings();
@@ -200,6 +204,7 @@ export default function TabBar({
     useUIStore.getState().deactivateUsagePanel();
     useUIStore.getState().deactivatePortsPanel();
     useUIStore.getState().deactivateSessionHistory();
+    useUIStore.getState().deactivateFilePreview();
     setActiveTab(tabId);
     const tab = tabs.find((t) => t.id === tabId);
     if (tab) useTerminalStore.getState().clearTabBell(tab.ptyId);
@@ -435,6 +440,31 @@ export default function TabBar({
               onClick={(e) => {
                 e.stopPropagation();
                 closeSessionHistory();
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {filePreviewOpen && (
+          <div
+            className={`tab ${filePreviewActive ? "active" : ""}`}
+            onClick={activateFilePreview}
+            onKeyDown={(event) => handleActionKey(event, activateFilePreview)}
+            role="tab"
+            tabIndex={0}
+            aria-selected={filePreviewActive}
+            aria-label="Open file preview panel"
+          >
+            <FileText size={12} />
+            <span>Preview</span>
+            <button
+              className="icon-btn ml-0.5"
+              aria-label="Close file preview panel"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeFilePreview();
               }}
             >
               ×
