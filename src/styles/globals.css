@@ -2275,20 +2275,39 @@ select {
 
 .diff-line {
   padding: 0 14px;
+  color: var(--app-fg);
+}
+
+/* Shiki tokens set their own inline `color`. The line-level `color` on
+ * add/del/context acts as the fallback when Shiki hasn't loaded yet or the
+ * file's language isn't supported — inline token colors win when present. */
+.diff-line__prefix {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  margin-right: 4px;
+  opacity: 0.4;
+  user-select: none;
 }
 
 .diff-line--add {
-  background: rgba(74, 222, 128, 0.1);
-  color: rgb(134, 239, 172);
+  background: color-mix(in srgb, var(--diff-add) 14%, transparent);
+}
+.diff-line--add .diff-line__prefix {
+  color: var(--diff-add);
+  opacity: 0.75;
 }
 
 .diff-line--del {
-  background: rgba(248, 113, 113, 0.1);
-  color: rgb(252, 165, 165);
+  background: color-mix(in srgb, var(--diff-del) 14%, transparent);
+}
+.diff-line--del .diff-line__prefix {
+  color: var(--diff-del);
+  opacity: 0.75;
 }
 
 .diff-line--hunk {
-  color: rgb(192, 132, 252);
+  color: var(--diff-hunk);
   opacity: 0.7;
   padding-top: 4px;
   padding-bottom: 2px;

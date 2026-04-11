@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Upload } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
 import tabKindMeta from "../../lib/tabKindMeta";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -51,6 +52,32 @@ export default function GitPanel() {
     ? `${gitStatus.staged}:${gitStatus.unstaged}:${gitStatus.untracked}`
     : "";
   useEffect(() => { fetchFiles(); }, [fetchFiles, statusKey]);
+
+  // Live-refresh the open diff when the watcher reports changes in this repo.
+  // The backend fires `git-fs-changed` with a list of repo roots; if ours is in
+  // the list and a file is selected, re-fetch its diff so the pane tracks edits
+  // in real time. Scroll is preserved because the DiffViewer instance is keyed
+  // by selectedPath below, so same-file updates reconcile in place.
+  useEffect(() => {
+    if (!activeProjectPath || !selectedPath) return;
+    const repo = activeProjectPath;
+    const path = selectedPath;
+    const staged = selectedArea === "staged";
+
+    const unlistenPromise = listen<{ paths: string[] }>("git-fs-changed", async (event) => {
+      if (!event.payload.paths.includes(repo)) return;
+      try {
+        const diff = await gitFileDiff(repo, path, staged);
+        setDiffContent(diff);
+      } catch {
+        // File may have been committed away between event and fetch — ignore.
+      }
+    });
+
+    return () => {
+      unlistenPromise.then((f) => f());
+    };
+  }, [activeProjectPath, selectedPath, selectedArea]);
 
 
   const refreshAfterChange = useCallback(async () => {
@@ -251,7 +278,7 @@ export default function GitPanel() {
           </div>
         </div>
         {selectedPath ? (
-          <DiffViewer diff={diffContent} filePath={selectedPath} />
+          <DiffViewer key={selectedPath} diff={diffContent} filePath={selectedPath} />
         ) : (
           <div className="git-panel__diff">
             <div style={{ padding: 24, opacity: 0.35, fontSize: 12 }}>
