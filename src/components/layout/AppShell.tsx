@@ -34,6 +34,7 @@ import { useUpdateStore } from "../../stores/useUpdateStore";
 import { initNotifications } from "../../lib/notifications";
 import { getErrorMessage } from "../../lib/errors";
 import { useNoticeStore } from "../../stores/useNoticeStore";
+import { registerActions } from "../../lib/registerActions";
 
 import type { CommandConfig, CommandState, TerminalTab, SessionMode, WorkspaceConfig } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
@@ -533,6 +534,16 @@ export default function AppShell() {
     });
     return () => { unlisten.then((f) => f()); };
   }, [handleNewShell, handleNewAssistant, handleOpenInEditor, pushNotice]);
+
+  // Register all shortcuttable actions into the action registry
+  useEffect(() => {
+    registerActions({
+      newShell: handleNewShell,
+      newAssistant: handleNewAssistant,
+      closeTab,
+      openInEditor: handleOpenInEditor,
+    });
+  }, [handleNewShell, handleNewAssistant, closeTab, handleOpenInEditor]);
 
   const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive || portsPanelActive || sessionHistoryActive;
 
