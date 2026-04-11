@@ -8,6 +8,7 @@ import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore"
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUpdateStore } from "../../stores/useUpdateStore";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
+import ShortcutEditor from "./ShortcutEditor";
 import {
   displayTerminalFontFamily,
   FONT_OPTIONS,
@@ -178,6 +179,12 @@ export default function SettingsPanel() {
 
       {isSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving...</div>}
       {error && <div className="mt-2 text-sm text-red-300">{error}</div>}
+
+      <hr className="settings-divider" />
+
+      {/* ── Keyboard Shortcuts ──────────────────────────── */}
+      <h2 className="section-label !p-0 mb-4">Keyboard Shortcuts</h2>
+      <ShortcutEditor />
 
       <hr className="settings-divider" />
 
