@@ -502,42 +502,39 @@ export default function AppShell() {
 
   // Handle native menu events (accelerators for Cmd+T, Cmd+Shift+T, Cmd+B, Cmd+E, Cmd+, etc.)
   useEffect(() => {
+    const menuActionMap: Record<string, string> = {
+      new_terminal: "shep.session.newTerminal",
+      new_agent: "shep.session.newAssistant",
+      toggle_sidebar: "shep.panel.toggleSidebar",
+      open_in_editor: "shep.editor.open",
+      settings: "shep.panel.toggleSettings",
+    };
+
     const unlisten = listen<string>("menu-event", (event) => {
-      switch (event.payload) {
-        case "new_terminal":
-          handleNewShell();
-          break;
-        case "new_agent":
-          handleNewAssistant();
-          break;
-        case "toggle_sidebar":
-          useUIStore.getState().toggleSidebar();
-          break;
-        case "open_in_editor": {
-          const repoPath = useTerminalStore.getState().activeProjectPath;
-          if (repoPath) handleOpenInEditor(repoPath);
-          break;
-        }
-        case "settings":
-          useUIStore.getState().openSettings();
-          break;
-        case "check_updates":
-          void useUpdateStore.getState().checkForUpdate().then(() => {
-            const { status, availableVersion } = useUpdateStore.getState();
-            if (status === "available" && availableVersion) {
-              pushNotice(
-                { tone: "info", title: "Update available", message: `Version ${availableVersion} is ready to download` },
-                { durationMs: 8000 },
-              );
-            } else if (status === "idle") {
-              pushNotice({ tone: "success", title: "You're up to date", message: "No updates available" });
-            }
-          });
-          break;
+      const actionId = menuActionMap[event.payload];
+      if (actionId) {
+        const action = getAction(actionId);
+        if (action) action.execute();
+        return;
+      }
+
+      // Non-shortcut menu items (check_updates)
+      if (event.payload === "check_updates") {
+        void useUpdateStore.getState().checkForUpdate().then(() => {
+          const { status, availableVersion } = useUpdateStore.getState();
+          if (status === "available" && availableVersion) {
+            pushNotice(
+              { tone: "info", title: "Update available", message: `Version ${availableVersion} is ready to download` },
+              { durationMs: 8000 },
+            );
+          } else if (status === "idle") {
+            pushNotice({ tone: "success", title: "You're up to date", message: "No updates available" });
+          }
+        });
       }
     });
     return () => { unlisten.then((f) => f()); };
-  }, [handleNewShell, handleNewAssistant, handleOpenInEditor, pushNotice]);
+  }, [pushNotice]);
 
   // Register all shortcuttable actions into the action registry
   useEffect(() => {
