@@ -46,12 +46,20 @@ export interface TerminalSettings {
   fontSize: number;
 }
 
-export interface ImportedFont {
-  id: string;
-  label: string;
+export interface FontFamily {
   family: string;
-  fileName: string;
-  format: string;
+  faceCount: number;
+  isNerdFont: boolean;
+}
+
+export interface FontFaceData {
+  /// Raw TTF/OTF bytes, sent from Rust over IPC as a number array.
+  data: number[];
+  /// CSS font-weight (100..900).
+  weight: number;
+  italic: boolean;
+  /// CSS font-stretch keyword index (1..9).
+  stretch: number;
 }
 
 // ── Runtime state types ─────────────────────────────────────────────

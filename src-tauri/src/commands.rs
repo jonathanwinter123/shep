@@ -4,6 +4,7 @@ use std::process::Command;
 use tauri::ipc::Channel;
 use tauri::{Emitter, State};
 
+use crate::fonts::{self, FontFaceData, FontFamily};
 use crate::git;
 use crate::git::{ChangedFile, CreatedWorktree, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
@@ -11,8 +12,8 @@ use crate::pty::session::{PtyColorTheme, PtyOutput};
 use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
 use crate::watcher::GitWatcher;
 use crate::workspace::config::{
-    EditorSettings, ImportedFont, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings,
-    UsageSettings, WorkspaceConfig,
+    EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings,
+    WorkspaceConfig,
 };
 use crate::workspace::manager::WorkspaceManager;
 
@@ -102,26 +103,17 @@ pub fn save_terminal_settings(
 }
 
 #[tauri::command]
-pub fn list_imported_fonts(
-    workspace: State<'_, WorkspaceManager>,
-) -> Result<Vec<ImportedFont>, String> {
-    workspace.list_imported_fonts()
+pub fn list_monospace_families() -> Vec<FontFamily> {
+    fonts::list_monospace_families()
 }
 
 #[tauri::command]
-pub fn import_font(
-    source_path: &str,
-    workspace: State<'_, WorkspaceManager>,
-) -> Result<ImportedFont, String> {
-    workspace.import_font(source_path)
-}
-
-#[tauri::command]
-pub fn read_imported_font(
-    font_id: &str,
-    workspace: State<'_, WorkspaceManager>,
-) -> Result<Vec<u8>, String> {
-    workspace.read_imported_font(font_id)
+pub async fn load_font_family(family: String) -> Vec<FontFaceData> {
+    // Font file reads can total 10+ MB for a large family. Run on the blocking
+    // thread pool so the Tauri runtime isn't stalled.
+    tauri::async_runtime::spawn_blocking(move || fonts::load_font_family(&family))
+        .await
+        .unwrap_or_default()
 }
 
 #[tauri::command]

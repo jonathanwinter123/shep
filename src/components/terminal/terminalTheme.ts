@@ -79,6 +79,10 @@ export function applyTerminalSettings(settings: TerminalSettings): void {
     const el = entry.term.element;
     if (!fontMetricsChanged || !el || el.offsetParent === null) continue;
 
+    // Clear the renderer's glyph texture atlas so the new font is measured
+    // and cached from scratch. Without this, xterm keeps rendering glyphs
+    // with the *old* font's metrics, causing clipping and misalignment.
+    entry.rendererAddon?.clearTextureAtlas?.();
     entry.fitAddon.fit();
     entry.term.refresh(0, entry.term.rows - 1);
     resizePty(ptyId, entry.term.cols, entry.term.rows).catch((error) => {

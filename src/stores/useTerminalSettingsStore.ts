@@ -4,7 +4,7 @@ import { getTerminalSettings, saveTerminalSettings } from "../lib/tauri";
 import { applyTerminalSettings } from "../components/terminal/terminalTheme";
 
 import { normalizeTerminalFontFamily, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from "../lib/terminalConfig";
-import { ensureUserFontLoaded } from "../lib/userFonts";
+import { ensureFamilyLoaded } from "../lib/fontLoader";
 
 const DEFAULT_SETTINGS: TerminalSettings = {
   cursorStyle: "block",
@@ -36,7 +36,10 @@ export const useTerminalSettingsStore = create<TerminalSettingsStore>((set, get)
         ...settings,
         fontFamily: normalizeTerminalFontFamily(settings.fontFamily),
       };
-      await ensureUserFontLoaded(normalizedSettings.fontFamily);
+      // Load font BEFORE publishing the new family name to the store so that
+      // any terminal mounting concurrently doesn't measure against a face that
+      // hasn't been registered yet.
+      await ensureFamilyLoaded(normalizedSettings.fontFamily);
       set({ settings: normalizedSettings, hasLoaded: true, error: null });
       applyTerminalSettings(normalizedSettings);
       if (normalizedSettings.fontFamily !== settings.fontFamily) {
@@ -58,17 +61,24 @@ export const useTerminalSettingsStore = create<TerminalSettingsStore>((set, get)
         ? { fontFamily: normalizeTerminalFontFamily(partial.fontFamily) }
         : {}),
     };
-    // Optimistic update
-    set({ settings: next, isSaving: true, error: null });
+    set({ isSaving: true, error: null });
     try {
-      await ensureUserFontLoaded(next.fontFamily);
-      applyTerminalSettings(next);
+      if (next.fontFamily !== prev.fontFamily) {
+        await ensureFamilyLoaded(next.fontFamily);
+      }
+      // Persist to disk BEFORE committing to the store or applying to
+      // terminals. If the save fails, `prev` remains the committed state —
+      // the UI never shows a value that wasn't written. This avoids the
+      // three-way inconsistency (store / terminals / disk) that the
+      // optimistic pattern exposed on save failure.
       await saveTerminalSettings(next);
-      set({ isSaving: false });
+      set({ settings: next, isSaving: false });
+      applyTerminalSettings(next);
     } catch (error) {
-      // Rollback
-      set({ settings: prev, isSaving: false, error: String(error) });
-      applyTerminalSettings(prev);
+      // Nothing to roll back: `settings` was never mutated, terminals were
+      // never re-applied, and the font (if loaded) sitting in document.fonts
+      // is harmless — it'll be reused next time the user picks it.
+      set({ isSaving: false, error: String(error) });
     }
   },
 }));
