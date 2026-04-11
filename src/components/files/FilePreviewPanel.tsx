@@ -1,9 +1,62 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFileExplorerStore } from "../../stores/useFileExplorerStore";
+import { getLanguageFromPath } from "../../lib/languageDetection";
+import { highlight, getAvailableLanguages } from "../../lib/highlighter";
 
 export default function FilePreviewPanel() {
   const previewFile = useFileExplorerStore((s) => s.previewFile);
   const previewLoading = useFileExplorerStore((s) => s.previewLoading);
   const previewError = useFileExplorerStore((s) => s.previewError);
+  const languageOverrides = useFileExplorerStore((s) => s.languageOverrides);
+  const setLanguageOverride = useFileExplorerStore(
+    (s) => s.setLanguageOverride,
+  );
+
+  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
+  const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
+  const highlightGenRef = useRef(0);
+
+  // Resolve language: override > auto-detect > null
+  const resolvedLanguage = useMemo(() => {
+    if (!previewFile) return null;
+    return (
+      languageOverrides[previewFile.path] ??
+      getLanguageFromPath(previewFile.path)
+    );
+  }, [previewFile, languageOverrides]);
+
+  // Run highlighting when file or language changes.
+  // This is a legitimate useEffect: it syncs React state with an external
+  // async system (Shiki WASM highlighter) similar to an imperative library.
+  useEffect(() => {
+    if (!previewFile?.content || !resolvedLanguage) {
+      setHighlightedHtml(null);
+      return;
+    }
+
+    const gen = ++highlightGenRef.current;
+    highlight(previewFile.content, resolvedLanguage).then((html) => {
+      // Only apply if this is still the latest request
+      if (gen === highlightGenRef.current) {
+        setHighlightedHtml(html);
+      }
+    });
+  }, [previewFile?.content, previewFile?.path, resolvedLanguage]);
+
+  // Load available languages list once
+  useEffect(() => {
+    getAvailableLanguages().then(setAvailableLanguages);
+  }, []);
+
+  const handleLanguageChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      if (!previewFile) return;
+      const lang = e.target.value;
+      if (lang === "") return;
+      setLanguageOverride(previewFile.path, lang);
+    },
+    [previewFile, setLanguageOverride],
+  );
 
   if (previewLoading) {
     return (
@@ -47,9 +100,27 @@ export default function FilePreviewPanel() {
 
   return (
     <div className="absolute inset-0 overflow-y-auto p-6">
-      <div className="mb-4">
-        <h2 className="section-label !p-0">{fileName}</h2>
-        <p className="text-xs opacity-40 mt-0.5">{previewFile.path}</p>
+      <div className="mb-4 flex items-baseline justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="section-label !p-0">{fileName}</h2>
+          <p className="text-xs opacity-40 mt-0.5 truncate">
+            {previewFile.path}
+          </p>
+        </div>
+        {availableLanguages.length > 0 && (
+          <select
+            className="shiki-lang-select"
+            value={resolvedLanguage ?? ""}
+            onChange={handleLanguageChange}
+          >
+            <option value="">Plain text</option>
+            {availableLanguages.sort().map((lang) => (
+              <option key={lang} value={lang}>
+                {lang}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {previewFile.truncated && (
@@ -68,16 +139,23 @@ export default function FilePreviewPanel() {
         </div>
       )}
 
-      <pre
-        className="text-sm font-mono whitespace-pre-wrap break-words p-4 rounded-md"
-        style={{
-          background: "var(--surface-hover)",
-          lineHeight: 1.5,
-          tabSize: 2,
-        }}
-      >
-        {previewFile.content}
-      </pre>
+      {highlightedHtml ? (
+        <div
+          className="shiki-container"
+          dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+        />
+      ) : (
+        <pre
+          className="text-sm font-mono whitespace-pre-wrap break-words p-4 rounded-md"
+          style={{
+            background: "var(--surface-hover)",
+            lineHeight: 1.5,
+            tabSize: 2,
+          }}
+        >
+          {previewFile.content}
+        </pre>
+      )}
     </div>
   );
 }
