@@ -46,6 +46,7 @@ export default function ProjectList({
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
     () => new Set(activeRepoPath ? [activeRepoPath] : []),
   );
+  const [filesOpen, setFilesOpen] = useState<Set<string>>(new Set());
 
   // Auto-expand a newly selected project
   const prevActiveRef = useRef(activeRepoPath);
@@ -170,7 +171,15 @@ export default function ProjectList({
                 <CollapsibleSection
                   label="Files"
                   icon={<FolderTree size={14} />}
-                  hasItems={true}
+                  hasItems={filesOpen.has(repo.path)}
+                  onAdd={() => {
+                    setFilesOpen((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(repo.path)) next.delete(repo.path);
+                      else next.add(repo.path);
+                      return next;
+                    });
+                  }}
                 >
                   <FileTree repoPath={repo.path} />
                 </CollapsibleSection>
