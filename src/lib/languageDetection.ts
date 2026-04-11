@@ -28,7 +28,7 @@ const EXTENSION_MAP: Record<string, string> = {
 
 const FILENAME_MAP: Record<string, string> = {
   Dockerfile: "docker",
-  Makefile: "makefile",
+  Makefile: "make",
   Gemfile: "ruby",
   Rakefile: "ruby",
 };

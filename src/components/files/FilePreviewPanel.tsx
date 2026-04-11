@@ -11,6 +11,9 @@ export default function FilePreviewPanel() {
   const setLanguageOverride = useFileExplorerStore(
     (s) => s.setLanguageOverride,
   );
+  const clearLanguageOverride = useFileExplorerStore(
+    (s) => s.clearLanguageOverride,
+  );
 
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
@@ -52,10 +55,13 @@ export default function FilePreviewPanel() {
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       if (!previewFile) return;
       const lang = e.target.value;
-      if (lang === "") return;
+      if (lang === "") {
+        clearLanguageOverride(previewFile.path);
+        return;
+      }
       setLanguageOverride(previewFile.path, lang);
     },
-    [previewFile, setLanguageOverride],
+    [previewFile, setLanguageOverride, clearLanguageOverride],
   );
 
   if (previewLoading) {

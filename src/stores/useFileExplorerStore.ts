@@ -21,6 +21,7 @@ interface FileExplorerStore {
   openPreview: (filePath: string) => Promise<void>;
   closePreview: () => void;
   setLanguageOverride: (filePath: string, language: string) => void;
+  clearLanguageOverride: (filePath: string) => void;
   clearProject: (projectPath: string) => void;
 }
 
@@ -92,6 +93,13 @@ export const useFileExplorerStore = create<FileExplorerStore>((set, get) => ({
     set((s) => ({
       languageOverrides: { ...s.languageOverrides, [filePath]: language },
     }));
+  },
+
+  clearLanguageOverride: (filePath: string) => {
+    set((s) => {
+      const { [filePath]: _, ...rest } = s.languageOverrides;
+      return { languageOverrides: rest };
+    });
   },
 
   clearProject: (projectPath: string) => {
