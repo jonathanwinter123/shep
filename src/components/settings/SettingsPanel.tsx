@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getIdentifier, getName, getTauriVersion, getVersion } from "@tauri-apps/api/app";
-import { open } from "@tauri-apps/plugin-dialog";
-import { Upload } from "lucide-react";
+import { Upload, ChevronDown, Check } from "lucide-react";
 import { EDITOR_OPTIONS } from "../../lib/editors";
 import { DARK_THEMES, LIGHT_THEMES, TRANSPARENT_THEMES } from "../../lib/themes";
 import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
@@ -13,15 +12,13 @@ import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUpdateStore } from "../../stores/useUpdateStore";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import {
-  FONT_OPTIONS,
   FONT_SIZE_OPTIONS,
+  TERMINAL_FONT_FAMILY,
 } from "../../lib/terminalConfig";
 import { ALL_USAGE_PROVIDERS } from "../usage/usageHelpers";
-import type { CursorStyle, BudgetMode } from "../../lib/types";
+import type { CursorStyle, BudgetMode, FontFamily } from "../../lib/types";
 import { getErrorMessage } from "../../lib/errors";
-import { getHomeDirectory } from "../../lib/tauri";
-import { getImportedFonts, importUserFont } from "../../lib/userFonts";
-import type { ImportedFont } from "../../lib/types";
+import { listMonospaceFamilies } from "../../lib/tauri";
 
 interface AppMeta {
   name: string;
@@ -47,9 +44,12 @@ export default function SettingsPanel() {
   const optionClass = "option-card w-44 justify-start";
   const [appMeta, setAppMeta] = useState<AppMeta | null>(null);
   const [appMetaError, setAppMetaError] = useState<string | null>(null);
-  const [importedFonts, setImportedFonts] = useState<ImportedFont[]>([]);
-  const [fontImporting, setFontImporting] = useState(false);
+  const [fontFamilies, setFontFamilies] = useState<FontFamily[]>([]);
   const [fontError, setFontError] = useState<string | null>(null);
+  const [fontPickerOpen, setFontPickerOpen] = useState(false);
+  const [fontSearch, setFontSearch] = useState("");
+  const fontPickerRef = useRef<HTMLDivElement>(null);
+  const fontSearchRef = useRef<HTMLInputElement>(null);
   const [themeError, setThemeError] = useState<string | null>(null);
   const themeId = useThemeStore((s) => s.themeId);
   const setTheme = useThemeStore((s) => s.setTheme);
@@ -134,10 +134,10 @@ export default function SettingsPanel() {
   useEffect(() => {
     let cancelled = false;
 
-    void getImportedFonts()
-      .then((fonts) => {
+    void listMonospaceFamilies()
+      .then((families) => {
         if (!cancelled) {
-          setImportedFonts(fonts);
+          setFontFamilies(families);
         }
       })
       .catch((error) => {
@@ -151,42 +151,61 @@ export default function SettingsPanel() {
     };
   }, []);
 
-  const importFontFile = async () => {
-    try {
-      setFontImporting(true);
-      setFontError(null);
+  // Close the font picker on outside click / Escape.
+  useEffect(() => {
+    if (!fontPickerOpen) return;
 
-      const homeDirectory = await getHomeDirectory();
-      const selected = await open({
-        multiple: false,
-        directory: false,
-        defaultPath: `${homeDirectory}/Library/Fonts`,
-        filters: [
-          {
-            name: "Font Files",
-            extensions: ["ttf", "otf", "woff", "woff2"],
-          },
-        ],
-      });
-
-      if (!selected || Array.isArray(selected)) {
-        setFontImporting(false);
-        return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (!fontPickerRef.current) return;
+      if (!fontPickerRef.current.contains(event.target as Node)) {
+        setFontPickerOpen(false);
       }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFontPickerOpen(false);
+    };
 
-      const imported = await importUserFont(selected);
-      setImportedFonts((current) => {
-        if (current.some((font) => font.id === imported.id)) {
-          return current;
-        }
-        return [...current, imported];
-      });
-      await updateTermSettings({ fontFamily: imported.family });
-      setFontImporting(false);
-    } catch (error) {
-      setFontImporting(false);
-      setFontError(getErrorMessage(error));
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [fontPickerOpen]);
+
+  // Assemble the searchable list: always surface the bundled MesloLGS NF
+  // (the default) even if CoreText didn't return it as a system-installed
+  // family, then append everything from Rust. Dedupe by family name.
+  const pickerFamilies = useMemo(() => {
+    const seen = new Set<string>();
+    const list: FontFamily[] = [];
+    const bundled: FontFamily = {
+      family: TERMINAL_FONT_FAMILY,
+      faceCount: 4,
+      isNerdFont: true,
+    };
+    list.push(bundled);
+    seen.add(TERMINAL_FONT_FAMILY);
+    for (const family of fontFamilies) {
+      if (seen.has(family.family)) continue;
+      seen.add(family.family);
+      list.push(family);
     }
+    return list;
+  }, [fontFamilies]);
+
+  const filteredFontFamilies = useMemo(() => {
+    const query = fontSearch.trim().toLowerCase();
+    if (!query) return pickerFamilies;
+    return pickerFamilies.filter((family) =>
+      family.family.toLowerCase().includes(query),
+    );
+  }, [pickerFamilies, fontSearch]);
+
+  const selectFont = (family: string) => {
+    setFontPickerOpen(false);
+    setFontSearch("");
+    void updateTermSettings({ fontFamily: family });
   };
 
   const importThemeFile = async (file: File | null) => {
@@ -367,47 +386,72 @@ export default function SettingsPanel() {
       </div>
 
       <div className="settings-row">
-        <span className="settings-row__label">Font</span>
-        <div className="flex flex-wrap gap-2">
-          {FONT_OPTIONS.map((font) => (
-            <button
-              key={font.id}
-              onClick={() => void updateTermSettings({ fontFamily: font.id })}
-              className={`option-card option-card--compact ${termSettings.fontFamily === font.id ? "selected" : ""}`}
-            >
-              <span>{font.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="settings-row">
-        <span className="settings-row__label">Custom Fonts</span>
-        <div className="flex flex-wrap gap-2">
-          {importedFonts.map((font) => (
-            <button
-              key={font.id}
-              onClick={() => void updateTermSettings({ fontFamily: font.family })}
-              className={`option-card option-card--compact ${termSettings.fontFamily === font.family ? "selected" : ""}`}
-              title={`Imported from ~/.shep/fonts/${font.fileName}`}
-            >
-              <span>{font.label}</span>
-            </button>
-          ))}
+        <span className="settings-row__label flex items-center gap-2">
+          <span>Font</span>
+          <InfoTip text="Lists every installed monospace font on your Mac. Nerd Font variants are surfaced first — they're the best choice for powerline prompts and devicons." />
+        </span>
+        <div className="relative" ref={fontPickerRef}>
           <button
-            onClick={() => void importFontFile()}
-            className="option-card option-card--compact"
-            disabled={fontImporting}
+            type="button"
+            onClick={() => {
+              setFontPickerOpen((open) => {
+                const next = !open;
+                if (next) {
+                  setFontSearch("");
+                  // Autofocus the search input once the dropdown mounts.
+                  window.setTimeout(() => fontSearchRef.current?.focus(), 0);
+                }
+                return next;
+              });
+            }}
+            className="option-card option-card--compact justify-between"
+            style={{ minWidth: 240 }}
           >
-            <span className="flex items-center gap-2">
-              <Upload size={14} />
-              <span>{fontImporting ? "Importing..." : "Import Font"}</span>
-            </span>
+            <span className="truncate">{termSettings.fontFamily || "Select font"}</span>
+            <ChevronDown size={14} className="shrink-0 opacity-60" />
           </button>
+
+          {fontPickerOpen && (
+            <div className="font-picker-dropdown">
+              <input
+                ref={fontSearchRef}
+                type="text"
+                value={fontSearch}
+                onChange={(event) => setFontSearch(event.target.value)}
+                placeholder="Search installed fonts..."
+                className="font-picker-search"
+              />
+              <div className="font-picker-list">
+                {filteredFontFamilies.length === 0 && (
+                  <div className="font-picker-empty">No matching fonts</div>
+                )}
+                {filteredFontFamilies.map((family) => {
+                  const active = termSettings.fontFamily === family.family;
+                  return (
+                    <button
+                      key={family.family}
+                      type="button"
+                      onClick={() => selectFont(family.family)}
+                      className={`font-picker-item ${active ? "font-picker-item--active" : ""}`}
+                    >
+                      <Check
+                        size={14}
+                        className={`shrink-0 ${active ? "opacity-100" : "opacity-0"}`}
+                      />
+                      <span className="font-picker-item__name">{family.family}</span>
+                      {family.isNerdFont && (
+                        <span className="font-picker-item__badge">Nerd Font</span>
+                      )}
+                      <span className="font-picker-item__count">
+                        {family.faceCount} {family.faceCount === 1 ? "face" : "faces"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
-        {!importedFonts.length && !fontError && (
-          <div className="mt-2 text-xs text-[var(--text-muted)]">No custom fonts imported.</div>
-        )}
         {fontError && <div className="mt-2 text-sm text-red-300">{fontError}</div>}
       </div>
 

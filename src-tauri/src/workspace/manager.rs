@@ -1,6 +1,6 @@
 use super::config::{
-    EditorSettings, ImportedFont, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings,
-    UsageSettings, WorkspaceConfig,
+    EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings,
+    WorkspaceConfig,
 };
 use super::loader;
 
@@ -61,18 +61,6 @@ impl WorkspaceManager {
 
     pub fn save_terminal_settings(&self, settings: &TerminalSettings) -> Result<(), String> {
         loader::save_terminal_settings(settings)
-    }
-
-    pub fn list_imported_fonts(&self) -> Result<Vec<ImportedFont>, String> {
-        loader::list_imported_fonts()
-    }
-
-    pub fn import_font(&self, source_path: &str) -> Result<ImportedFont, String> {
-        loader::import_font(source_path)
-    }
-
-    pub fn read_imported_font(&self, font_id: &str) -> Result<Vec<u8>, String> {
-        loader::read_imported_font(font_id)
     }
 
     pub fn load_usage_settings(&self) -> Result<UsageSettings, String> {

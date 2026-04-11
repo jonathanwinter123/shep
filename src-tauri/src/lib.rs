@@ -1,4 +1,5 @@
 mod commands;
+mod fonts;
 mod git;
 mod menu;
 mod pty;
@@ -83,9 +84,8 @@ pub fn run() {
             commands::save_keybinding_settings,
             commands::get_terminal_settings,
             commands::save_terminal_settings,
-            commands::list_imported_fonts,
-            commands::import_font,
-            commands::read_imported_font,
+            commands::list_monospace_families,
+            commands::load_font_family,
             commands::open_in_editor,
             commands::reveal_in_finder,
             commands::spawn_pty,

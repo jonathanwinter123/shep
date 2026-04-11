@@ -12,7 +12,8 @@ import type {
   EditorSettings,
   KeybindingSettings,
   TerminalSettings,
-  ImportedFont,
+  FontFamily,
+  FontFaceData,
   PreferredEditor,
   ProviderUsageSnapshot,
   LocalUsageDetails,
@@ -70,16 +71,12 @@ export function saveTerminalSettings(settings: TerminalSettings): Promise<void> 
   return invoke("save_terminal_settings", { settings });
 }
 
-export function listImportedFonts(): Promise<ImportedFont[]> {
-  return invoke("list_imported_fonts");
+export function listMonospaceFamilies(): Promise<FontFamily[]> {
+  return invoke("list_monospace_families");
 }
 
-export function importFont(sourcePath: string): Promise<ImportedFont> {
-  return invoke("import_font", { sourcePath });
-}
-
-export function readImportedFont(fontId: string): Promise<number[]> {
-  return invoke("read_imported_font", { fontId });
+export function loadFontFamily(family: string): Promise<FontFaceData[]> {
+  return invoke("load_font_family", { family });
 }
 
 export function openInEditor(
