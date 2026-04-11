@@ -16,8 +16,6 @@ import { TERMINAL_LINE_HEIGHT } from "../../lib/terminalConfig";
 import { createTerminalTheme } from "./terminalTheme";
 import { useThemeStore } from "../../stores/useThemeStore";
 import { notifyAgent } from "../../lib/notifications";
-import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
-import { useKeybindingStore } from "../../stores/useKeybindingStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 
 interface TerminalViewProps {
@@ -85,24 +83,6 @@ export default function TerminalView({
         void notifyAgent(ptyId, message);
       }
       return true;
-    });
-
-    // Intercept key combos for custom keybindings
-    term.attachCustomKeyEventHandler((ev) => {
-      const settings = useKeybindingStore.getState().settings;
-      for (const preset of KEYBINDING_PRESETS) {
-        if (settings[preset.id] && preset.match(ev)) {
-          if (ev.type === "keydown") {
-            writePty(ptyId, preset.sequence).catch((error) => {
-              if (import.meta.env.DEV) {
-                console.error("Failed to write PTY keybinding:", error);
-              }
-            });
-          }
-          return false; // prevent xterm default handling
-        }
-      }
-      return true; // let xterm handle normally
     });
 
     const entry = { term, fitAddon, rendererAddon: null as WebglAddon | CanvasAddon | null };
