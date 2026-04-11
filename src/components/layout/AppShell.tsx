@@ -309,6 +309,7 @@ export default function AppShell() {
     useUIStore.getState().deactivateUsagePanel();
     useUIStore.getState().deactivatePortsPanel();
     useUIStore.getState().deactivateSessionHistory();
+    useUIStore.getState().deactivateFilePreview();
     setActiveTab(tabId); // auto-switches workspace if tab is in a different one
     const store = useTerminalStore.getState();
     const allTabs = activeRepoPath ? store.getAllProjectTabs(activeRepoPath) : [];
@@ -374,6 +375,7 @@ export default function AppShell() {
     useUIStore.getState().deactivateUsagePanel();
     useUIStore.getState().deactivatePortsPanel();
     useUIStore.getState().deactivateSessionHistory();
+    useUIStore.getState().deactivateFilePreview();
     const { cols, rows } = getTerminalDimensions();
     spawnBlankShell(cols, rows);
   }, [spawnBlankShell, getTerminalDimensions]);
