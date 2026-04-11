@@ -15,6 +15,8 @@ interface UIStore {
   portsPanelActive: boolean;  // ports panel is the active view
   sessionHistoryOpen: boolean;   // session history tab visible in tab bar
   sessionHistoryActive: boolean; // session history panel is the active view
+  filePreviewOpen: boolean;      // file preview tab visible in tab bar
+  filePreviewActive: boolean;    // file preview panel is the active view
   sidebarVisible: boolean;    // sidebar visibility
   username: string | null;
   computerName: string | null;
@@ -52,6 +54,11 @@ interface UIStore {
   activateSessionHistory: () => void;
   deactivateSessionHistory: () => void;
   toggleSessionHistory: () => void;
+  openFilePreview: () => void;
+  closeFilePreview: () => void;
+  activateFilePreview: () => void;
+  deactivateFilePreview: () => void;
+  toggleFilePreview: () => void;
   toggleSidebar: () => void;
   setUsername: (name: string) => void;
   setComputerName: (name: string) => void;
@@ -67,6 +74,7 @@ function activateNextOpen(s: UIStore, excluding: string): Partial<UIStore> {
     ["usage", s.usageTabOpen],
     ["ports", s.portsPanelOpen],
     ["sessionHistory", s.sessionHistoryOpen],
+    ["filePreview", s.filePreviewOpen],
   ];
   for (const [name, isOpen] of candidates) {
     if (name === excluding || !isOpen) continue;
@@ -78,6 +86,7 @@ function activateNextOpen(s: UIStore, excluding: string): Partial<UIStore> {
       case "usage": return { usagePanelActive: true };
       case "ports": return { portsPanelActive: true };
       case "sessionHistory": return { sessionHistoryActive: true };
+      case "filePreview": return { filePreviewActive: true };
     }
   }
   return {};
@@ -91,6 +100,7 @@ const deactivateAll = {
   usagePanelActive: false,
   portsPanelActive: false,
   sessionHistoryActive: false,
+  filePreviewActive: false,
 };
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -108,6 +118,8 @@ export const useUIStore = create<UIStore>((set) => ({
   portsPanelActive: false,
   sessionHistoryOpen: false,
   sessionHistoryActive: false,
+  filePreviewOpen: false,
+  filePreviewActive: false,
   sidebarVisible: true,
   username: null,
   computerName: null,
@@ -282,6 +294,32 @@ export const useUIStore = create<UIStore>((set) => ({
         return { ...deactivateAll, sessionHistoryActive: true };
       }
       return { sessionHistoryOpen: true, ...deactivateAll, sessionHistoryActive: true };
+    }),
+  openFilePreview: () => set({
+    filePreviewOpen: true,
+    ...deactivateAll,
+    filePreviewActive: true,
+  }),
+  closeFilePreview: () =>
+    set((s) => ({
+      filePreviewOpen: false,
+      filePreviewActive: false,
+      ...activateNextOpen(s, "filePreview"),
+    })),
+  activateFilePreview: () => set({
+    ...deactivateAll,
+    filePreviewActive: true,
+  }),
+  deactivateFilePreview: () => set({ filePreviewActive: false }),
+  toggleFilePreview: () =>
+    set((s) => {
+      if (s.filePreviewOpen && s.filePreviewActive) {
+        return { filePreviewOpen: false, filePreviewActive: false, ...activateNextOpen(s, "filePreview") };
+      }
+      if (s.filePreviewOpen) {
+        return { ...deactivateAll, filePreviewActive: true };
+      }
+      return { filePreviewOpen: true, ...deactivateAll, filePreviewActive: true };
     }),
   toggleSidebar: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })),
   setUsername: (name: string) => set({ username: name }),
