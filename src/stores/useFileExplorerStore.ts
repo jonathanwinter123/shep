@@ -13,11 +13,14 @@ interface FileExplorerStore {
   previewFile: FileContents | null;
   previewLoading: boolean;
   previewError: string | null;
+  // User-overridden language for file preview, keyed by file path
+  languageOverrides: Record<string, string>;
 
   loadDirectory: (dirPath: string, depth: number) => Promise<void>;
   toggleDir: (projectPath: string, dirPath: string) => Promise<void>;
   openPreview: (filePath: string) => Promise<void>;
   closePreview: () => void;
+  setLanguageOverride: (filePath: string, language: string) => void;
   clearProject: (projectPath: string) => void;
 }
 
@@ -30,6 +33,7 @@ export const useFileExplorerStore = create<FileExplorerStore>((set, get) => ({
   previewFile: null,
   previewLoading: false,
   previewError: null,
+  languageOverrides: {},
 
   loadDirectory: async (dirPath: string, depth: number) => {
     set((s) => ({ loading: { ...s.loading, [dirPath]: true } }));
@@ -82,6 +86,12 @@ export const useFileExplorerStore = create<FileExplorerStore>((set, get) => ({
 
   closePreview: () => {
     set({ previewFile: null, previewError: null });
+  },
+
+  setLanguageOverride: (filePath: string, language: string) => {
+    set((s) => ({
+      languageOverrides: { ...s.languageOverrides, [filePath]: language },
+    }));
   },
 
   clearProject: (projectPath: string) => {
