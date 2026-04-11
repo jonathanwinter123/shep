@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Upload } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
-import tabKindMeta from "../../lib/tabKindMeta";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import {
@@ -11,7 +10,6 @@ import {
 import type { ChangedFile } from "../../lib/types";
 import FileList from "./FileList";
 import DiffViewer from "./DiffViewer";
-import BranchDropdown from "./BranchDropdown";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
 
@@ -179,13 +177,6 @@ export default function GitPanel() {
     }
   }, [activeProjectPath, currentBranch, pushing, refreshStatus, pushNotice]);
 
-  const handleBranchChanged = useCallback(() => {
-    fetchFiles();
-    setSelectedPath(null);
-    setSelectedArea(null);
-    setDiffContent("");
-  }, [fetchFiles]);
-
   if (!activeProjectPath) {
     return (
       <div className="absolute inset-0 flex items-center justify-center opacity-50">
@@ -209,38 +200,6 @@ export default function GitPanel() {
 
   return (
     <div className="git-panel">
-      <div className="git-panel__header">
-        <span style={{ opacity: 0.5, flexShrink: 0 }}>{tabKindMeta.git.icon(14)}</span>
-        <BranchDropdown
-          repoPath={activeProjectPath}
-          currentBranch={gitStatus.branch}
-          isWorktree={gitStatus.worktree_parent != null}
-          onBranchChanged={handleBranchChanged}
-        />
-        <span
-          style={{
-            width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-            backgroundColor: activeStatus.dirty ? "var(--status-attention)" : "var(--status-clean)",
-          }}
-        />
-        {showPush && (
-          <button
-            className="btn-ghost"
-            style={{ fontSize: 11, padding: "2px 8px", gap: 4, marginLeft: 4 }}
-            onClick={handlePush}
-            disabled={pushing}
-            title={`Push ${activeStatus.ahead} commit${activeStatus.ahead > 1 ? "s" : ""} to origin`}
-          >
-            <Upload size={11} />
-            {pushing ? "Pushing…" : `Push ↑${activeStatus.ahead}`}
-          </button>
-        )}
-        {!showPush && (gitStatus.behind > 0) && (
-          <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 4, flexShrink: 0 }}>
-            ↓{gitStatus.behind}
-          </span>
-        )}
-      </div>
       <div className="git-panel__body">
         <div className="git-panel__sidebar">
           <FileList
@@ -268,13 +227,26 @@ export default function GitPanel() {
               }}
               rows={2}
             />
-            <button
-              className="btn-primary git-panel__commit-btn"
-              disabled={!canCommit}
-              onClick={handleCommit}
-            >
-              {committing ? "Committing…" : `Commit${stagedCount > 0 ? ` (${stagedCount})` : ""}`}
-            </button>
+            <div className="git-panel__commit-actions">
+              <button
+                className="btn-primary git-panel__commit-btn"
+                disabled={!canCommit}
+                onClick={handleCommit}
+              >
+                {committing ? "Committing…" : `Commit${stagedCount > 0 ? ` (${stagedCount})` : ""}`}
+              </button>
+              {showPush && (
+                <button
+                  className="btn-ghost git-panel__push-btn"
+                  onClick={handlePush}
+                  disabled={pushing}
+                  title={`Push ${activeStatus.ahead} commit${activeStatus.ahead > 1 ? "s" : ""} to origin`}
+                >
+                  <Upload size={11} />
+                  {pushing ? "Pushing…" : `Push ↑${activeStatus.ahead}`}
+                </button>
+              )}
+            </div>
           </div>
         </div>
         {selectedPath ? (

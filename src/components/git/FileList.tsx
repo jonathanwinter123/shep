@@ -13,24 +13,21 @@ interface FileListProps {
   onUnstageAll: () => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  M: "rgb(96, 165, 250)",   // blue
-  A: "rgb(74, 222, 128)",   // green
-  D: "rgb(248, 113, 113)",  // red
-  R: "rgb(192, 132, 252)",  // purple
-  U: "rgb(251, 191, 36)",   // yellow
-  "?": "rgb(148, 163, 184)", // gray
+const STATUS_LABEL: Record<string, string> = {
+  M: "Modified",
+  A: "Added",
+  D: "Deleted",
+  R: "Renamed",
+  U: "Unmerged",
+  "?": "Untracked",
 };
 
-function fileName(path: string): string {
+/** Immediate parent dir + filename; empty parent for root-level files. */
+function formatPath(path: string): { name: string; parent: string } {
   const parts = path.split("/");
-  return parts[parts.length - 1];
-}
-
-function fileDir(path: string): string {
-  const parts = path.split("/");
-  if (parts.length <= 1) return "";
-  return parts.slice(0, -1).join("/") + "/";
+  const name = parts[parts.length - 1];
+  const parent = parts.length > 1 ? parts[parts.length - 2] : "";
+  return { name, parent };
 }
 
 export default function FileList({
@@ -73,15 +70,21 @@ export default function FileList({
     );
   }
 
+  const singleSection = sections.length === 1;
+
   return (
     <div className="git-panel__file-list">
       {sections.map((section) => (
         <div key={section.key} style={{ marginBottom: 4 }}>
-          <div className="section-label" style={{ padding: "8px 10px 4px", display: "flex", alignItems: "center", gap: 4 }}>
-            <span>{section.label}</span>
-            <span className="badge" style={{ marginLeft: 2 }}>
-              {section.files.length}
-            </span>
+          <div className={`section-label${singleSection ? " section-label--minimal" : ""}`}>
+            {!singleSection && (
+              <>
+                <span>{section.label}</span>
+                <span className="badge" style={{ marginLeft: 2 }}>
+                  {section.files.length}
+                </span>
+              </>
+            )}
             <span style={{ flex: 1 }} />
             {section.bulkAction && (
               <button
@@ -91,7 +94,6 @@ export default function FileList({
                   e.stopPropagation();
                   section.bulkAction!();
                 }}
-                style={{ opacity: 0.5, padding: 2 }}
               >
                 {section.bulkIcon}
               </button>
@@ -100,24 +102,21 @@ export default function FileList({
           {section.files.map((file) => {
             const isSelected =
               file.path === selectedPath && file.area === selectedArea;
+            const fmt = formatPath(file.path);
+            const statusLabel = STATUS_LABEL[file.status] ?? "Changed";
             return (
               <div
                 key={`${file.area}:${file.path}`}
                 className={`list-item file-item${isSelected ? " active" : ""}`}
+                data-status={file.status}
+                title={`${statusLabel} · ${file.path}`}
                 onClick={() => onSelect(file)}
               >
-                <span
-                  className="file-status-badge"
-                  style={{ color: STATUS_COLORS[file.status] || STATUS_COLORS["?"] }}
-                >
-                  {file.status}
-                </span>
-                <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  <span style={{ fontWeight: 500 }}>{fileName(file.path)}</span>
-                  {fileDir(file.path) && (
-                    <span style={{ opacity: 0.45, marginLeft: 4, fontSize: 11 }}>
-                      {fileDir(file.path)}
-                    </span>
+                <span className="file-status-bar" aria-hidden="true" />
+                <span className="file-item__name-wrap">
+                  <span className="file-item__name">{fmt.name}</span>
+                  {fmt.parent && (
+                    <span className="file-item__parent">{fmt.parent}</span>
                   )}
                 </span>
                 <button
