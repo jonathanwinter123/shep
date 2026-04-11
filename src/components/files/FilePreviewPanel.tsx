@@ -32,8 +32,9 @@ export default function FilePreviewPanel() {
   // This is a legitimate useEffect: it syncs React state with an external
   // async system (Shiki WASM highlighter) similar to an imperative library.
   useEffect(() => {
+    setHighlightedHtml(null);
+
     if (!previewFile?.content || !resolvedLanguage) {
-      setHighlightedHtml(null);
       return;
     }
 
@@ -120,7 +121,7 @@ export default function FilePreviewPanel() {
             onChange={handleLanguageChange}
           >
             <option value="">Plain text</option>
-            {availableLanguages.sort().map((lang) => (
+            {availableLanguages.map((lang) => (
               <option key={lang} value={lang}>
                 {lang}
               </option>

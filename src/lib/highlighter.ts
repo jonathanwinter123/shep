@@ -21,6 +21,7 @@ const PRELOAD_LANGS = [
   "xml",
   "docker",
   "diff",
+  "make",
 ] as const;
 
 const THEME = "dracula";
@@ -80,7 +81,10 @@ export async function highlight(
 export async function getAvailableLanguages(): Promise<string[]> {
   try {
     const hl = await getHighlighter();
-    return hl.getLoadedLanguages();
+    // getLoadedLanguages() includes aliases (ts, js, sh, etc.) — filter to
+    // canonical names only so the dropdown isn't cluttered with duplicates.
+    const loaded = new Set(hl.getLoadedLanguages());
+    return [...PRELOAD_LANGS].filter((l) => loaded.has(l)).sort();
   } catch {
     return [];
   }
