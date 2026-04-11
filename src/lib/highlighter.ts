@@ -22,6 +22,7 @@ const PRELOAD_LANGS = [
   "docker",
   "diff",
   "make",
+  "text",
 ] as const;
 
 const THEME = "dracula";

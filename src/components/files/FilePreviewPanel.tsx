@@ -11,20 +11,17 @@ export default function FilePreviewPanel() {
   const setLanguageOverride = useFileExplorerStore(
     (s) => s.setLanguageOverride,
   );
-  const clearLanguageOverride = useFileExplorerStore(
-    (s) => s.clearLanguageOverride,
-  );
-
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
   const highlightGenRef = useRef(0);
 
-  // Resolve language: override > auto-detect > null
+  // Resolve language: override > auto-detect > plain text
   const resolvedLanguage = useMemo(() => {
     if (!previewFile) return null;
     return (
       languageOverrides[previewFile.path] ??
-      getLanguageFromPath(previewFile.path)
+      getLanguageFromPath(previewFile.path) ??
+      "text"
     );
   }, [previewFile, languageOverrides]);
 
@@ -55,14 +52,9 @@ export default function FilePreviewPanel() {
   const handleLanguageChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       if (!previewFile) return;
-      const lang = e.target.value;
-      if (lang === "") {
-        clearLanguageOverride(previewFile.path);
-        return;
-      }
-      setLanguageOverride(previewFile.path, lang);
+      setLanguageOverride(previewFile.path, e.target.value);
     },
-    [previewFile, setLanguageOverride, clearLanguageOverride],
+    [previewFile, setLanguageOverride],
   );
 
   if (previewLoading) {
@@ -117,10 +109,10 @@ export default function FilePreviewPanel() {
         {availableLanguages.length > 0 && (
           <select
             className="shiki-lang-select"
-            value={resolvedLanguage ?? ""}
+            value={resolvedLanguage ?? "text"}
             onChange={handleLanguageChange}
           >
-            <option value="">Plain text</option>
+            <option value="text">Plain text</option>
             {availableLanguages.map((lang) => (
               <option key={lang} value={lang}>
                 {lang}
@@ -146,22 +138,11 @@ export default function FilePreviewPanel() {
         </div>
       )}
 
-      {highlightedHtml ? (
+      {highlightedHtml && (
         <div
           className="shiki-container"
           dangerouslySetInnerHTML={{ __html: highlightedHtml }}
         />
-      ) : (
-        <pre
-          className="text-sm font-mono whitespace-pre-wrap break-words p-4 rounded-md"
-          style={{
-            background: "var(--surface-hover)",
-            lineHeight: 1.5,
-            tabSize: 2,
-          }}
-        >
-          {previewFile.content}
-        </pre>
       )}
     </div>
   );
