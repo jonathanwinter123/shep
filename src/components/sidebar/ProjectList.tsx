@@ -1,13 +1,14 @@
 import { useMemo, useRef, useState } from "react";
 import type { RepoInfo, CommandState } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Sparkles, SquareTerminal } from "lucide-react";
+import { FolderTree, Sparkles, SquareTerminal } from "lucide-react";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
 import ProjectItem from "./ProjectItem";
 import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
+import FileTree from "./FileTree";
 import CommandsRow from "./CommandsRow";
 import GitStatusRow from "./GitStatusRow";
 
@@ -164,6 +165,14 @@ export default function ProjectList({
                     onSelectTab={onSelectTab}
                     onCloseTab={onCloseTab}
                   />
+                </CollapsibleSection>
+
+                <CollapsibleSection
+                  label="Files"
+                  icon={<FolderTree size={14} />}
+                  hasItems={true}
+                >
+                  <FileTree repoPath={repo.path} />
                 </CollapsibleSection>
 
                 <CommandsRow badge={commandsBadge} />
