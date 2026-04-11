@@ -11,7 +11,7 @@ pub fn setup(app: &AppHandle<Wry>) -> tauri::Result<()> {
     let check_updates =
         MenuItem::with_id(app, "check_updates", "Check for Updates…", true, None::<&str>)?;
     let settings =
-        MenuItem::with_id(app, "settings", "Settings…", true, Some("CmdOrCtrl+,"))?;
+        MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
 
     let app_menu = SubmenuBuilder::new(app, "Shep")
         .about(Some(about_meta))
@@ -31,20 +31,20 @@ pub fn setup(app: &AppHandle<Wry>) -> tauri::Result<()> {
 
     // -- File --
     let new_terminal =
-        MenuItem::with_id(app, "new_terminal", "New Terminal", true, Some("CmdOrCtrl+T"))?;
+        MenuItem::with_id(app, "new_terminal", "New Terminal", true, None::<&str>)?;
     let new_agent = MenuItem::with_id(
         app,
         "new_agent",
         "New Agent Session",
         true,
-        Some("CmdOrCtrl+Shift+T"),
+        None::<&str>,
     )?;
     let open_in_editor = MenuItem::with_id(
         app,
         "open_in_editor",
         "Open in Editor",
         true,
-        Some("CmdOrCtrl+E"),
+        None::<&str>,
     )?;
 
     let file_menu = SubmenuBuilder::new(app, "File")
@@ -74,7 +74,7 @@ pub fn setup(app: &AppHandle<Wry>) -> tauri::Result<()> {
         "toggle_sidebar",
         "Toggle Sidebar",
         true,
-        Some("CmdOrCtrl+B"),
+        None::<&str>,
     )?;
 
     let view_menu = SubmenuBuilder::new(app, "View")
