@@ -49,11 +49,13 @@ export default function ShortcutEditor() {
   const handleStartRecording = useCallback((actionId: string) => {
     setRecordingId(actionId);
     setConflict(null);
+    useShortcutStore.getState().setRecording(true);
   }, []);
 
   const handleCancelRecording = useCallback(() => {
     setRecordingId(null);
     setConflict(null);
+    useShortcutStore.getState().setRecording(false);
   }, []);
 
   // Listen for key combo while recording
@@ -72,6 +74,7 @@ export default function ShortcutEditor() {
       if (ev.key === "Backspace" || ev.key === "Delete") {
         void setShortcut(recordingId, "");
         setRecordingId(null);
+        useShortcutStore.getState().setRecording(false);
         return;
       }
 
@@ -91,6 +94,7 @@ export default function ShortcutEditor() {
 
       void setShortcut(recordingId, normalized);
       setRecordingId(null);
+      useShortcutStore.getState().setRecording(false);
     };
 
     window.addEventListener("keydown", handler, { capture: true });
@@ -103,6 +107,7 @@ export default function ShortcutEditor() {
       void setShortcut(conflict.actionId, conflict.combo);
       setRecordingId(null);
       setConflict(null);
+      useShortcutStore.getState().setRecording(false);
     });
   }, [conflict, setShortcut]);
 

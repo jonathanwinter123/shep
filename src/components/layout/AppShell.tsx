@@ -549,6 +549,8 @@ export default function AppShell() {
   // Global keyboard shortcut listener (capture phase — fires before xterm.js)
   useEffect(() => {
     const handler = (ev: KeyboardEvent) => {
+      // Skip while ShortcutEditor is recording a new key combo
+      if (useShortcutStore.getState().recording) return;
       // Skip modifier-only presses
       if (["Control", "Alt", "Shift", "Meta"].includes(ev.key)) return;
       // Skip if user is typing in an input/textarea (but not terminal)
@@ -558,7 +560,7 @@ export default function AppShell() {
       const combo = eventToCombo(ev);
       if (!combo) return;
 
-      const reverseMap = useShortcutStore.getState().buildReverseMap();
+      const reverseMap = useShortcutStore.getState().getReverseMap();
       const actionId = reverseMap.get(combo);
       if (!actionId) return;
 

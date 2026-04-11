@@ -11,11 +11,18 @@ interface ShortcutStore {
   isSaving: boolean;
   error: string | null;
 
+  /** True while the ShortcutEditor is recording a new key combo. */
+  recording: boolean;
+  setRecording: (recording: boolean) => void;
+
+  /** Cached reverse map (combo → actionId). Null means needs rebuild. */
+  _reverseMapCache: Map<string, string> | null;
+
   loadSettings: () => Promise<void>;
   setShortcut: (actionId: string, combo: string) => Promise<void>;
   resetShortcut: (actionId: string) => Promise<void>;
   getEffectiveShortcut: (actionId: string) => string | null;
-  buildReverseMap: () => Map<string, string>;
+  getReverseMap: () => Map<string, string>;
 }
 
 export const useShortcutStore = create<ShortcutStore>((set, get) => ({
@@ -24,12 +31,17 @@ export const useShortcutStore = create<ShortcutStore>((set, get) => ({
   isSaving: false,
   error: null,
 
+  recording: false,
+  setRecording: (recording) => set({ recording }),
+
+  _reverseMapCache: null,
+
   loadSettings: async () => {
     try {
       const overrides = await getKeybindingSettings();
-      set({ overrides, hasLoaded: true, error: null });
+      set({ overrides, hasLoaded: true, error: null, _reverseMapCache: null });
     } catch (error) {
-      set({ overrides: {}, hasLoaded: true, error: String(error) });
+      set({ overrides: {}, hasLoaded: true, error: String(error), _reverseMapCache: null });
     }
   },
 
@@ -37,24 +49,24 @@ export const useShortcutStore = create<ShortcutStore>((set, get) => ({
     const prev = get().overrides;
     const normalized = combo ? normalizeCombo(combo) : "";
     const next = { ...prev, [actionId]: normalized };
-    set({ overrides: next, isSaving: true, error: null });
+    set({ overrides: next, isSaving: true, error: null, _reverseMapCache: null });
     try {
       await saveKeybindingSettings(next);
       set({ isSaving: false });
     } catch (error) {
-      set({ overrides: prev, isSaving: false, error: String(error) });
+      set({ overrides: prev, isSaving: false, error: String(error), _reverseMapCache: null });
     }
   },
 
   resetShortcut: async (actionId) => {
     const prev = get().overrides;
     const { [actionId]: _, ...next } = prev;
-    set({ overrides: next, isSaving: true, error: null });
+    set({ overrides: next, isSaving: true, error: null, _reverseMapCache: null });
     try {
       await saveKeybindingSettings(next);
       set({ isSaving: false });
     } catch (error) {
-      set({ overrides: prev, isSaving: false, error: String(error) });
+      set({ overrides: prev, isSaving: false, error: String(error), _reverseMapCache: null });
     }
   },
 
@@ -67,7 +79,10 @@ export const useShortcutStore = create<ShortcutStore>((set, get) => ({
     return getAction(actionId)?.defaultShortcut ?? null;
   },
 
-  buildReverseMap: () => {
+  getReverseMap: () => {
+    const cached = get()._reverseMapCache;
+    if (cached) return cached;
+
     const { getEffectiveShortcut } = get();
     const map = new Map<string, string>();
     for (const action of getAllActions()) {
@@ -76,6 +91,7 @@ export const useShortcutStore = create<ShortcutStore>((set, get) => ({
         map.set(normalizeCombo(combo), action.id);
       }
     }
+    set({ _reverseMapCache: map });
     return map;
   },
 }));
