@@ -35,6 +35,8 @@ import { initNotifications } from "../../lib/notifications";
 import { getErrorMessage } from "../../lib/errors";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { registerActions } from "../../lib/registerActions";
+import { eventToCombo } from "../../lib/keyCombo";
+import { getAction } from "../../lib/actionRegistry";
 import { useShortcutStore } from "../../stores/useShortcutStore";
 
 import type { CommandConfig, CommandState, TerminalTab, SessionMode, WorkspaceConfig } from "../../lib/types";
@@ -546,6 +548,34 @@ export default function AppShell() {
       openInEditor: handleOpenInEditor,
     });
   }, [handleNewShell, handleNewAssistant, closeTab, handleOpenInEditor]);
+
+  // Global keyboard shortcut listener (capture phase — fires before xterm.js)
+  useEffect(() => {
+    const handler = (ev: KeyboardEvent) => {
+      // Skip modifier-only presses
+      if (["Control", "Alt", "Shift", "Meta"].includes(ev.key)) return;
+      // Skip if user is typing in an input/textarea (but not terminal)
+      const tag = (ev.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      const combo = eventToCombo(ev);
+      if (!combo) return;
+
+      const reverseMap = useShortcutStore.getState().buildReverseMap();
+      const actionId = reverseMap.get(combo);
+      if (!actionId) return;
+
+      const action = getAction(actionId);
+      if (!action) return;
+
+      ev.preventDefault();
+      ev.stopPropagation();
+      action.execute();
+    };
+
+    window.addEventListener("keydown", handler, { capture: true });
+    return () => window.removeEventListener("keydown", handler, { capture: true });
+  }, []);
 
   const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive || portsPanelActive || sessionHistoryActive;
 
