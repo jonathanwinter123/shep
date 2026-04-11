@@ -12,6 +12,8 @@ const EMPTY_SET = new Set<string>();
 const EMPTY_ENTRIES: FileEntry[] = [];
 
 export default function FileTree({ repoPath }: FileTreeProps) {
+  // Broad subscription intentional — useMemo below filters to visible entries only,
+  // so re-render cost is just the memo recomputation, not child re-renders.
   const entries = useFileExplorerStore((s) => s.entries);
   const expandedDirs = useFileExplorerStore(
     (s) => s.expandedDirs[repoPath] ?? EMPTY_SET,

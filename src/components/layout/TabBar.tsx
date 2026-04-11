@@ -7,6 +7,7 @@ import { GitBranch, Terminal, Sparkles, SquareTerminal, ChartNoAxesCombined, Rad
 import GearIcon from "../sidebar/icons/GearIcon";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { handleActionKey } from "../../lib/a11y";
+import { useFileExplorerStore } from "../../stores/useFileExplorerStore";
 import DevMemory from "./DevMemory";
 
 
@@ -465,6 +466,7 @@ export default function TabBar({
               onClick={(e) => {
                 e.stopPropagation();
                 closeFilePreview();
+                useFileExplorerStore.getState().closePreview();
               }}
             >
               ×

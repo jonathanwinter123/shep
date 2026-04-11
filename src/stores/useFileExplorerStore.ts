@@ -39,7 +39,8 @@ export const useFileExplorerStore = create<FileExplorerStore>((set, get) => ({
         entries: { ...s.entries, [dirPath]: result },
         loading: { ...s.loading, [dirPath]: false },
       }));
-    } catch {
+    } catch (err) {
+      if (import.meta.env.DEV) console.error("Failed to load directory:", err);
       set((s) => ({ loading: { ...s.loading, [dirPath]: false } }));
     }
   },
