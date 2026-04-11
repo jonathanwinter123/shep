@@ -5,6 +5,8 @@ import { useShortcutStore } from "../../stores/useShortcutStore";
 import { getAllActions, type ActionDefinition } from "../../lib/actionRegistry";
 import { eventToCombo, normalizeCombo, formatComboForDisplay } from "../../lib/keyCombo";
 
+const TERMINAL_ACTION_IDS = new Set(["terminal.newLine", "terminal.deleteWord", "terminal.clearTerminal"]);
+
 /** Group actions by category, sorted. */
 function groupedActions(): [string, ActionDefinition[]][] {
   const actions = getAllActions();
@@ -42,7 +44,6 @@ export default function ShortcutEditor() {
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ actionId: string; combo: string; conflictingId: string } | null>(null);
 
-  const terminalActionIds = new Set(["terminal.newLine", "terminal.deleteWord", "terminal.clearTerminal"]);
 
   const groups = groupedActions();
 
@@ -169,7 +170,7 @@ export default function ShortcutEditor() {
       {/* Conflict dialog */}
       {conflict && (() => {
         const conflictAction = getAllActions().find((a) => a.id === conflict.conflictingId);
-        const isTerminal = terminalActionIds.has(conflict.conflictingId);
+        const isTerminal = TERMINAL_ACTION_IDS.has(conflict.conflictingId);
         return (
           <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
             <div className="bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg p-4 max-w-sm shadow-lg">
