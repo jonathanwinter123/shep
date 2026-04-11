@@ -2,10 +2,12 @@ import { create } from "zustand";
 import type { KeybindingSettings } from "../lib/types";
 import { getKeybindingSettings, saveKeybindingSettings } from "../lib/tauri";
 
+// Legacy defaults — kept for backwards compatibility until Task 8 removes this store.
+// Values are "enabled" / "" to match the new Record<string, string> type.
 const DEFAULT_SETTINGS: KeybindingSettings = {
-  shiftEnterNewline: true,
-  optionDeleteWord: true,
-  cmdKClear: true,
+  shiftEnterNewline: "enabled",
+  optionDeleteWord: "enabled",
+  cmdKClear: "enabled",
 };
 
 interface KeybindingStore {
@@ -14,7 +16,7 @@ interface KeybindingStore {
   isSaving: boolean;
   error: string | null;
   loadSettings: () => Promise<void>;
-  setEnabled: (id: keyof KeybindingSettings, enabled: boolean) => Promise<void>;
+  setEnabled: (id: string, enabled: boolean) => Promise<void>;
 }
 
 export const useKeybindingStore = create<KeybindingStore>((set, get) => ({
@@ -34,7 +36,7 @@ export const useKeybindingStore = create<KeybindingStore>((set, get) => ({
 
   setEnabled: async (id, enabled) => {
     const prev = get().settings;
-    const next = { ...prev, [id]: enabled };
+    const next = { ...prev, [id]: enabled ? "enabled" : "" };
     // Optimistic update
     set({ settings: next, isSaving: true, error: null });
     try {

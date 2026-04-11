@@ -35,6 +35,7 @@ import { initNotifications } from "../../lib/notifications";
 import { getErrorMessage } from "../../lib/errors";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { registerActions } from "../../lib/registerActions";
+import { useShortcutStore } from "../../stores/useShortcutStore";
 
 import type { CommandConfig, CommandState, TerminalTab, SessionMode, WorkspaceConfig } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
@@ -167,6 +168,7 @@ export default function AppShell() {
     void loadTerminalSettings();
     void loadUsageSettings();
     void fetchUsageSnapshots();
+    void useShortcutStore.getState().loadSettings();
     void initNotifications();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));
