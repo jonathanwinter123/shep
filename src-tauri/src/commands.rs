@@ -304,6 +304,16 @@ pub async fn git_file_diff(path: String, file_path: String, staged: bool) -> Res
 }
 
 #[tauri::command]
+pub async fn git_file_contents(path: String, file_path: String, source: String) -> Result<String, String> {
+    git::file_contents(&path, &file_path, &source)
+}
+
+#[tauri::command]
+pub async fn git_list_files(path: String) -> Result<Vec<String>, String> {
+    git::list_files(&path)
+}
+
+#[tauri::command]
 pub async fn git_stage_file(path: String, file_path: String) -> Result<(), String> {
     git::stage_file(&path, &file_path)
 }

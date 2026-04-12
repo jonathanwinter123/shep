@@ -1959,6 +1959,140 @@ select {
   flex-direction: column;
 }
 
+/* Single full-width header strip spanning the whole git panel. The
+ * search pill is absolutely positioned and horizontally centered so
+ * it stays visually anchored regardless of the mode toggle width.
+ * The Diffs/Files mode toggle sits on the right via justify-content.
+ * Opaque background blocks scroll bleed from columns below. */
+.git-panel__header {
+  position: relative;
+  flex-shrink: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 10px;
+  background: var(--frame-tint);
+  z-index: 5;
+}
+
+/* Centered always-visible search pill. Absolute so the mode toggle
+ * next to it never nudges it off-center. */
+.git-panel__header-search {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 260px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--overlay) 6%, transparent);
+  border: 1px solid var(--glass-border);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.git-panel__header-search:focus-within {
+  border-color: var(--border-hover);
+}
+
+.git-panel__search-icon {
+  color: var(--text-muted);
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+.git-panel__search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 2px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.git-panel__search-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+.git-panel__search-clear,
+.git-panel__search-dismiss {
+  flex-shrink: 0;
+  opacity: 0.5;
+  padding: 2px;
+}
+.git-panel__search-clear:hover,
+.git-panel__search-dismiss:hover {
+  opacity: 1;
+}
+
+/* Repo browser file tree — rows inherit .list-item styling and add a
+ * lucide chevron/icon slot on the left. Depth is set inline via
+ * paddingLeft on the row so folders nest visually. */
+.repo-browser__tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+  scrollbar-color: rgba(185, 208, 255, 0.24) transparent;
+}
+
+.tree-row {
+  min-height: 26px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  padding-right: 8px;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.tree-row__chevron {
+  flex-shrink: 0;
+  width: 13px;
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+
+.tree-row__icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.tree-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Changed-file / changed-folder highlight. Two-color scheme matching
+ * the file-list convention: green for new (added/untracked), attention
+ * amber for modified and for folders with any descendants changed.
+ * Icon and name both tint together. Untracked files additionally dim
+ * their name to signal "not yet tracked by git". */
+.tree-row--added .tree-row__name {
+  color: var(--status-added);
+  font-weight: 600;
+}
+.tree-row--added .tree-row__icon {
+  color: var(--status-added);
+  opacity: 0.85;
+}
+
+.tree-row--modified .tree-row__name {
+  color: var(--status-attention);
+  font-weight: 600;
+}
+.tree-row--modified .tree-row__icon {
+  color: var(--status-attention);
+  opacity: 0.85;
+}
+
+.tree-row--untracked .tree-row__name {
+  opacity: 0.6;
+}
+
 
 .git-panel__body {
   display: flex;
@@ -1967,12 +2101,25 @@ select {
 }
 
 .git-panel__sidebar {
+  position: relative;
   width: 280px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--glass-border);
 }
+
+/* Viewer area — wraps the right pane so overlays (find-in-file search,
+ * mode toggle) can absolute-position relative to it without fighting
+ * the scroll container inside DiffViewer/FileViewer. */
+.git-panel__viewer-area {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 
 .git-panel__file-list {
   flex: 1;
@@ -2043,6 +2190,51 @@ select {
   min-width: 0;
   overflow: auto;
   scrollbar-color: rgba(185, 208, 255, 0.24) transparent;
+}
+
+/* Segmented toggle pill — used both for the Diff/File toggle inside the
+ * viewer pane and the Diffs/Repo mode bar at the top of the git panel.
+ * Base style is inline-flow; absolute positioning comes from the scoped
+ * rule below that targets the one inside `.git-panel__viewer-wrap`. */
+.view-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--overlay) 6%, transparent);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.view-toggle__btn {
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.view-toggle__btn:hover {
+  color: var(--text-primary);
+}
+.view-toggle__btn--active {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--overlay) 10%, transparent);
+}
+
+/* File-viewer line number gutter — muted and non-interactive. */
+.file-view__line-no {
+  display: inline-block;
+  width: 3em;
+  margin-right: 10px;
+  text-align: right;
+  color: var(--text-muted);
+  opacity: 0.45;
+  user-select: none;
 }
 
 /* ── Commands Panel ────────────────────────────────────── */
@@ -2273,12 +2465,23 @@ select {
   border-radius: 2px;
   background: var(--text-muted);
 }
-.file-item[data-status="M"] .file-status-bar { background: var(--status-modified); }
-.file-item[data-status="A"] .file-status-bar { background: var(--status-added); }
-.file-item[data-status="D"] .file-status-bar { background: var(--status-deleted); }
-.file-item[data-status="R"] .file-status-bar { background: var(--status-renamed); }
-.file-item[data-status="U"] .file-status-bar { background: var(--status-unmerged); }
-.file-item[data-status="?"] .file-status-bar { background: var(--text-muted); }
+/* Three-color scheme matching the repo-browser tree: green for new files,
+ * amber for modifications, red for deletions. Untracked (?) files are
+ * conceptually "new" so they get the same green as staged additions — the
+ * `?` vs `A` distinction is handled separately in the diffs view by which
+ * section they live in (STAGED vs CHANGES), not by color. */
+.file-item[data-status="A"] .file-status-bar,
+.file-item[data-status="?"] .file-status-bar {
+  background: var(--status-added);
+}
+.file-item[data-status="M"] .file-status-bar,
+.file-item[data-status="R"] .file-status-bar,
+.file-item[data-status="U"] .file-status-bar {
+  background: var(--status-attention);
+}
+.file-item[data-status="D"] .file-status-bar {
+  background: var(--status-deleted);
+}
 
 /* Filename and parent-dir hint. Filename stays prominent; parent is muted
  * and only shown when the file isn't at the repo root. */
@@ -2386,6 +2589,15 @@ select {
 
 .diff-line--context {
   color: var(--text-secondary);
+}
+
+/* Find-in-file match highlight — a subtle amber tint over the line, on
+ * top of whatever diff add/del/context background is already in place.
+ * Uses the same attention color as the dirty indicator for consistency
+ * with the Cmd+F dot on the collapsed search icon. */
+.diff-line--find-match {
+  background: color-mix(in srgb, var(--status-attention) 22%, transparent);
+  box-shadow: inset 2px 0 0 var(--status-attention);
 }
 
 /* ── Inline create-form (used by ProjectItem for worktree branch input;

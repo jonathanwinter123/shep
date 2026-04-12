@@ -109,6 +109,8 @@ pub fn run() {
             commands::git_status,
             commands::git_changed_files,
             commands::git_file_diff,
+            commands::git_file_contents,
+            commands::git_list_files,
             commands::git_stage_file,
             commands::git_stage_all,
             commands::git_commit,

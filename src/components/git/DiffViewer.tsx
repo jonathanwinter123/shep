@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useThemeStore } from "../../stores/useThemeStore";
 import {
   highlightSource,
@@ -10,6 +10,10 @@ import {
 interface DiffViewerProps {
   diff: string;
   filePath: string;
+  /** Find-in-file term from the right-panel search. When non-empty, diff
+   *  lines whose content contains the term (case-insensitive) get a
+   *  highlight class, and the first match is scrolled into view. */
+  findTerm?: string;
 }
 
 type LineType = "add" | "del" | "context" | "hunk" | "meta";
@@ -109,12 +113,40 @@ function renderTokens(tokens: ThemedToken[] | undefined, fallback: string) {
   ));
 }
 
-export default function DiffViewer({ diff, filePath }: DiffViewerProps) {
+export default function DiffViewer({ diff, filePath, findTerm = "" }: DiffViewerProps) {
   const theme = useThemeStore((s) => s.theme);
   const [highlight, setHighlight] = useState<HighlightState>(EMPTY_HIGHLIGHT);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const parsed = useMemo(() => parseDiff(diff), [diff]);
   const lang = useMemo(() => langForFile(filePath), [filePath]);
+
+  // Pre-compute the set of parsed-line indices matching the find term.
+  // We match against `content` (prefix-stripped) so the +/-/space prefix
+  // doesn't bleed into matches. Hunk/meta lines are skipped — finding
+  // "foo" shouldn't highlight `@@ -foo,5 +foo,5 @@`.
+  const matchSet = useMemo(() => {
+    const s = new Set<number>();
+    const needle = findTerm.trim().toLowerCase();
+    if (!needle) return s;
+    for (let i = 0; i < parsed.lines.length; i++) {
+      const line = parsed.lines[i];
+      if (line.type === "hunk" || line.type === "meta") continue;
+      if (line.content.toLowerCase().includes(needle)) s.add(i);
+    }
+    return s;
+  }, [parsed, findTerm]);
+
+  // Scroll to the first match whenever the find term changes. Imperative
+  // DOM scroll — legitimate effect use for integrating with the rendered DOM.
+  useEffect(() => {
+    if (matchSet.size === 0 || !scrollRef.current) return;
+    const firstIdx = Math.min(...matchSet);
+    const el = scrollRef.current.querySelector<HTMLDivElement>(
+      `[data-line-idx="${firstIdx}"]`,
+    );
+    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [matchSet]);
 
   // Run Shiki when the diff, file, or theme changes. Shiki is an async,
   // imperative external library (explicitly listed as a legitimate effect use
@@ -159,12 +191,12 @@ export default function DiffViewer({ diff, filePath }: DiffViewerProps) {
   }
 
   return (
-    <div className="git-panel__diff">
+    <div className="git-panel__diff" ref={scrollRef}>
       <div className="diff-content">
         {parsed.lines.map((line, i) => {
           if (line.type === "hunk" || line.type === "meta") {
             return (
-              <div key={i} className={`diff-line diff-line--${line.type}`}>
+              <div key={i} data-line-idx={i} className={`diff-line diff-line--${line.type}`}>
                 <span className="diff-line__prefix">{"\u00A0"}</span>
                 {line.raw || "\u00A0"}
               </div>
@@ -181,8 +213,14 @@ export default function DiffViewer({ diff, filePath }: DiffViewerProps) {
                 ? highlight.newTokens?.[line.newIdx]
                 : undefined;
 
+          const isMatch = matchSet.has(i);
+
           return (
-            <div key={i} className={`diff-line diff-line--${line.type}`}>
+            <div
+              key={i}
+              data-line-idx={i}
+              className={`diff-line diff-line--${line.type}${isMatch ? " diff-line--find-match" : ""}`}
+            >
               <span className="diff-line__prefix">{prefix}</span>
               {renderTokens(tokens, line.content)}
             </div>
