@@ -6,6 +6,8 @@ import {
   shikiThemeFor,
   type ThemedToken,
 } from "../../lib/shikiHighlighter";
+import MarkdownViewer from "./MarkdownViewer";
+import { isMarkdownFile } from "../../lib/markdownRenderer";
 
 interface FileViewerProps {
   contents: string;
@@ -36,6 +38,7 @@ export default function FileViewer({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const lang = useMemo(() => langForFile(filePath), [filePath]);
+  const markdownFile = useMemo(() => isMarkdownFile(filePath), [filePath]);
   const oversized = contents.length > SHIKI_MAX_BYTES;
 
   // Pre-compute the set of line indices that match the find term. Empty
@@ -110,6 +113,10 @@ export default function FileViewer({
         </div>
       </div>
     );
+  }
+
+  if (markdownFile) {
+    return <MarkdownViewer contents={contents} />;
   }
 
   const lines = contents.split("\n");

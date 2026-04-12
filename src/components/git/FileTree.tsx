@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { ChevronDown, ChevronRight, File as FileIcon, Folder } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { renderSearchHighlight } from "./searchHighlight";
 
 /** Change classification for a node in the tree. `added` covers untracked
@@ -174,11 +174,6 @@ function TreeRow({ node, depth, expanded, selected, search, onToggle, onSelect }
           )
         ) : (
           <span className="tree-row__chevron" />
-        )}
-        {isDir ? (
-          <Folder size={14} className="tree-row__icon" />
-        ) : (
-          <FileIcon size={14} className="tree-row__icon" />
         )}
         <span className="tree-row__name">{renderSearchHighlight(node.name, search)}</span>
       </div>

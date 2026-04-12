@@ -2046,8 +2046,8 @@ select {
   opacity: 0.75;
 }
 
-/* Repo browser file tree — rows inherit .list-item styling and add a
- * lucide chevron/icon slot on the left. Depth is set inline via
+/* Repo browser file tree — rows inherit .list-item styling and use a
+ * disclosure chevron slot on the left. Depth is set inline via
  * paddingLeft on the row so folders nest visually. */
 .repo-browser__tree {
   flex: 1;
@@ -2072,12 +2072,6 @@ select {
   opacity: 0.55;
 }
 
-.tree-row__icon {
-  flex-shrink: 0;
-  color: var(--text-muted);
-  opacity: 0.7;
-}
-
 .tree-row__name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2093,18 +2087,9 @@ select {
   color: var(--status-added);
   font-weight: 600;
 }
-.tree-row--added .tree-row__icon {
-  color: var(--status-added);
-  opacity: 0.85;
-}
-
 .tree-row--modified .tree-row__name {
   color: var(--status-attention);
   font-weight: 600;
-}
-.tree-row--modified .tree-row__icon {
-  color: var(--status-attention);
-  opacity: 0.85;
 }
 
 .tree-row--untracked .tree-row__name {
@@ -2252,6 +2237,123 @@ select {
   min-width: 0;
   overflow: auto;
   scrollbar-color: rgba(185, 208, 255, 0.24) transparent;
+}
+
+.markdown-view {
+  padding-top: 48px;
+}
+
+.markdown-view__content {
+  max-width: 860px;
+  padding: 10px 24px 28px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.markdown-view__content > :first-child {
+  margin-top: 0;
+}
+
+.markdown-view__content > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-view__content h1,
+.markdown-view__content h2,
+.markdown-view__content h3,
+.markdown-view__content h4,
+.markdown-view__content h5,
+.markdown-view__content h6 {
+  margin: 1.5em 0 0.45em;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.markdown-view__content h1 {
+  font-size: 1.8rem;
+}
+
+.markdown-view__content h2 {
+  font-size: 1.4rem;
+}
+
+.markdown-view__content h3 {
+  font-size: 1.15rem;
+}
+
+.markdown-view__content p,
+.markdown-view__content ul,
+.markdown-view__content ol,
+.markdown-view__content blockquote,
+.markdown-view__content pre,
+.markdown-view__content table {
+  margin: 0 0 1em;
+}
+
+.markdown-view__content ul,
+.markdown-view__content ol {
+  padding-left: 1.4em;
+}
+
+.markdown-view__content li + li {
+  margin-top: 0.2em;
+}
+
+.markdown-view__content a {
+  color: var(--text-primary);
+  text-decoration-color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+.markdown-view__content code {
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 0.92em;
+}
+
+.markdown-view__content :not(pre) > code {
+  padding: 0.12em 0.38em;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--overlay) 6%, transparent);
+  color: var(--text-primary);
+}
+
+.markdown-view__content pre {
+  overflow-x: auto;
+}
+
+.markdown-view__content pre.shiki {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--overlay) 14%, transparent);
+  background: color-mix(in srgb, var(--overlay) 3%, transparent) !important;
+}
+
+.markdown-view__content blockquote {
+  padding-left: 14px;
+  margin-left: 0;
+  border-left: 3px solid color-mix(in srgb, var(--overlay) 18%, transparent);
+  color: var(--text-muted);
+}
+
+.markdown-view__content hr {
+  border: none;
+  border-top: 1px solid color-mix(in srgb, var(--overlay) 16%, transparent);
+  margin: 1.4em 0;
+}
+
+.markdown-view__content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-view__content th,
+.markdown-view__content td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, var(--overlay) 12%, transparent);
+}
+
+.markdown-view__content th {
+  color: var(--text-primary);
 }
 
 /* Segmented toggle pill — used both for the Diff/File toggle inside the
