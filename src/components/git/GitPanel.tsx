@@ -364,6 +364,26 @@ export default function GitPanel() {
     return Array.from(byPath.values()).sort((a, b) => a.path.localeCompare(b.path));
   }, [filteredFiles]);
 
+  useEffect(() => {
+    if (!activeProjectPath || panelMode !== "diffs") return;
+
+    const currentValid = preferredDiffFiles.some(
+      (file) => file.path === selectedPath && file.area === selectedArea,
+    );
+
+    if (currentValid) return;
+
+    const first = preferredDiffFiles[0] ?? null;
+    if (!first) return;
+
+    useGitPanelStore.getState().setDiffsSelection(
+      activeProjectPath,
+      first.path,
+      first.area,
+      first.status,
+    );
+  }, [activeProjectPath, panelMode, preferredDiffFiles, selectedArea, selectedPath]);
+
   if (!activeProjectPath) {
     return (
       <div className="absolute inset-0 flex items-center justify-center opacity-50">
@@ -474,19 +494,19 @@ export default function GitPanel() {
             <div className="view-toggle" role="tablist" aria-label="Panel mode">
               <button
                 role="tab"
-                aria-selected={panelMode === "diffs"}
-                className={`view-toggle__btn${panelMode === "diffs" ? " view-toggle__btn--active" : ""}`}
-                onClick={() => handleSetPanelMode("diffs")}
-              >
-                Diffs
-              </button>
-              <button
-                role="tab"
                 aria-selected={panelMode === "files"}
                 className={`view-toggle__btn${panelMode === "files" ? " view-toggle__btn--active" : ""}`}
                 onClick={() => handleSetPanelMode("files")}
               >
                 Files
+              </button>
+              <button
+                role="tab"
+                aria-selected={panelMode === "diffs"}
+                className={`view-toggle__btn${panelMode === "diffs" ? " view-toggle__btn--active" : ""}`}
+                onClick={() => handleSetPanelMode("diffs")}
+              >
+                Diffs
               </button>
             </div>
           </div>

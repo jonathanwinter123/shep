@@ -24,7 +24,7 @@ const meta: Record<TabKind, TabKindMeta> = {
     shortcut: "⇧⌘C",
   },
   git: {
-    label: "Git",
+    label: "Files",
     icon: (size) => <FolderTree size={size} />,
     shortcut: "⌘G",
   },
