@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useThemeStore } from "../../stores/useThemeStore";
-import { getMarkdownRenderer } from "../../lib/markdownRenderer";
+import {
+  getMarkdownRenderer,
+  getPlainMarkdownRenderer,
+} from "../../lib/markdownRenderer";
 import { shikiThemeFor } from "../../lib/shikiHighlighter";
 
 interface MarkdownViewerProps {
@@ -20,8 +23,19 @@ export default function MarkdownViewer({ contents }: MarkdownViewerProps) {
         const renderer = await getMarkdownRenderer(themeName);
         const next = renderer.render(contents);
         if (!cancelled) setHtml(next);
-      } catch {
-        if (!cancelled) setHtml("");
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error("Markdown render failed, falling back to plain markdown:", error);
+        }
+        try {
+          const fallback = getPlainMarkdownRenderer().render(contents);
+          if (!cancelled) setHtml(fallback);
+        } catch (fallbackError) {
+          if (import.meta.env.DEV) {
+            console.error("Plain markdown fallback also failed:", fallbackError);
+          }
+          if (!cancelled) setHtml("");
+        }
       }
     })();
 
