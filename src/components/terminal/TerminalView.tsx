@@ -6,7 +6,7 @@ import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
-import { writePty, resizePty } from "../../lib/tauri";
+import { writePty, resizePty, openUrl } from "../../lib/tauri";
 import {
   flushPendingOutput,
   registerTerminal,
@@ -55,6 +55,11 @@ export default function TerminalView({
       scrollback: termSettings.scrollback,
       allowTransparency: true,
       allowProposedApi: true,
+      linkHandler: {
+        activate: (_ev, url) => {
+          void openUrl(url);
+        },
+      },
     });
 
     const fitAddon = new FitAddon();
@@ -62,7 +67,9 @@ export default function TerminalView({
     const unicodeAddon = new Unicode11Addon();
     term.loadAddon(unicodeAddon);
     term.unicode.activeVersion = "11";
-    term.loadAddon(new WebLinksAddon());
+    term.loadAddon(new WebLinksAddon((_ev, url) => {
+      void openUrl(url);
+    }));
 
     // Send input to PTY
     term.onData((data) => {

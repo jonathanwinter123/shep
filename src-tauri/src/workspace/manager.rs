@@ -15,6 +15,10 @@ impl WorkspaceManager {
         loader::migrate_old_projects()
     }
 
+    pub fn backfill_global_config_defaults(&self) -> Result<(), String> {
+        loader::backfill_global_config_defaults()
+    }
+
     pub fn list_repos(&self) -> Result<Vec<RepoInfo>, String> {
         loader::list_repos()
     }

@@ -1,38 +1,68 @@
-import { useState, useEffect, useCallback } from "react";
-import { Upload } from "lucide-react";
-import tabKindMeta from "../../lib/tabKindMeta";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Search, X, PanelLeft, PanelLeftOpen } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
+import { useGitPanelStore } from "../../stores/useGitPanelStore";
 import {
-  gitChangedFiles, gitFileDiff, gitStageFile, gitUnstageAll, gitUnstageFile,
-  gitStageAll, gitCommit, gitPushBranch,
+  gitChangedFiles, gitFileDiff, gitFileContents, gitListFiles,
 } from "../../lib/tauri";
 import type { ChangedFile } from "../../lib/types";
 import FileList from "./FileList";
+import FileTree from "./FileTree";
 import DiffViewer from "./DiffViewer";
-import BranchDropdown from "./BranchDropdown";
+import FileViewer from "./FileViewer";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
 
+type PanelMode = "diffs" | "files";
+const PANEL_MODE_KEY = "shep:gitPanelMode";
+
 export default function GitPanel() {
   const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
-  const refreshStatus = useGitStore((s) => s.refreshStatus);
   const pushNotice = useNoticeStore((s) => s.pushNotice);
 
   const gitStatus = useGitStore(
     (s) => activeProjectPath ? s.projectGitStatus[activeProjectPath] ?? null : null,
   );
 
-  const [files, setFiles] = useState<ChangedFile[]>([]);
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [selectedArea, setSelectedArea] = useState<string | null>(null);
-  const [diffContent, setDiffContent] = useState<string>("");
-  const [commitMsg, setCommitMsg] = useState("");
-  const [committing, setCommitting] = useState(false);
-  const [pushing, setPushing] = useState(false);
-  const canLoadGitFiles = !!activeProjectPath && !!gitStatus?.is_git_repo;
-  const currentBranch = gitStatus?.branch ?? "";
+  // Persistent per-repo UI state lives in useGitPanelStore so it survives
+  // GitPanel unmounts (switching tabs or navigating away and back).
+  const panelState = useGitPanelStore((s) =>
+    activeProjectPath ? s.perRepo[activeProjectPath] ?? null : null,
+  );
+  const selectedPath = panelState?.diffsSelectedPath ?? null;
+  const selectedArea = panelState?.diffsSelectedArea ?? null;
+  const repoSelectedPath = panelState?.repoSelectedPath ?? null;
+  const repoExpanded = panelState?.repoExpanded ?? [];
+  const leftSearch = panelState?.leftSearch ?? "";
+  const sidebarCollapsed = panelState?.sidebarCollapsed ?? false;
 
+  // Transient local state — reset on every mount, no need to persist.
+  const [files, setFiles] = useState<ChangedFile[]>([]);
+  const [diffContent, setDiffContent] = useState<string>("");
+  const [repoFiles, setRepoFiles] = useState<string[]>([]);
+  const [repoFileContent, setRepoFileContent] = useState<string>("");
+  const [repoFileError, setRepoFileError] = useState<string | null>(null);
+  const [repoFileLoading, setRepoFileLoading] = useState<boolean>(false);
+
+  // Panel mode persists via localStorage, with backwards compat for the
+  // old "repo" value (renamed to "files" in the UI).
+  const [panelMode, setPanelMode] = useState<PanelMode>(() => {
+    const stored = localStorage.getItem(PANEL_MODE_KEY);
+    return stored === "files" || stored === "repo" ? "files" : "diffs";
+  });
+
+  // A single unified search term (`leftSearch`, persisted in the panel
+  // store) drives both the sidebar file filter AND the in-viewer
+  // find-in-file highlight. The header control can collapse visually,
+  // but the underlying term stays unified.
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchOpen, setSearchOpen] = useState(() => leftSearch.trim().length > 0);
+
+  const canLoadGitFiles = !!activeProjectPath && !!gitStatus?.is_git_repo;
+
+  // ── Diffs mode: fetch changed files ───────────────────────────────
   const fetchFiles = useCallback(async () => {
     if (!canLoadGitFiles || !activeProjectPath) {
       setFiles([]);
@@ -52,112 +82,318 @@ export default function GitPanel() {
     : "";
   useEffect(() => { fetchFiles(); }, [fetchFiles, statusKey]);
 
+  // ── Diffs mode: fetch diff content on selection change ─────────────
+  useEffect(() => {
+    if (!activeProjectPath || !selectedPath || !selectedArea) {
+      setDiffContent("");
+      return;
+    }
+    const repo = activeProjectPath;
+    const path = selectedPath;
+    const staged = selectedArea === "staged";
 
-  const refreshAfterChange = useCallback(async () => {
-    if (!activeProjectPath) return;
-    await fetchFiles();
-    await refreshStatus(activeProjectPath);
-  }, [activeProjectPath, fetchFiles, refreshStatus]);
+    let cancelled = false;
+    setDiffContent("");
+    void (async () => {
+      try {
+        const diff = await gitFileDiff(repo, path, staged);
+        if (!cancelled) setDiffContent(diff);
+      } catch (error) {
+        if (!cancelled) {
+          pushNotice({
+            tone: "error",
+            title: "Couldn't load diff",
+            message: getErrorMessage(error),
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProjectPath, selectedPath, selectedArea, pushNotice]);
+
+  // ── Diffs mode: watcher refresh for the open diff ──────────────────
+  useEffect(() => {
+    if (!activeProjectPath || !selectedPath || !selectedArea) return;
+    const repo = activeProjectPath;
+    const path = selectedPath;
+    const staged = selectedArea === "staged";
+
+    const unlistenPromise = listen<{ paths: string[] }>("git-fs-changed", async (event) => {
+      if (!event.payload.paths.includes(repo)) return;
+      try {
+        const diff = await gitFileDiff(repo, path, staged);
+        setDiffContent(diff);
+      } catch {
+        // File may have been committed away — silent ignore.
+      }
+    });
+    return () => {
+      unlistenPromise.then((f) => f());
+    };
+  }, [activeProjectPath, selectedPath, selectedArea]);
+
+  // ── Files mode: fetch repo file list ───────────────────────────────
+  useEffect(() => {
+    if (!canLoadGitFiles || !activeProjectPath) {
+      setRepoFiles([]);
+      return;
+    }
+    const repo = activeProjectPath;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await gitListFiles(repo);
+        if (!cancelled) setRepoFiles(result);
+      } catch (error) {
+        if (!cancelled) {
+          setRepoFiles([]);
+          pushNotice({
+            tone: "error",
+            title: "Couldn't list repo files",
+            message: getErrorMessage(error),
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canLoadGitFiles, activeProjectPath, pushNotice]);
+
+  // ── Files mode: watcher refresh for the repo file list ────────────
+  useEffect(() => {
+    if (!canLoadGitFiles || !activeProjectPath) return;
+    const repo = activeProjectPath;
+    const unlistenPromise = listen<{ paths: string[] }>("git-fs-changed", async (event) => {
+      if (!event.payload.paths.includes(repo)) return;
+      try {
+        const result = await gitListFiles(repo);
+        setRepoFiles(result);
+      } catch {
+        // Silent — initial fetch already pushed an error notice if needed.
+      }
+    });
+    return () => {
+      unlistenPromise.then((f) => f());
+    };
+  }, [canLoadGitFiles, activeProjectPath]);
+
+  // ── Files mode: fetch file contents on selection change ────────────
+  useEffect(() => {
+    if (!canLoadGitFiles || !activeProjectPath || !repoSelectedPath) {
+      setRepoFileContent("");
+      setRepoFileError(null);
+      setRepoFileLoading(false);
+      return;
+    }
+    const repo = activeProjectPath;
+    const path = repoSelectedPath;
+    let cancelled = false;
+    setRepoFileContent("");
+    setRepoFileError(null);
+    setRepoFileLoading(true);
+    void (async () => {
+      try {
+        const content = await gitFileContents(repo, path, "working");
+        if (!cancelled) setRepoFileContent(content);
+      } catch (error) {
+        if (!cancelled) setRepoFileError(getErrorMessage(error));
+      } finally {
+        if (!cancelled) setRepoFileLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canLoadGitFiles, activeProjectPath, repoSelectedPath]);
+
+  // ── Files mode: watcher refresh for the open file contents ────────
+  useEffect(() => {
+    if (!canLoadGitFiles || !activeProjectPath || !repoSelectedPath) return;
+    const repo = activeProjectPath;
+    const path = repoSelectedPath;
+    const unlistenPromise = listen<{ paths: string[] }>("git-fs-changed", async (event) => {
+      if (!event.payload.paths.includes(repo)) return;
+      try {
+        const content = await gitFileContents(repo, path, "working");
+        setRepoFileContent(content);
+        setRepoFileError(null);
+      } catch (error) {
+        setRepoFileError(getErrorMessage(error));
+      }
+    });
+    return () => {
+      unlistenPromise.then((f) => f());
+    };
+  }, [canLoadGitFiles, activeProjectPath, repoSelectedPath]);
+
+  // Cmd+F (or Ctrl+F) focuses the always-visible unified search input.
+  // Listener is only bound while GitPanel is mounted.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  useEffect(() => {
+    if (leftSearch.trim()) setSearchOpen(true);
+  }, [leftSearch]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const id = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [searchOpen]);
 
   const handleSelect = useCallback(
-    async (file: ChangedFile) => {
+    (file: ChangedFile) => {
       if (!activeProjectPath) return;
-      setSelectedPath(file.path);
-      setSelectedArea(file.area);
-      try {
-        const diff = await gitFileDiff(activeProjectPath, file.path, file.area === "staged");
-        setDiffContent(diff);
-      } catch (error) {
-        setDiffContent("");
-        pushNotice({ tone: "error", title: "Couldn't load diff", message: getErrorMessage(error) });
-      }
+      useGitPanelStore.getState().setDiffsSelection(
+        activeProjectPath,
+        file.path,
+        file.area,
+        file.status,
+      );
     },
-    [activeProjectPath, pushNotice],
+    [activeProjectPath],
   );
 
-  const handleStage = useCallback(
-    async (file: ChangedFile) => {
+  const handleSetPanelMode = useCallback((mode: PanelMode) => {
+    setPanelMode(mode);
+    localStorage.setItem(PANEL_MODE_KEY, mode);
+  }, []);
+
+  const handleSetLeftSearch = useCallback(
+    (value: string) => {
       if (!activeProjectPath) return;
-      try {
-        await gitStageFile(activeProjectPath, file.path);
-        await refreshAfterChange();
-      } catch (error) {
-        pushNotice({ tone: "error", title: `Couldn't stage ${file.path}`, message: getErrorMessage(error) });
-      }
+      useGitPanelStore.getState().setLeftSearch(activeProjectPath, value);
     },
-    [activeProjectPath, refreshAfterChange, pushNotice],
+    [activeProjectPath],
   );
 
-  const handleUnstage = useCallback(
-    async (file: ChangedFile) => {
+  const handleOpenSearch = useCallback(() => {
+    setSearchOpen(true);
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    handleSetLeftSearch("");
+    setSearchOpen(false);
+  }, [handleSetLeftSearch]);
+
+  const handleRepoSelect = useCallback(
+    (path: string) => {
       if (!activeProjectPath) return;
-      try {
-        await gitUnstageFile(activeProjectPath, file.path);
-        await refreshAfterChange();
-      } catch (error) {
-        pushNotice({ tone: "error", title: `Couldn't unstage ${file.path}`, message: getErrorMessage(error) });
-      }
+      useGitPanelStore.getState().setRepoSelection(activeProjectPath, path);
     },
-    [activeProjectPath, refreshAfterChange, pushNotice],
+    [activeProjectPath],
   );
 
-  const handleStageAll = useCallback(async () => {
-    if (!activeProjectPath) return;
-    try {
-      await gitStageAll(activeProjectPath);
-      await refreshAfterChange();
-    } catch (error) {
-      pushNotice({ tone: "error", title: "Couldn't stage all", message: getErrorMessage(error) });
-    }
-  }, [activeProjectPath, refreshAfterChange, pushNotice]);
+  const handleRepoExpandedChange = useCallback(
+    (expanded: string[]) => {
+      if (!activeProjectPath) return;
+      useGitPanelStore.getState().setRepoExpanded(activeProjectPath, expanded);
+    },
+    [activeProjectPath],
+  );
 
-  const handleUnstageAll = useCallback(async () => {
-    if (!activeProjectPath) return;
-    try {
-      await gitUnstageAll(activeProjectPath);
-      await refreshAfterChange();
-    } catch (error) {
-      pushNotice({ tone: "error", title: "Couldn't unstage all", message: getErrorMessage(error) });
-    }
-  }, [activeProjectPath, refreshAfterChange, pushNotice]);
+  const handleSetSidebarCollapsed = useCallback(
+    (collapsed: boolean) => {
+      if (!activeProjectPath) return;
+      useGitPanelStore.getState().setSidebarCollapsed(activeProjectPath, collapsed);
+    },
+    [activeProjectPath],
+  );
 
-  const handleCommit = useCallback(async () => {
-    if (!activeProjectPath || !commitMsg.trim() || committing) return;
-    setCommitting(true);
-    try {
-      await gitCommit(activeProjectPath, commitMsg.trim());
-      setCommitMsg("");
-      setSelectedPath(null);
-      setSelectedArea(null);
-      setDiffContent("");
-      await refreshAfterChange();
-    } catch (error) {
-      pushNotice({ tone: "error", title: "Commit failed", message: getErrorMessage(error) });
-    } finally {
-      setCommitting(false);
+  // Classify each changed file into "added" (new: status A or ?) or
+  // "modified" (everything else) for the repo-browser tree coloring.
+  // Also build a set of untracked paths (status ?) so the tree can dim
+  // their names to signal "not tracked by git yet".
+  const changedPathsMap = useMemo(() => {
+    const m = new Map<string, "added" | "modified">();
+    for (const f of files) {
+      const kind: "added" | "modified" =
+        f.status === "A" || f.status === "?" ? "added" : "modified";
+      m.set(f.path, kind);
     }
-  }, [activeProjectPath, commitMsg, committing, refreshAfterChange, pushNotice]);
+    return m;
+  }, [files]);
 
-  const handlePush = useCallback(async () => {
-    if (!activeProjectPath || !currentBranch || pushing) return;
-    setPushing(true);
-    try {
-      await gitPushBranch(activeProjectPath, currentBranch);
-      await refreshStatus(activeProjectPath);
-      pushNotice({ tone: "success", title: "Pushed", message: `${currentBranch} → origin` });
-    } catch (error) {
-      pushNotice({ tone: "error", title: "Push failed", message: getErrorMessage(error) });
-    } finally {
-      setPushing(false);
+  const untrackedPaths = useMemo(() => {
+    const s = new Set<string>();
+    for (const f of files) {
+      if (f.status === "?") s.add(f.path);
     }
-  }, [activeProjectPath, currentBranch, pushing, refreshStatus, pushNotice]);
+    return s;
+  }, [files]);
 
-  const handleBranchChanged = useCallback(() => {
-    fetchFiles();
-    setSelectedPath(null);
-    setSelectedArea(null);
-    setDiffContent("");
-  }, [fetchFiles]);
+  // Filter the changed files list for FileList based on the same lifted
+  // leftSearch term. Empty search returns all files.
+  const filteredFiles = useMemo(() => {
+    if (!leftSearch.trim()) return files;
+    const needle = leftSearch.trim().toLowerCase();
+    return files.filter((f) => f.path.toLowerCase().includes(needle));
+  }, [files, leftSearch]);
+
+  const preferredDiffFiles = useMemo(() => {
+    const priority = (area: string) => {
+      if (area === "unstaged" || area === "untracked") return 2;
+      if (area === "staged") return 1;
+      return 0;
+    };
+
+    const byPath = new Map<string, ChangedFile>();
+    for (const file of filteredFiles) {
+      const current = byPath.get(file.path);
+      if (!current || priority(file.area) > priority(current.area)) {
+        byPath.set(file.path, file);
+      }
+    }
+
+    return Array.from(byPath.values()).sort((a, b) => a.path.localeCompare(b.path));
+  }, [filteredFiles]);
+
+  useEffect(() => {
+    if (!activeProjectPath || panelMode !== "diffs") return;
+
+    const currentValid = preferredDiffFiles.some(
+      (file) => file.path === selectedPath && file.area === selectedArea,
+    );
+
+    if (currentValid) return;
+
+    const fallback =
+      preferredDiffFiles.find((file) => file.path === selectedPath)
+      ?? preferredDiffFiles[0]
+      ?? null;
+    if (!fallback) return;
+
+    useGitPanelStore.getState().setDiffsSelection(
+      activeProjectPath,
+      fallback.path,
+      fallback.area,
+      fallback.status,
+    );
+  }, [activeProjectPath, panelMode, preferredDiffFiles, selectedArea, selectedPath]);
+
+  useEffect(() => {
+    if (!activeProjectPath || panelMode !== "files") return;
+    if (!repoSelectedPath) return;
+
+    const currentValid = repoFiles.includes(repoSelectedPath);
+    if (currentValid) return;
+
+    useGitPanelStore.getState().setRepoSelection(activeProjectPath, null);
+  }, [activeProjectPath, panelMode, repoFiles, repoSelectedPath]);
 
   if (!activeProjectPath) {
     return (
@@ -175,90 +411,149 @@ export default function GitPanel() {
     );
   }
 
-  const activeStatus = gitStatus;
-  const stagedCount = files.filter((f) => f.area === "staged").length;
-  const canCommit = stagedCount > 0 && commitMsg.trim().length > 0 && !committing;
-  const showPush = activeStatus.ahead > 0;
-
   return (
     <div className="git-panel">
-      <div className="git-panel__header">
-        <span style={{ opacity: 0.5, flexShrink: 0 }}>{tabKindMeta.git.icon(14)}</span>
-        <BranchDropdown
-          repoPath={activeProjectPath}
-          currentBranch={gitStatus.branch}
-          isWorktree={gitStatus.worktree_parent != null}
-          onBranchChanged={handleBranchChanged}
-        />
-        <span
-          style={{
-            width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-            backgroundColor: activeStatus.dirty ? "var(--status-attention)" : "var(--status-clean)",
-          }}
-        />
-        {showPush && (
-          <button
-            className="btn-ghost"
-            style={{ fontSize: 11, padding: "2px 8px", gap: 4, marginLeft: 4 }}
-            onClick={handlePush}
-            disabled={pushing}
-            title={`Push ${activeStatus.ahead} commit${activeStatus.ahead > 1 ? "s" : ""} to origin`}
-          >
-            <Upload size={11} />
-            {pushing ? "Pushing…" : `Push ↑${activeStatus.ahead}`}
-          </button>
-        )}
-        {!showPush && (gitStatus.behind > 0) && (
-          <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 4, flexShrink: 0 }}>
-            ↓{gitStatus.behind}
-          </span>
-        )}
-      </div>
       <div className="git-panel__body">
-        <div className="git-panel__sidebar">
-          <FileList
-            files={files}
-            selectedPath={selectedPath}
-            selectedArea={selectedArea}
-            onSelect={handleSelect}
-            onStage={handleStage}
-            onUnstage={handleUnstage}
-            onStageAll={handleStageAll}
-            onUnstageAll={handleUnstageAll}
-          />
-          {/* Commit area — always visible at the bottom of the file list */}
-          <div className="git-panel__commit">
-            <textarea
-              className="git-panel__commit-input"
-              placeholder="Commit message"
-              value={commitMsg}
-              onChange={(e) => setCommitMsg(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canCommit) {
-                  e.preventDefault();
-                  handleCommit();
-                }
-              }}
-              rows={2}
-            />
-            <button
-              className="btn-primary git-panel__commit-btn"
-              disabled={!canCommit}
-              onClick={handleCommit}
-            >
-              {committing ? "Committing…" : `Commit${stagedCount > 0 ? ` (${stagedCount})` : ""}`}
-            </button>
+        {!sidebarCollapsed && (
+          <div className="git-panel__sidebar">
+            {panelMode === "files" ? (
+              <FileTree
+                files={repoFiles}
+                changedPaths={changedPathsMap}
+                untrackedPaths={untrackedPaths}
+                search={leftSearch}
+                selectedPath={repoSelectedPath}
+                onSelect={handleRepoSelect}
+                expandedPaths={repoExpanded}
+                onExpandedChange={handleRepoExpandedChange}
+              />
+            ) : (
+              <FileList
+                files={preferredDiffFiles}
+                search={leftSearch}
+                selectedPath={selectedPath}
+                onSelect={handleSelect}
+              />
+            )}
           </div>
-        </div>
-        {selectedPath ? (
-          <DiffViewer diff={diffContent} filePath={selectedPath} />
-        ) : (
-          <div className="git-panel__diff">
-            <div style={{ padding: 24, opacity: 0.35, fontSize: 12 }}>
-              Select a file to view diff
+        )}
+
+        <div className={`git-panel__viewer-area${sidebarCollapsed ? " git-panel__viewer-area--wide" : ""}`}>
+          <div className="git-panel__viewer-controls">
+            <div className={`git-panel__header-search-shell${searchOpen ? " git-panel__header-search-shell--open" : ""}`}>
+              {searchOpen ? (
+                <div className="git-panel__header-search">
+                  <Search size={12} className="git-panel__search-icon" />
+                  <input
+                    ref={searchInputRef}
+                    className="git-panel__search-input"
+                    type="text"
+                    placeholder="Search files, filter diffs…"
+                    value={leftSearch}
+                    onChange={(e) => handleSetLeftSearch(e.target.value)}
+                    onBlur={() => {
+                      if (!leftSearch.trim()) setSearchOpen(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        if (leftSearch) handleSetLeftSearch("");
+                        else setSearchOpen(false);
+                      }
+                    }}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  {(leftSearch || searchOpen) && (
+                    <button
+                      className="icon-btn git-panel__search-clear"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        if (leftSearch) {
+                          handleSetLeftSearch("");
+                          searchInputRef.current?.focus();
+                        } else {
+                          handleCloseSearch();
+                        }
+                      }}
+                      title={leftSearch ? "Clear (Esc)" : "Close search"}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  className="git-panel__search-trigger"
+                  onClick={handleOpenSearch}
+                  title="Search (Cmd/Ctrl+F)"
+                  aria-label="Search"
+                >
+                  <Search size={15} className="git-panel__search-trigger-icon" />
+                </button>
+              )}
+            </div>
+            <button
+              className="git-panel__pane-toggle"
+              onClick={() => handleSetSidebarCollapsed(!sidebarCollapsed)}
+              title={sidebarCollapsed ? "Show files panel" : "Hide files panel"}
+              aria-label={sidebarCollapsed ? "Show files panel" : "Hide files panel"}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeft size={16} />}
+            </button>
+            <div className="view-toggle" role="tablist" aria-label="Panel mode">
+              <button
+                role="tab"
+                aria-selected={panelMode === "files"}
+                className={`view-toggle__btn${panelMode === "files" ? " view-toggle__btn--active" : ""}`}
+                onClick={() => handleSetPanelMode("files")}
+              >
+                Files
+              </button>
+              <button
+                role="tab"
+                aria-selected={panelMode === "diffs"}
+                className={`view-toggle__btn${panelMode === "diffs" ? " view-toggle__btn--active" : ""}`}
+                onClick={() => handleSetPanelMode("diffs")}
+              >
+                Diffs
+              </button>
             </div>
           </div>
-        )}
+          {/* Viewer content — mode-switched. */}
+          {panelMode === "files" ? (
+            repoSelectedPath ? (
+              <FileViewer
+                key={repoSelectedPath}
+                contents={repoFileContent}
+                filePath={repoSelectedPath}
+                loading={repoFileLoading}
+                error={repoFileError}
+                findTerm={leftSearch}
+              />
+            ) : (
+              <div className="git-panel__diff">
+                <div style={{ padding: 24, opacity: 0.35, fontSize: 12 }}>
+                  Select a file to view
+                </div>
+              </div>
+            )
+          ) : selectedPath ? (
+            <DiffViewer
+              key={selectedPath}
+              diff={diffContent}
+              filePath={selectedPath}
+              findTerm={leftSearch}
+            />
+          ) : (
+            <div className="git-panel__diff">
+              <div style={{ padding: 24, opacity: 0.35, fontSize: 12 }}>
+                Select a file to view
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

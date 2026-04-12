@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // ── Global config (~/.shep/config.yml) ──────────────────────────────
 
@@ -78,6 +78,12 @@ pub struct TerminalSettings {
     pub font_family: String,
     #[serde(default = "default_font_size", rename = "fontSize")]
     pub font_size: u32,
+    #[serde(
+        default = "default_url_allowlist",
+        rename = "urlAllowlist",
+        alias = "allowedUrlSchemes"
+    )]
+    pub url_allowlist: Vec<String>,
 }
 
 fn default_cursor_style() -> String {
@@ -96,6 +102,10 @@ fn default_font_size() -> u32 {
     14
 }
 
+fn default_url_allowlist() -> Vec<String> {
+    vec!["http".to_string(), "https".to_string()]
+}
+
 impl Default for TerminalSettings {
     fn default() -> Self {
         TerminalSettings {
@@ -104,8 +114,45 @@ impl Default for TerminalSettings {
             scrollback: default_scrollback(),
             font_family: default_font_family(),
             font_size: default_font_size(),
+            url_allowlist: default_url_allowlist(),
         }
     }
+}
+
+pub fn normalize_terminal_settings(settings: &mut TerminalSettings) {
+    settings.url_allowlist = normalize_url_allowlist(&settings.url_allowlist);
+}
+
+fn normalize_url_allowlist(schemes: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut normalized = Vec::new();
+
+    for scheme in ["http", "https"] {
+        seen.insert(scheme.to_string());
+        normalized.push(scheme.to_string());
+    }
+
+    for scheme in schemes {
+        let candidate = scheme.trim().trim_end_matches(':').to_ascii_lowercase();
+        if !is_valid_url_scheme_token(&candidate) {
+            continue;
+        }
+        if seen.insert(candidate.clone()) {
+            normalized.push(candidate);
+        }
+    }
+
+    normalized
+}
+
+fn is_valid_url_scheme_token(scheme: &str) -> bool {
+    let mut chars = scheme.chars();
+    match chars.next() {
+        Some(ch) if ch.is_ascii_alphabetic() => {}
+        _ => return false,
+    }
+
+    chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '+' | '-' | '.'))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

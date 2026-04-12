@@ -18,7 +18,7 @@ export default function GitStatusRow({ repoPath }: GitStatusRowProps) {
   if (!status?.is_git_repo) return null;
 
   const changeCount = status.staged + status.unstaged + status.untracked;
-  const label = status.branch && status.branch !== "(detached)" ? status.branch : "Git";
+  const label = status.branch && status.branch !== "(detached)" ? status.branch : "Files";
 
   return (
     <button

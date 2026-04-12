@@ -332,8 +332,20 @@ pub struct ChangedFile {
 }
 
 pub fn changed_files(path: &str) -> Result<Vec<ChangedFile>, String> {
+    // `--untracked-files=all` expands untracked directories into their
+    // individual file entries. Without this, git returns `foo/` as a
+    // single directory entry when a whole folder is untracked, and that
+    // trailing-slash "folder" leaks into our file list. Gitignored files
+    // inside the directory are still excluded.
     let output = Command::new("git")
-        .args(["-C", path, "status", "--porcelain=v2", "-z"])
+        .args([
+            "-C",
+            path,
+            "status",
+            "--porcelain=v2",
+            "--untracked-files=all",
+            "-z",
+        ])
         .output()
         .map_err(|e| e.to_string())?;
 
@@ -452,6 +464,87 @@ fn status_letter(byte: u8) -> String {
         _ => "M",
     }
     .to_string()
+}
+
+/// Maximum file size we'll return for preview. This is intentionally aligned
+/// with the frontend's practical rendering budget so we don't send giant file
+/// contents over IPC only to freeze the UI trying to paint them.
+const MAX_FILE_PREVIEW_BYTES: u64 = 200 * 1024; // 200 KB
+
+fn decode_preview_bytes(bytes: Vec<u8>, file_path: &str) -> Result<String, String> {
+    String::from_utf8(bytes)
+        .map_err(|_| format!("Binary or non-UTF-8 file cannot be previewed: {file_path}"))
+}
+
+/// List all files known to git in this repo — tracked files plus untracked
+/// files that aren't gitignored. Uses the same flags `git status` uses
+/// internally, so the result matches what a user would consider "files in
+/// the project" (no node_modules, target/, etc.).
+pub fn list_files(path: &str) -> Result<Vec<String>, String> {
+    let output = Command::new("git")
+        .args([
+            "-C",
+            path,
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout.lines().map(|s| s.to_string()).collect())
+}
+
+/// Read a file's contents for preview in the file-viewer mode. `source`
+/// selects which version:
+/// - "working" — read from the working tree (on disk)
+/// - "staged"  — read from the git index (`git show :path`)
+/// - "head"    — read from HEAD (`git show HEAD:path`), used for deleted files
+pub fn file_contents(path: &str, file_path: &str, source: &str) -> Result<String, String> {
+    match source {
+        "working" => {
+            let full_path = std::path::Path::new(path).join(file_path);
+            let metadata = std::fs::metadata(&full_path)
+                .map_err(|e| format!("Cannot read {file_path}: {e}"))?;
+            if metadata.len() > MAX_FILE_PREVIEW_BYTES {
+                return Err(format!(
+                    "File too large to preview ({} bytes, limit {})",
+                    metadata.len(),
+                    MAX_FILE_PREVIEW_BYTES
+                ));
+            }
+            let bytes = std::fs::read(&full_path)
+                .map_err(|e| format!("Cannot read {file_path}: {e}"))?;
+            decode_preview_bytes(bytes, file_path)
+        }
+        "staged" | "head" => {
+            let spec = if source == "staged" {
+                format!(":{file_path}")
+            } else {
+                format!("HEAD:{file_path}")
+            };
+            let output = Command::new("git")
+                .args(["-C", path, "show", &spec])
+                .output()
+                .map_err(|e| e.to_string())?;
+            if !output.status.success() {
+                return Err(String::from_utf8_lossy(&output.stderr).to_string());
+            }
+            if (output.stdout.len() as u64) > MAX_FILE_PREVIEW_BYTES {
+                return Err(format!(
+                    "File too large to preview ({} bytes, limit {})",
+                    output.stdout.len(),
+                    MAX_FILE_PREVIEW_BYTES
+                ));
+            }
+            decode_preview_bytes(output.stdout, file_path)
+        }
+        _ => Err(format!("Unknown source: {source}")),
+    }
 }
 
 pub fn file_diff(path: &str, file_path: &str, staged: bool) -> Result<String, String> {

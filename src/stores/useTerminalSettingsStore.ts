@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS: TerminalSettings = {
   scrollback: 10000,
   fontFamily: TERMINAL_FONT_FAMILY,
   fontSize: TERMINAL_FONT_SIZE,
+  urlAllowlist: ["http", "https"],
 };
 
 interface TerminalSettingsStore {

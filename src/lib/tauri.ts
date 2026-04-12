@@ -7,7 +7,6 @@ import type {
   PtyOutput,
   GitStatus,
   ChangedFile,
-  WorktreeEntry,
   CreatedWorktree,
   EditorSettings,
   KeybindingSettings,
@@ -175,14 +174,6 @@ export function gitListBranches(path: string): Promise<string[]> {
   return invoke("git_list_branches", { path });
 }
 
-export function gitPushBranch(path: string, branch: string): Promise<void> {
-  return invoke("git_push_branch", { path, branch });
-}
-
-export function gitListWorktrees(path: string): Promise<WorktreeEntry[]> {
-  return invoke("git_list_worktrees", { path });
-}
-
 export function gitCreateWorktree(path: string, branchName: string): Promise<CreatedWorktree> {
   return invoke("git_create_worktree", { path, branchName });
 }
@@ -199,24 +190,21 @@ export function gitFileDiff(path: string, filePath: string, staged: boolean): Pr
   return invoke("git_file_diff", { path, filePath, staged });
 }
 
-export function gitStageFile(path: string, filePath: string): Promise<void> {
-  return invoke("git_stage_file", { path, filePath });
+/** Read a file's contents for preview in file-viewer mode. `source` is one
+ *  of: "working" (from disk), "staged" (from git index), "head" (from HEAD). */
+export function gitFileContents(
+  path: string,
+  filePath: string,
+  source: "working" | "staged" | "head",
+): Promise<string> {
+  return invoke("git_file_contents", { path, filePath, source });
 }
 
-export function gitStageAll(path: string): Promise<void> {
-  return invoke("git_stage_all", { path });
-}
-
-export function gitCommit(path: string, message: string): Promise<void> {
-  return invoke("git_commit", { path, message });
-}
-
-export function gitUnstageFile(path: string, filePath: string): Promise<void> {
-  return invoke("git_unstage_file", { path, filePath });
-}
-
-export function gitUnstageAll(path: string): Promise<void> {
-  return invoke("git_unstage_all", { path });
+/** List all files known to git — tracked + untracked-but-not-ignored.
+ *  Returns repo-relative paths, same set a user would consider "files in
+ *  this project" (build artifacts and node_modules are excluded). */
+export function gitListFiles(path: string): Promise<string[]> {
+  return invoke("git_list_files", { path });
 }
 
 export function gitSwitchBranch(path: string, branchName: string): Promise<void> {
