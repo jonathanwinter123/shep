@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Upload, Search, X, PanelLeft, PanelLeftOpen } from "lucide-react";
+import { Search, X, PanelLeft, PanelLeftOpen } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitPanelStore } from "../../stores/useGitPanelStore";
 import {
   gitChangedFiles, gitFileDiff, gitFileContents, gitListFiles,
-  gitStageFile, gitUnstageAll, gitUnstageFile,
-  gitStageAll, gitCommit, gitPushBranch,
 } from "../../lib/tauri";
 import type { ChangedFile } from "../../lib/types";
 import FileList from "./FileList";
@@ -22,7 +20,6 @@ const PANEL_MODE_KEY = "shep:gitPanelMode";
 
 export default function GitPanel() {
   const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
-  const refreshStatus = useGitStore((s) => s.refreshStatus);
   const pushNotice = useNoticeStore((s) => s.pushNotice);
 
   const gitStatus = useGitStore(
@@ -66,11 +63,7 @@ export default function GitPanel() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchOpen, setSearchOpen] = useState(() => leftSearch.trim().length > 0);
 
-  const [commitMsg, setCommitMsg] = useState("");
-  const [committing, setCommitting] = useState(false);
-  const [pushing, setPushing] = useState(false);
   const canLoadGitFiles = !!activeProjectPath && !!gitStatus?.is_git_repo;
-  const currentBranch = gitStatus?.branch ?? "";
 
   // ── Diffs mode: fetch changed files ───────────────────────────────
   const fetchFiles = useCallback(async () => {
@@ -264,12 +257,6 @@ export default function GitPanel() {
     return () => window.cancelAnimationFrame(id);
   }, [searchOpen]);
 
-  const refreshAfterChange = useCallback(async () => {
-    if (!activeProjectPath) return;
-    await fetchFiles();
-    await refreshStatus(activeProjectPath);
-  }, [activeProjectPath, fetchFiles, refreshStatus]);
-
   const handleSelect = useCallback(
     (file: ChangedFile) => {
       if (!activeProjectPath) return;
@@ -329,82 +316,6 @@ export default function GitPanel() {
     [activeProjectPath],
   );
 
-  const handleStage = useCallback(
-    async (file: ChangedFile) => {
-      if (!activeProjectPath) return;
-      try {
-        await gitStageFile(activeProjectPath, file.path);
-        await refreshAfterChange();
-      } catch (error) {
-        pushNotice({ tone: "error", title: `Couldn't stage ${file.path}`, message: getErrorMessage(error) });
-      }
-    },
-    [activeProjectPath, refreshAfterChange, pushNotice],
-  );
-
-  const handleUnstage = useCallback(
-    async (file: ChangedFile) => {
-      if (!activeProjectPath) return;
-      try {
-        await gitUnstageFile(activeProjectPath, file.path);
-        await refreshAfterChange();
-      } catch (error) {
-        pushNotice({ tone: "error", title: `Couldn't unstage ${file.path}`, message: getErrorMessage(error) });
-      }
-    },
-    [activeProjectPath, refreshAfterChange, pushNotice],
-  );
-
-  const handleStageAll = useCallback(async () => {
-    if (!activeProjectPath) return;
-    try {
-      await gitStageAll(activeProjectPath);
-      await refreshAfterChange();
-    } catch (error) {
-      pushNotice({ tone: "error", title: "Couldn't stage all", message: getErrorMessage(error) });
-    }
-  }, [activeProjectPath, refreshAfterChange, pushNotice]);
-
-  const handleUnstageAll = useCallback(async () => {
-    if (!activeProjectPath) return;
-    try {
-      await gitUnstageAll(activeProjectPath);
-      await refreshAfterChange();
-    } catch (error) {
-      pushNotice({ tone: "error", title: "Couldn't unstage all", message: getErrorMessage(error) });
-    }
-  }, [activeProjectPath, refreshAfterChange, pushNotice]);
-
-  const handleCommit = useCallback(async () => {
-    if (!activeProjectPath || !commitMsg.trim() || committing) return;
-    setCommitting(true);
-    try {
-      await gitCommit(activeProjectPath, commitMsg.trim());
-      setCommitMsg("");
-      useGitPanelStore.getState().clearSelection(activeProjectPath);
-      setDiffContent("");
-      await refreshAfterChange();
-    } catch (error) {
-      pushNotice({ tone: "error", title: "Commit failed", message: getErrorMessage(error) });
-    } finally {
-      setCommitting(false);
-    }
-  }, [activeProjectPath, commitMsg, committing, refreshAfterChange, pushNotice]);
-
-  const handlePush = useCallback(async () => {
-    if (!activeProjectPath || !currentBranch || pushing) return;
-    setPushing(true);
-    try {
-      await gitPushBranch(activeProjectPath, currentBranch);
-      await refreshStatus(activeProjectPath);
-      pushNotice({ tone: "success", title: "Pushed", message: `${currentBranch} → origin` });
-    } catch (error) {
-      pushNotice({ tone: "error", title: "Push failed", message: getErrorMessage(error) });
-    } finally {
-      setPushing(false);
-    }
-  }, [activeProjectPath, currentBranch, pushing, refreshStatus, pushNotice]);
-
   // Classify each changed file into "added" (new: status A or ?) or
   // "modified" (everything else) for the repo-browser tree coloring.
   // Also build a set of untracked paths (status ?) so the tree can dim
@@ -435,6 +346,24 @@ export default function GitPanel() {
     return files.filter((f) => f.path.toLowerCase().includes(needle));
   }, [files, leftSearch]);
 
+  const preferredDiffFiles = useMemo(() => {
+    const priority = (area: string) => {
+      if (area === "unstaged" || area === "untracked") return 2;
+      if (area === "staged") return 1;
+      return 0;
+    };
+
+    const byPath = new Map<string, ChangedFile>();
+    for (const file of filteredFiles) {
+      const current = byPath.get(file.path);
+      if (!current || priority(file.area) > priority(current.area)) {
+        byPath.set(file.path, file);
+      }
+    }
+
+    return Array.from(byPath.values()).sort((a, b) => a.path.localeCompare(b.path));
+  }, [filteredFiles]);
+
   if (!activeProjectPath) {
     return (
       <div className="absolute inset-0 flex items-center justify-center opacity-50">
@@ -450,11 +379,6 @@ export default function GitPanel() {
       </div>
     );
   }
-
-  const activeStatus = gitStatus;
-  const stagedCount = files.filter((f) => f.area === "staged").length;
-  const canCommit = stagedCount > 0 && commitMsg.trim().length > 0 && !committing;
-  const showPush = activeStatus.ahead > 0;
 
   return (
     <div className="git-panel">
@@ -474,54 +398,11 @@ export default function GitPanel() {
               />
             ) : (
               <FileList
-                files={filteredFiles}
+                files={preferredDiffFiles}
                 search={leftSearch}
                 selectedPath={selectedPath}
-                selectedArea={selectedArea}
                 onSelect={handleSelect}
-                onStage={handleStage}
-                onUnstage={handleUnstage}
-                onStageAll={handleStageAll}
-                onUnstageAll={handleUnstageAll}
               />
-            )}
-
-            {panelMode === "diffs" && (
-              <div className="git-panel__commit">
-                <textarea
-                  className="git-panel__commit-input"
-                  placeholder="Commit message"
-                  value={commitMsg}
-                  onChange={(e) => setCommitMsg(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canCommit) {
-                      e.preventDefault();
-                      handleCommit();
-                    }
-                  }}
-                  rows={2}
-                />
-                <div className="git-panel__commit-actions">
-                  <button
-                    className="btn-primary git-panel__commit-btn"
-                    disabled={!canCommit}
-                    onClick={handleCommit}
-                  >
-                    {committing ? "Committing…" : `Commit${stagedCount > 0 ? ` (${stagedCount})` : ""}`}
-                  </button>
-                  {showPush && (
-                    <button
-                      className="btn-ghost git-panel__push-btn"
-                      onClick={handlePush}
-                      disabled={pushing}
-                      title={`Push ${activeStatus.ahead} commit${activeStatus.ahead > 1 ? "s" : ""} to origin`}
-                    >
-                      <Upload size={11} />
-                      {pushing ? "Pushing…" : `Push ↑${activeStatus.ahead}`}
-                    </button>
-                  )}
-                </div>
-              </div>
             )}
           </div>
         )}

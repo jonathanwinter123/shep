@@ -95,7 +95,6 @@ export default function ProjectList({
 
   const commandsBadge = commands.length > 0 ? String(commands.length) : null;
   const gitStatuses = useGitStore((s) => s.projectGitStatus);
-  const existingPaths = useMemo(() => new Set(repos.map((r) => r.path)), [repos]);
   const sortedRepos = useMemo(() => {
     return [...repos].sort((a, b) => {
       const aWorktreeParent = gitStatuses[a.path]?.worktree_parent ?? null;
@@ -127,7 +126,6 @@ export default function ProjectList({
               isExpanded={isExpanded}
               activity={projectActivity[repo.path]}
               worktreeParent={worktreeParent}
-              existingPaths={existingPaths}
               onOpenInEditor={() => onOpenInEditor(repo.path)}
               onRemove={() => onRemoveProject(repo.path)}
               onClick={() => handleProjectClick(repo.path)}
