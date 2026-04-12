@@ -44,6 +44,7 @@ export interface TerminalSettings {
   scrollback: number;
   fontFamily: string;
   fontSize: number;
+  urlAllowlist: string[];
 }
 
 export interface FontFamily {

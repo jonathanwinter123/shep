@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCcw, Skull, ExternalLink, Folder } from "lucide-react";
-import { listListeningPorts, killPort } from "../../lib/tauri";
+import { listListeningPorts, killPort, openUrl } from "../../lib/tauri";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
 import type { PortInfo } from "../../lib/types";
@@ -71,7 +71,7 @@ export default function PortsPanel() {
   }, [pushNotice, refresh]);
 
   const handleOpenBrowser = useCallback((port: number) => {
-    window.open(`http://localhost:${port}`, "_blank");
+    void openUrl(`http://localhost:${port}`);
   }, []);
 
   // Group by project

@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::config::{
     CommandConfig, EditorSettings, GlobalConfig, KeybindingSettings, RegisteredRepo, RepoEntry,
-    RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
+    RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig, normalize_terminal_settings,
 };
 
 static CONFIG_CACHE: Mutex<Option<(GlobalConfig, SystemTime)>> = Mutex::new(None);
@@ -83,6 +83,24 @@ pub fn save_global_config(config: &GlobalConfig) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+pub fn backfill_global_config_defaults() -> Result<(), String> {
+    let path = global_config_path()?;
+    if !path.exists() {
+        return save_global_config(&GlobalConfig::default());
+    }
+
+    let content =
+        fs::read_to_string(&path).map_err(|e| format!("Failed to read global config: {e}"))?;
+    let needs_url_allowlist = !content.contains("urlAllowlist:");
+    if !needs_url_allowlist {
+        return Ok(());
+    }
+
+    let mut config = load_global_config()?;
+    normalize_terminal_settings(&mut config.terminal);
+    save_global_config(&config)
 }
 
 pub fn load_editor_settings() -> Result<EditorSettings, String> {

@@ -3,6 +3,7 @@ use std::path::Path;
 use std::process::Command;
 use tauri::ipc::Channel;
 use tauri::{Emitter, State};
+use url::Url;
 
 use crate::fonts::{self, FontFaceData, FontFamily};
 use crate::git;
@@ -12,8 +13,8 @@ use crate::pty::session::{PtyColorTheme, PtyOutput};
 use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
 use crate::watcher::GitWatcher;
 use crate::workspace::config::{
-    EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings,
-    WorkspaceConfig,
+    normalize_terminal_settings, EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo,
+    TerminalSettings, UsageSettings, WorkspaceConfig,
 };
 use crate::workspace::manager::WorkspaceManager;
 
@@ -91,14 +92,17 @@ pub fn save_keybinding_settings(
 pub fn get_terminal_settings(
     workspace: State<'_, WorkspaceManager>,
 ) -> Result<TerminalSettings, String> {
-    workspace.load_terminal_settings()
+    let mut settings = workspace.load_terminal_settings()?;
+    normalize_terminal_settings(&mut settings);
+    Ok(settings)
 }
 
 #[tauri::command]
 pub fn save_terminal_settings(
-    settings: TerminalSettings,
+    mut settings: TerminalSettings,
     workspace: State<'_, WorkspaceManager>,
 ) -> Result<(), String> {
+    normalize_terminal_settings(&mut settings);
     workspace.save_terminal_settings(&settings)
 }
 
@@ -156,9 +160,15 @@ pub fn reveal_in_finder(path: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn open_url(url: &str) -> Result<(), String> {
-    if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err("Only http/https URLs are allowed".to_string());
+pub fn open_url(url: &str, workspace: State<'_, WorkspaceManager>) -> Result<(), String> {
+    let parsed = Url::parse(url).map_err(|_| "Invalid URL".to_string())?;
+    let scheme = parsed.scheme().to_ascii_lowercase();
+
+    let mut settings = workspace.load_terminal_settings()?;
+    normalize_terminal_settings(&mut settings);
+
+    if !settings.url_allowlist.iter().any(|allowed| allowed == &scheme) {
+        return Err(format!("URL scheme '{scheme}' is not allowed"));
     }
 
     let status = Command::new("open")

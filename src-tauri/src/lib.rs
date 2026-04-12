@@ -34,6 +34,9 @@ pub fn run() {
             if let Err(e) = workspace.migrate() {
                 eprintln!("Migration warning: {e}");
             }
+            if let Err(e) = workspace.backfill_global_config_defaults() {
+                eprintln!("Config backfill warning: {e}");
+            }
 
             // Start file system watcher for git status updates
             app.manage(GitWatcher::new(app.handle().clone()));
