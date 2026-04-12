@@ -2138,6 +2138,14 @@ select {
   flex-direction: column;
 }
 
+.git-panel__viewer-area--wide .diff-line {
+  padding-left: 6px;
+}
+
+.git-panel__viewer-area--wide .file-view .diff-line {
+  padding-left: 2px;
+}
+
 .git-panel__viewer-controls {
   position: absolute;
   top: 8px;
@@ -2146,10 +2154,32 @@ select {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px;
+  padding: 3px;
   border-radius: 8px;
   background: var(--frame-tint);
   border: 1px solid color-mix(in srgb, var(--glass-border) 80%, transparent);
+}
+
+.git-panel__pane-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 0.75;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.git-panel__pane-toggle:hover {
+  color: var(--text-primary);
+  opacity: 1;
 }
 
 
@@ -2269,15 +2299,15 @@ select {
 
 @media (max-width: 900px) {
   .git-panel__header-search-shell--open {
-    width: min(320px, calc(100vw - 240px));
+    width: min(320px, calc(100vw - 286px));
   }
 }
 
 /* File-viewer line number gutter — muted and non-interactive. */
 .file-view__line-no {
   display: inline-block;
-  width: 3em;
-  margin-right: 10px;
+  width: 2.5em;
+  margin-right: 8px;
   text-align: right;
   color: var(--text-muted);
   opacity: 0.45;
@@ -2498,7 +2528,7 @@ select {
  * both sides. */
 .file-item {
   min-height: 24px;
-  padding: 3px 8px;
+  padding: 3px 8px 3px 0;
 }
 
 /* Colored status bar on the left — 3px vertical accent that replaces the
@@ -2592,6 +2622,11 @@ select {
 .diff-line {
   padding: 0 14px;
   color: var(--app-fg);
+}
+
+.file-view .diff-line {
+  padding-left: 6px;
+  padding-right: 12px;
 }
 
 /* Shiki tokens set their own inline `color`. The line-level `color` on

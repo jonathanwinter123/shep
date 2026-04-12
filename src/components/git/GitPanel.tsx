@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Upload, Search, X } from "lucide-react";
+import { Upload, Search, X, PanelLeft, PanelLeftOpen } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -42,6 +42,7 @@ export default function GitPanel() {
     [panelState?.repoExpanded],
   );
   const leftSearch = panelState?.leftSearch ?? "";
+  const sidebarCollapsed = panelState?.sidebarCollapsed ?? false;
 
   // Transient local state — reset on every mount, no need to persist.
   const [files, setFiles] = useState<ChangedFile[]>([]);
@@ -320,6 +321,14 @@ export default function GitPanel() {
     [activeProjectPath],
   );
 
+  const handleSetSidebarCollapsed = useCallback(
+    (collapsed: boolean) => {
+      if (!activeProjectPath) return;
+      useGitPanelStore.getState().setSidebarCollapsed(activeProjectPath, collapsed);
+    },
+    [activeProjectPath],
+  );
+
   const handleStage = useCallback(
     async (file: ChangedFile) => {
       if (!activeProjectPath) return;
@@ -450,72 +459,74 @@ export default function GitPanel() {
   return (
     <div className="git-panel">
       <div className="git-panel__body">
-        <div className="git-panel__sidebar">
-          {panelMode === "files" ? (
-            <FileTree
-              files={repoFiles}
-              changedPaths={changedPathsMap}
-              untrackedPaths={untrackedPaths}
-              search={leftSearch}
-              selectedPath={repoSelectedPath}
-              onSelect={handleRepoSelect}
-              expandedPaths={repoExpanded}
-              onExpandedChange={handleRepoExpandedChange}
-            />
-          ) : (
-            <FileList
-              files={filteredFiles}
-              search={leftSearch}
-              selectedPath={selectedPath}
-              selectedArea={selectedArea}
-              onSelect={handleSelect}
-              onStage={handleStage}
-              onUnstage={handleUnstage}
-              onStageAll={handleStageAll}
-              onUnstageAll={handleUnstageAll}
-            />
-          )}
-
-          {panelMode === "diffs" && (
-            <div className="git-panel__commit">
-              <textarea
-                className="git-panel__commit-input"
-                placeholder="Commit message"
-                value={commitMsg}
-                onChange={(e) => setCommitMsg(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canCommit) {
-                    e.preventDefault();
-                    handleCommit();
-                  }
-                }}
-                rows={2}
+        {!sidebarCollapsed && (
+          <div className="git-panel__sidebar">
+            {panelMode === "files" ? (
+              <FileTree
+                files={repoFiles}
+                changedPaths={changedPathsMap}
+                untrackedPaths={untrackedPaths}
+                search={leftSearch}
+                selectedPath={repoSelectedPath}
+                onSelect={handleRepoSelect}
+                expandedPaths={repoExpanded}
+                onExpandedChange={handleRepoExpandedChange}
               />
-              <div className="git-panel__commit-actions">
-                <button
-                  className="btn-primary git-panel__commit-btn"
-                  disabled={!canCommit}
-                  onClick={handleCommit}
-                >
-                  {committing ? "Committing…" : `Commit${stagedCount > 0 ? ` (${stagedCount})` : ""}`}
-                </button>
-                {showPush && (
-                  <button
-                    className="btn-ghost git-panel__push-btn"
-                    onClick={handlePush}
-                    disabled={pushing}
-                    title={`Push ${activeStatus.ahead} commit${activeStatus.ahead > 1 ? "s" : ""} to origin`}
-                  >
-                    <Upload size={11} />
-                    {pushing ? "Pushing…" : `Push ↑${activeStatus.ahead}`}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+            ) : (
+              <FileList
+                files={filteredFiles}
+                search={leftSearch}
+                selectedPath={selectedPath}
+                selectedArea={selectedArea}
+                onSelect={handleSelect}
+                onStage={handleStage}
+                onUnstage={handleUnstage}
+                onStageAll={handleStageAll}
+                onUnstageAll={handleUnstageAll}
+              />
+            )}
 
-        <div className="git-panel__viewer-area">
+            {panelMode === "diffs" && (
+              <div className="git-panel__commit">
+                <textarea
+                  className="git-panel__commit-input"
+                  placeholder="Commit message"
+                  value={commitMsg}
+                  onChange={(e) => setCommitMsg(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canCommit) {
+                      e.preventDefault();
+                      handleCommit();
+                    }
+                  }}
+                  rows={2}
+                />
+                <div className="git-panel__commit-actions">
+                  <button
+                    className="btn-primary git-panel__commit-btn"
+                    disabled={!canCommit}
+                    onClick={handleCommit}
+                  >
+                    {committing ? "Committing…" : `Commit${stagedCount > 0 ? ` (${stagedCount})` : ""}`}
+                  </button>
+                  {showPush && (
+                    <button
+                      className="btn-ghost git-panel__push-btn"
+                      onClick={handlePush}
+                      disabled={pushing}
+                      title={`Push ${activeStatus.ahead} commit${activeStatus.ahead > 1 ? "s" : ""} to origin`}
+                    >
+                      <Upload size={11} />
+                      {pushing ? "Pushing…" : `Push ↑${activeStatus.ahead}`}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={`git-panel__viewer-area${sidebarCollapsed ? " git-panel__viewer-area--wide" : ""}`}>
           <div className="git-panel__viewer-controls">
             <div className={`git-panel__header-search-shell${searchOpen ? " git-panel__header-search-shell--open" : ""}`}>
               {searchOpen ? (
@@ -571,6 +582,14 @@ export default function GitPanel() {
                 </button>
               )}
             </div>
+            <button
+              className="git-panel__pane-toggle"
+              onClick={() => handleSetSidebarCollapsed(!sidebarCollapsed)}
+              title={sidebarCollapsed ? "Show files panel" : "Hide files panel"}
+              aria-label={sidebarCollapsed ? "Show files panel" : "Hide files panel"}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeft size={16} />}
+            </button>
             <div className="view-toggle" role="tablist" aria-label="Panel mode">
               <button
                 role="tab"

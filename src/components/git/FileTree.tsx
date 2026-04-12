@@ -162,7 +162,7 @@ function TreeRow({ node, depth, expanded, selected, search, onToggle, onSelect }
     <>
       <div
         className={classes}
-        style={{ paddingLeft: 8 + depth * 14 }}
+        style={{ paddingLeft: depth * 14 }}
         onClick={handleClick}
         title={node.path}
       >
