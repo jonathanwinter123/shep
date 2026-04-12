@@ -466,10 +466,15 @@ fn status_letter(byte: u8) -> String {
     .to_string()
 }
 
-/// Maximum file size we'll return for preview. Files over this cap produce
-/// a `FileTooLarge` error so the frontend can show a "too large" message
-/// instead of trying to serialize 50MB into the IPC channel.
-const MAX_FILE_PREVIEW_BYTES: u64 = 2 * 1024 * 1024; // 2 MB
+/// Maximum file size we'll return for preview. This is intentionally aligned
+/// with the frontend's practical rendering budget so we don't send giant file
+/// contents over IPC only to freeze the UI trying to paint them.
+const MAX_FILE_PREVIEW_BYTES: u64 = 200 * 1024; // 200 KB
+
+fn decode_preview_bytes(bytes: Vec<u8>, file_path: &str) -> Result<String, String> {
+    String::from_utf8(bytes)
+        .map_err(|_| format!("Binary or non-UTF-8 file cannot be previewed: {file_path}"))
+}
 
 /// List all files known to git in this repo — tracked files plus untracked
 /// files that aren't gitignored. Uses the same flags `git status` uses
@@ -512,8 +517,9 @@ pub fn file_contents(path: &str, file_path: &str, source: &str) -> Result<String
                     MAX_FILE_PREVIEW_BYTES
                 ));
             }
-            std::fs::read_to_string(&full_path)
-                .map_err(|e| format!("Cannot read {file_path}: {e}"))
+            let bytes = std::fs::read(&full_path)
+                .map_err(|e| format!("Cannot read {file_path}: {e}"))?;
+            decode_preview_bytes(bytes, file_path)
         }
         "staged" | "head" => {
             let spec = if source == "staged" {
@@ -535,7 +541,7 @@ pub fn file_contents(path: &str, file_path: &str, source: &str) -> Result<String
                     MAX_FILE_PREVIEW_BYTES
                 ));
             }
-            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+            decode_preview_bytes(output.stdout, file_path)
         }
         _ => Err(format!("Unknown source: {source}")),
     }

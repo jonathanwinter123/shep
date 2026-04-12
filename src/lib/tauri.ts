@@ -7,7 +7,6 @@ import type {
   PtyOutput,
   GitStatus,
   ChangedFile,
-  WorktreeEntry,
   CreatedWorktree,
   EditorSettings,
   KeybindingSettings,
@@ -175,14 +174,6 @@ export function gitListBranches(path: string): Promise<string[]> {
   return invoke("git_list_branches", { path });
 }
 
-export function gitPushBranch(path: string, branch: string): Promise<void> {
-  return invoke("git_push_branch", { path, branch });
-}
-
-export function gitListWorktrees(path: string): Promise<WorktreeEntry[]> {
-  return invoke("git_list_worktrees", { path });
-}
-
 export function gitCreateWorktree(path: string, branchName: string): Promise<CreatedWorktree> {
   return invoke("git_create_worktree", { path, branchName });
 }
@@ -214,26 +205,6 @@ export function gitFileContents(
  *  this project" (build artifacts and node_modules are excluded). */
 export function gitListFiles(path: string): Promise<string[]> {
   return invoke("git_list_files", { path });
-}
-
-export function gitStageFile(path: string, filePath: string): Promise<void> {
-  return invoke("git_stage_file", { path, filePath });
-}
-
-export function gitStageAll(path: string): Promise<void> {
-  return invoke("git_stage_all", { path });
-}
-
-export function gitCommit(path: string, message: string): Promise<void> {
-  return invoke("git_commit", { path, message });
-}
-
-export function gitUnstageFile(path: string, filePath: string): Promise<void> {
-  return invoke("git_unstage_file", { path, filePath });
-}
-
-export function gitUnstageAll(path: string): Promise<void> {
-  return invoke("git_unstage_all", { path });
 }
 
 export function gitSwitchBranch(path: string, branchName: string): Promise<void> {

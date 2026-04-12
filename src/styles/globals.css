@@ -90,6 +90,10 @@ body,
   --status-crashed: #f7768e;
   --status-attention: #e0af68;
   --status-clean: #9ece6a;
+  --status-added: #9ece6a;
+  --status-deleted: #f7768e;
+  --diff-add: #9ece6a;
+  --diff-del: #f7768e;
 }
 
 .logo-unavailable {
