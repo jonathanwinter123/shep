@@ -152,6 +152,10 @@ export function getHighlighter(): Promise<HighlighterCore> {
         import("shiki/langs/bash.mjs"),
       ],
       engine: createOnigurumaEngine(import("shiki/wasm")),
+    }).catch((error) => {
+      cached = null;
+      console.error("[shiki] failed to initialize shared highlighter", error);
+      throw error;
     });
   }
   return cached;
