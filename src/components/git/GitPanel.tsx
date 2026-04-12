@@ -60,8 +60,10 @@ export default function GitPanel() {
 
   // A single unified search term (`leftSearch`, persisted in the panel
   // store) drives both the sidebar file filter AND the in-viewer
-  // find-in-file highlight. One always-visible input, two effects.
+  // find-in-file highlight. The header control can collapse visually,
+  // but the underlying term stays unified.
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchOpen, setSearchOpen] = useState(() => leftSearch.trim().length > 0);
 
   const [commitMsg, setCommitMsg] = useState("");
   const [committing, setCommitting] = useState(false);
@@ -241,13 +243,25 @@ export default function GitPanel() {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
         e.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
+        setSearchOpen(true);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  useEffect(() => {
+    if (leftSearch.trim()) setSearchOpen(true);
+  }, [leftSearch]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const id = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [searchOpen]);
 
   const refreshAfterChange = useCallback(async () => {
     if (!activeProjectPath) return;
@@ -280,6 +294,15 @@ export default function GitPanel() {
     },
     [activeProjectPath],
   );
+
+  const handleOpenSearch = useCallback(() => {
+    setSearchOpen(true);
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    handleSetLeftSearch("");
+    setSearchOpen(false);
+  }, [handleSetLeftSearch]);
 
   const handleRepoSelect = useCallback(
     (path: string) => {
@@ -426,59 +449,6 @@ export default function GitPanel() {
 
   return (
     <div className="git-panel">
-      {/* Single full-width header strip. Always-visible search is
-          absolutely centered; Diffs/Files mode toggle sits on the right.
-          Opaque background blocks scroll bleed from columns below. */}
-      <div className="git-panel__header">
-        <div className="git-panel__header-search">
-          <Search size={12} className="git-panel__search-icon" />
-          <input
-            ref={searchInputRef}
-            className="git-panel__search-input"
-            type="text"
-            placeholder="Search files, filter diffs…"
-            value={leftSearch}
-            onChange={(e) => handleSetLeftSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape" && leftSearch) {
-                e.preventDefault();
-                handleSetLeftSearch("");
-              }
-            }}
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-          />
-          {leftSearch && (
-            <button
-              className="icon-btn git-panel__search-clear"
-              onClick={() => handleSetLeftSearch("")}
-              title="Clear (Esc)"
-            >
-              <X size={12} />
-            </button>
-          )}
-        </div>
-        <div className="view-toggle" role="tablist" aria-label="Panel mode">
-          <button
-            role="tab"
-            aria-selected={panelMode === "diffs"}
-            className={`view-toggle__btn${panelMode === "diffs" ? " view-toggle__btn--active" : ""}`}
-            onClick={() => handleSetPanelMode("diffs")}
-          >
-            Diffs
-          </button>
-          <button
-            role="tab"
-            aria-selected={panelMode === "files"}
-            className={`view-toggle__btn${panelMode === "files" ? " view-toggle__btn--active" : ""}`}
-            onClick={() => handleSetPanelMode("files")}
-          >
-            Files
-          </button>
-        </div>
-      </div>
-
       <div className="git-panel__body">
         <div className="git-panel__sidebar">
           {panelMode === "files" ? (
@@ -495,6 +465,7 @@ export default function GitPanel() {
           ) : (
             <FileList
               files={filteredFiles}
+              search={leftSearch}
               selectedPath={selectedPath}
               selectedArea={selectedArea}
               onSelect={handleSelect}
@@ -545,6 +516,80 @@ export default function GitPanel() {
         </div>
 
         <div className="git-panel__viewer-area">
+          <div className="git-panel__viewer-controls">
+            <div className={`git-panel__header-search-shell${searchOpen ? " git-panel__header-search-shell--open" : ""}`}>
+              {searchOpen ? (
+                <div className="git-panel__header-search">
+                  <Search size={12} className="git-panel__search-icon" />
+                  <input
+                    ref={searchInputRef}
+                    className="git-panel__search-input"
+                    type="text"
+                    placeholder="Search files, filter diffs…"
+                    value={leftSearch}
+                    onChange={(e) => handleSetLeftSearch(e.target.value)}
+                    onBlur={() => {
+                      if (!leftSearch.trim()) setSearchOpen(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        if (leftSearch) handleSetLeftSearch("");
+                        else setSearchOpen(false);
+                      }
+                    }}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  {(leftSearch || searchOpen) && (
+                    <button
+                      className="icon-btn git-panel__search-clear"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        if (leftSearch) {
+                          handleSetLeftSearch("");
+                          searchInputRef.current?.focus();
+                        } else {
+                          handleCloseSearch();
+                        }
+                      }}
+                      title={leftSearch ? "Clear (Esc)" : "Close search"}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  className="git-panel__search-trigger"
+                  onClick={handleOpenSearch}
+                  title="Search (Cmd/Ctrl+F)"
+                  aria-label="Search"
+                >
+                  <Search size={15} className="git-panel__search-trigger-icon" />
+                </button>
+              )}
+            </div>
+            <div className="view-toggle" role="tablist" aria-label="Panel mode">
+              <button
+                role="tab"
+                aria-selected={panelMode === "diffs"}
+                className={`view-toggle__btn${panelMode === "diffs" ? " view-toggle__btn--active" : ""}`}
+                onClick={() => handleSetPanelMode("diffs")}
+              >
+                Diffs
+              </button>
+              <button
+                role="tab"
+                aria-selected={panelMode === "files"}
+                className={`view-toggle__btn${panelMode === "files" ? " view-toggle__btn--active" : ""}`}
+                onClick={() => handleSetPanelMode("files")}
+              >
+                Files
+              </button>
+            </div>
+          </div>
           {/* Viewer content — mode-switched. */}
           {panelMode === "files" ? (
             repoSelectedPath ? (

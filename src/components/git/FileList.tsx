@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { Plus, Minus } from "lucide-react";
 import type { ChangedFile } from "../../lib/types";
+import { renderSearchHighlight } from "./searchHighlight";
 
 interface FileListProps {
   files: ChangedFile[];
+  search: string;
   selectedPath: string | null;
   selectedArea: string | null;
   onSelect: (file: ChangedFile) => void;
@@ -32,6 +34,7 @@ function formatPath(path: string): { name: string; parent: string } {
 
 export default function FileList({
   files,
+  search,
   selectedPath,
   selectedArea,
   onSelect,
@@ -114,9 +117,13 @@ export default function FileList({
               >
                 <span className="file-status-bar" aria-hidden="true" />
                 <span className="file-item__name-wrap">
-                  <span className="file-item__name">{fmt.name}</span>
+                  <span className="file-item__name">
+                    {renderSearchHighlight(fmt.name, search)}
+                  </span>
                   {fmt.parent && (
-                    <span className="file-item__parent">{fmt.parent}</span>
+                    <span className="file-item__parent">
+                      {renderSearchHighlight(fmt.parent, search)}
+                    </span>
                   )}
                 </span>
                 <button

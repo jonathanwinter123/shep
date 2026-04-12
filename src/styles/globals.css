@@ -1959,54 +1959,44 @@ select {
   flex-direction: column;
 }
 
-/* Single full-width header strip spanning the whole git panel. The
- * search pill is absolutely positioned and horizontally centered so
- * it stays visually anchored regardless of the mode toggle width.
- * The Diffs/Files mode toggle sits on the right via justify-content.
- * Opaque background blocks scroll bleed from columns below. */
-.git-panel__header {
-  position: relative;
-  flex-shrink: 0;
-  height: 40px;
+.git-panel__header-search-shell {
   display: flex;
-  align-items: center;
   justify-content: flex-end;
-  padding: 0 10px;
-  background: var(--frame-tint);
-  z-index: 5;
+  width: 34px;
+  overflow: visible;
 }
 
-/* Centered always-visible search pill. Absolute so the mode toggle
- * next to it never nudges it off-center. */
+.git-panel__header-search-shell--open {
+  width: min(420px, calc(100vw - 420px));
+}
+
 .git-panel__header-search {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 260px;
+  width: 100%;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--overlay) 6%, transparent);
-  border: 1px solid var(--glass-border);
+  gap: 6px;
+  padding: 0 9px;
+  height: 34px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--overlay) 3%, transparent);
+  border: 1px solid color-mix(in srgb, var(--overlay) 14%, transparent);
   transition: border-color 160ms ease, background 160ms ease;
 }
 .git-panel__header-search:focus-within {
-  border-color: var(--border-hover);
+  background: color-mix(in srgb, var(--overlay) 5%, transparent);
+  border-color: color-mix(in srgb, var(--overlay) 14%, transparent);
 }
 
 .git-panel__search-icon {
   color: var(--text-muted);
-  opacity: 0.55;
+  opacity: 0.65;
   flex-shrink: 0;
 }
 .git-panel__search-input {
   flex: 1;
   min-width: 0;
-  padding: 2px 2px;
-  font-size: 12px;
+  padding: 0;
+  font-size: 13px;
   font-family: inherit;
   color: var(--text-primary);
   background: transparent;
@@ -2020,12 +2010,40 @@ select {
 .git-panel__search-clear,
 .git-panel__search-dismiss {
   flex-shrink: 0;
-  opacity: 0.5;
-  padding: 2px;
+  width: 20px;
+  height: 20px;
+  opacity: 0.55;
+  padding: 0;
 }
 .git-panel__search-clear:hover,
 .git-panel__search-dismiss:hover {
   opacity: 1;
+}
+
+.git-panel__search-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: transparent;
+  transition: color 160ms ease, opacity 160ms ease;
+}
+
+.git-panel__search-trigger:hover {
+  color: var(--text-primary);
+  opacity: 1;
+}
+
+.git-panel__search-trigger-icon {
+  flex-shrink: 0;
+  opacity: 0.75;
 }
 
 /* Repo browser file tree — rows inherit .list-item styling and add a
@@ -2120,6 +2138,20 @@ select {
   flex-direction: column;
 }
 
+.git-panel__viewer-controls {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--frame-tint);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 80%, transparent);
+}
+
 
 .git-panel__file-list {
   flex: 1;
@@ -2198,18 +2230,20 @@ select {
  * rule below that targets the one inside `.git-panel__viewer-wrap`. */
 .view-toggle {
   display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--overlay) 6%, transparent);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  gap: 1px;
+  align-items: center;
+  height: 34px;
+  padding: 1px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--overlay) 3%, transparent);
+  border: 1px solid color-mix(in srgb, var(--overlay) 14%, transparent);
 }
 
 .view-toggle__btn {
-  padding: 2px 10px;
-  font-size: 11px;
+  min-width: 66px;
+  height: 30px;
+  padding: 0 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
   background: transparent;
@@ -2224,6 +2258,19 @@ select {
 .view-toggle__btn--active {
   color: var(--text-primary);
   background: color-mix(in srgb, var(--overlay) 10%, transparent);
+}
+
+.search-highlight {
+  padding: 0 1px;
+  border-radius: 3px;
+  color: inherit;
+  background: color-mix(in srgb, var(--status-attention) 22%, transparent);
+}
+
+@media (max-width: 900px) {
+  .git-panel__header-search-shell--open {
+    width: min(320px, calc(100vw - 240px));
+  }
 }
 
 /* File-viewer line number gutter — muted and non-interactive. */

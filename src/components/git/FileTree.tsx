@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { ChevronDown, ChevronRight, File as FileIcon, Folder } from "lucide-react";
+import { renderSearchHighlight } from "./searchHighlight";
 
 /** Change classification for a node in the tree. `added` covers untracked
  *  and newly-staged files (rendered green); `modified` covers existing
@@ -131,11 +132,12 @@ interface TreeRowProps {
   depth: number;
   expanded: Set<string>;
   selected: string | null;
+  search: string;
   onToggle: (path: string) => void;
   onSelect: (path: string) => void;
 }
 
-function TreeRow({ node, depth, expanded, selected, onToggle, onSelect }: TreeRowProps) {
+function TreeRow({ node, depth, expanded, selected, search, onToggle, onSelect }: TreeRowProps) {
   const isDir = !!node.children;
   const isExpanded = expanded.has(node.path);
   const isSelected = !isDir && selected === node.path;
@@ -178,7 +180,7 @@ function TreeRow({ node, depth, expanded, selected, onToggle, onSelect }: TreeRo
         ) : (
           <FileIcon size={14} className="tree-row__icon" />
         )}
-        <span className="tree-row__name">{node.name}</span>
+        <span className="tree-row__name">{renderSearchHighlight(node.name, search)}</span>
       </div>
       {isDir &&
         isExpanded &&
@@ -190,6 +192,7 @@ function TreeRow({ node, depth, expanded, selected, onToggle, onSelect }: TreeRo
             depth={depth + 1}
             expanded={expanded}
             selected={selected}
+            search={search}
             onToggle={onToggle}
             onSelect={onSelect}
           />
@@ -277,6 +280,7 @@ export default function FileTree({
           depth={0}
           expanded={effectiveExpanded}
           selected={selectedPath}
+          search={search}
           onToggle={handleToggle}
           onSelect={onSelect}
         />
