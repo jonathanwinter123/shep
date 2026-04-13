@@ -1,5 +1,7 @@
+use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 
 // ── Global config (~/.shep/config.yml) ──────────────────────────────
 
@@ -42,28 +44,82 @@ pub struct EditorSettings {
     pub preferred_editor: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KeybindingSettings {
-    #[serde(default = "default_true", rename = "shiftEnterNewline")]
-    pub shift_enter_newline: bool,
-    #[serde(default = "default_true", rename = "optionDeleteWord")]
-    pub option_delete_word: bool,
-    #[serde(default = "default_true", rename = "cmdKClear")]
-    pub cmd_k_clear: bool,
+/// Flat map of `actionId → keyCombo` keybindings.
+///
+/// Serializes as a plain YAML map (`terminal.newLine: "Shift+Enter"`).
+/// Deserializes with backwards compatibility: old boolean keys
+/// (`shiftEnterNewline: true`) are translated to the new dotted format.
+#[derive(Debug, Clone, Serialize)]
+pub struct KeybindingSettings(pub HashMap<String, String>);
+
+impl Default for KeybindingSettings {
+    fn default() -> Self {
+        KeybindingSettings(HashMap::new())
+    }
+}
+
+impl<'de> Deserialize<'de> for KeybindingSettings {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct KeybindingVisitor;
+
+        impl<'de> Visitor<'de> for KeybindingVisitor {
+            type Value = KeybindingSettings;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a map of keybinding settings")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<KeybindingSettings, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut result = HashMap::new();
+
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        // Old format: boolean values for legacy keys
+                        "shiftEnterNewline" | "shift_enter_newline" => {
+                            let enabled: bool = map.next_value()?;
+                            result.insert(
+                                "terminal.newLine".to_string(),
+                                if enabled { "Shift+Enter".to_string() } else { String::new() },
+                            );
+                        }
+                        "optionDeleteWord" | "option_delete_word" => {
+                            let enabled: bool = map.next_value()?;
+                            result.insert(
+                                "terminal.deleteWord".to_string(),
+                                if enabled { "Option+Delete".to_string() } else { String::new() },
+                            );
+                        }
+                        "cmdKClear" | "cmd_k_clear" => {
+                            let enabled: bool = map.next_value()?;
+                            result.insert(
+                                "terminal.clearTerminal".to_string(),
+                                if enabled { "Cmd+K".to_string() } else { String::new() },
+                            );
+                        }
+                        // New format: string values with dotted keys
+                        _ => {
+                            let value: String = map.next_value()?;
+                            result.insert(key, value);
+                        }
+                    }
+                }
+
+                Ok(KeybindingSettings(result))
+            }
+        }
+
+        deserializer.deserialize_map(KeybindingVisitor)
+    }
 }
 
 fn default_true() -> bool {
     true
-}
-
-impl Default for KeybindingSettings {
-    fn default() -> Self {
-        KeybindingSettings {
-            shift_enter_newline: true,
-            option_delete_word: true,
-            cmd_k_clear: true,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

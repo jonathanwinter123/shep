@@ -30,11 +30,8 @@ export interface EditorSettings {
   preferredEditor: PreferredEditor | null;
 }
 
-export interface KeybindingSettings {
-  shiftEnterNewline: boolean;
-  optionDeleteWord: boolean;
-  cmdKClear: boolean;
-}
+/** Flat map of action ID → key combo string. */
+export type KeybindingSettings = Record<string, string>;
 
 export type CursorStyle = "block" | "underline" | "bar";
 

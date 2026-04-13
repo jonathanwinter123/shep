@@ -2,14 +2,13 @@ import { useEffect, useState } from "react";
 import { getIdentifier, getName, getTauriVersion, getVersion } from "@tauri-apps/api/app";
 import { EDITOR_OPTIONS } from "../../lib/editors";
 import { DARK_THEMES, LIGHT_THEMES, TRANSPARENT_THEMES } from "../../lib/themes";
-import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useThemeStore } from "../../stores/useThemeStore";
-import { useKeybindingStore } from "../../stores/useKeybindingStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUpdateStore } from "../../stores/useUpdateStore";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
+import ShortcutEditor from "./ShortcutEditor";
 import {
   displayTerminalFontFamily,
   FONT_OPTIONS,
@@ -55,13 +54,6 @@ export default function SettingsPanel() {
   const loadSettings = useEditorStore((s) => s.loadSettings);
   const setPreferredEditor = useEditorStore((s) => s.setPreferredEditor);
 
-  const kbSettings = useKeybindingStore((s) => s.settings);
-  const kbHasLoaded = useKeybindingStore((s) => s.hasLoaded);
-  const kbIsSaving = useKeybindingStore((s) => s.isSaving);
-  const kbError = useKeybindingStore((s) => s.error);
-  const loadKbSettings = useKeybindingStore((s) => s.loadSettings);
-  const setKbEnabled = useKeybindingStore((s) => s.setEnabled);
-
   const termSettings = useTerminalSettingsStore((s) => s.settings);
   const termHasLoaded = useTerminalSettingsStore((s) => s.hasLoaded);
   const termIsSaving = useTerminalSettingsStore((s) => s.isSaving);
@@ -88,10 +80,9 @@ export default function SettingsPanel() {
 
   useEffect(() => {
     if (!hasLoaded) void loadSettings();
-    if (!kbHasLoaded) void loadKbSettings();
     if (!termHasLoaded) void loadTermSettings();
     if (!usageHasLoaded) void loadUsageSettings();
-  }, [hasLoaded, loadSettings, kbHasLoaded, loadKbSettings, termHasLoaded, loadTermSettings, usageHasLoaded, loadUsageSettings]);
+  }, [hasLoaded, loadSettings, termHasLoaded, loadTermSettings, usageHasLoaded, loadUsageSettings]);
 
   useEffect(() => {
     setCustomFontInput(displayTerminalFontFamily(termSettings.fontFamily));
@@ -191,31 +182,9 @@ export default function SettingsPanel() {
 
       <hr className="settings-divider" />
 
-      {/* ── Keybindings ────────────────────────────────────── */}
-      <h2 className="section-label !p-0 mb-4">Keybindings</h2>
-
-      <div className="flex flex-wrap gap-3">
-        {KEYBINDING_PRESETS.map((preset) => {
-          const active = kbSettings[preset.id];
-          return (
-            <button
-              key={preset.id}
-              onClick={() => void setKbEnabled(preset.id, !active)}
-              className={`keybinding-card ${active ? "selected" : ""}`}
-            >
-              <span className="keybinding-card__keys">
-                {preset.keys.map((k, i) => (
-                  <kbd key={i} className="keybinding-kbd">{k}</kbd>
-                ))}
-              </span>
-              <span className="keybinding-card__action">{preset.action}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {kbIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving keybindings...</div>}
-      {kbError && <div className="mt-2 text-sm text-red-300">{kbError}</div>}
+      {/* ── Keyboard Shortcuts ──────────────────────────── */}
+      <h2 className="section-label !p-0 mb-4">Keyboard Shortcuts</h2>
+      <ShortcutEditor />
 
       <hr className="settings-divider" />
 

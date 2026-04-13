@@ -35,6 +35,10 @@ import { useUpdateStore } from "../../stores/useUpdateStore";
 import { initNotifications } from "../../lib/notifications";
 import { getErrorMessage } from "../../lib/errors";
 import { useNoticeStore } from "../../stores/useNoticeStore";
+import { registerActions } from "../../lib/registerActions";
+import { eventToCombo } from "../../lib/keyCombo";
+import { getAction } from "../../lib/actionRegistry";
+import { useShortcutStore } from "../../stores/useShortcutStore";
 
 import type { CommandConfig, CommandState, TerminalTab, SessionMode, WorkspaceConfig } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
@@ -168,6 +172,7 @@ export default function AppShell() {
     void loadTerminalSettings();
     void loadUsageSettings();
     void fetchUsageSnapshots();
+    void useShortcutStore.getState().loadSettings();
     void initNotifications();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));
@@ -501,42 +506,79 @@ export default function AppShell() {
 
   // Handle native menu events (accelerators for Cmd+T, Cmd+Shift+T, Cmd+B, Cmd+E, Cmd+, etc.)
   useEffect(() => {
+    const menuActionMap: Record<string, string> = {
+      new_terminal: "shep.session.newTerminal",
+      new_agent: "shep.session.newAssistant",
+      toggle_sidebar: "shep.panel.toggleSidebar",
+      open_in_editor: "shep.editor.open",
+      settings: "shep.panel.toggleSettings",
+    };
+
     const unlisten = listen<string>("menu-event", (event) => {
-      switch (event.payload) {
-        case "new_terminal":
-          handleNewShell();
-          break;
-        case "new_agent":
-          handleNewAssistant();
-          break;
-        case "toggle_sidebar":
-          useUIStore.getState().toggleSidebar();
-          break;
-        case "open_in_editor": {
-          const repoPath = useTerminalStore.getState().activeProjectPath;
-          if (repoPath) handleOpenInEditor(repoPath);
-          break;
-        }
-        case "settings":
-          useUIStore.getState().openSettings();
-          break;
-        case "check_updates":
-          void useUpdateStore.getState().checkForUpdate().then(() => {
-            const { status, availableVersion } = useUpdateStore.getState();
-            if (status === "available" && availableVersion) {
-              pushNotice(
-                { tone: "info", title: "Update available", message: `Version ${availableVersion} is ready to download` },
-                { durationMs: 8000 },
-              );
-            } else if (status === "idle") {
-              pushNotice({ tone: "success", title: "You're up to date", message: "No updates available" });
-            }
-          });
-          break;
+      const actionId = menuActionMap[event.payload];
+      if (actionId) {
+        const action = getAction(actionId);
+        if (action) action.execute();
+        return;
+      }
+
+      // Non-shortcut menu items (check_updates)
+      if (event.payload === "check_updates") {
+        void useUpdateStore.getState().checkForUpdate().then(() => {
+          const { status, availableVersion } = useUpdateStore.getState();
+          if (status === "available" && availableVersion) {
+            pushNotice(
+              { tone: "info", title: "Update available", message: `Version ${availableVersion} is ready to download` },
+              { durationMs: 8000 },
+            );
+          } else if (status === "idle") {
+            pushNotice({ tone: "success", title: "You're up to date", message: "No updates available" });
+          }
+        });
       }
     });
     return () => { unlisten.then((f) => f()); };
-  }, [handleNewShell, handleNewAssistant, handleOpenInEditor, pushNotice]);
+  }, [pushNotice]);
+
+  // Register all shortcuttable actions into the action registry
+  useEffect(() => {
+    registerActions({
+      newShell: handleNewShell,
+      newAssistant: handleNewAssistant,
+      closeTab,
+      openInEditor: handleOpenInEditor,
+    });
+  }, [handleNewShell, handleNewAssistant, closeTab, handleOpenInEditor]);
+
+  // Global keyboard shortcut listener (capture phase — fires before xterm.js)
+  useEffect(() => {
+    const handler = (ev: KeyboardEvent) => {
+      // Skip while ShortcutEditor is recording a new key combo
+      if (useShortcutStore.getState().recording) return;
+      // Skip modifier-only presses
+      if (["Control", "Alt", "Shift", "Meta"].includes(ev.key)) return;
+      // Skip if user is typing in an input/textarea (but not terminal)
+      const tag = (ev.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      const combo = eventToCombo(ev);
+      if (!combo) return;
+
+      const reverseMap = useShortcutStore.getState().getReverseMap();
+      const actionId = reverseMap.get(combo);
+      if (!actionId) return;
+
+      const action = getAction(actionId);
+      if (!action) return;
+
+      ev.preventDefault();
+      ev.stopPropagation();
+      action.execute();
+    };
+
+    window.addEventListener("keydown", handler, { capture: true });
+    return () => window.removeEventListener("keydown", handler, { capture: true });
+  }, []);
 
   const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive || portsPanelActive || sessionHistoryActive || filePreviewActive;
 
