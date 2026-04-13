@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { RepoInfo, CommandState } from "../../lib/types";
+import type { RepoInfo, RepoGroup, CommandState } from "../../lib/types";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import SectionHeader from "./SectionHeader";
@@ -9,6 +9,7 @@ import SidebarUsage from "./SidebarUsage";
 
 interface SidebarProps {
   repos: RepoInfo[];
+  groups: RepoGroup[];
   activeRepoPath: string | null;
   activeTabId: string | null;
   commands: CommandState[];
@@ -20,10 +21,15 @@ interface SidebarProps {
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
+  onCreateGroup: (name: string) => void;
+  onRenameGroup: (groupId: string, newName: string) => void;
+  onDeleteGroup: (groupId: string) => void;
+  onMoveToGroup: (repoPath: string, groupId: string | null) => void;
 }
 
 export default function Sidebar({
   repos,
+  groups,
   activeRepoPath,
   activeTabId,
   commands,
@@ -35,6 +41,10 @@ export default function Sidebar({
   onSelectTab,
   onCloseTab,
   onNewShell,
+  onCreateGroup,
+  onRenameGroup,
+  onDeleteGroup,
+  onMoveToGroup,
 }: SidebarProps) {
   const projectState = useTerminalStore((s) => s.projectState);
   const projectCommands = useCommandStore((s) => s.projectCommands);
@@ -85,6 +95,7 @@ export default function Sidebar({
         <SectionHeader label="Projects" />
         <ProjectList
           repos={repos}
+          groups={groups}
           activeRepoPath={activeRepoPath}
           activeTabId={activeTabId}
           commands={commands}
@@ -97,6 +108,10 @@ export default function Sidebar({
           onSelectTab={onSelectTab}
           onCloseTab={onCloseTab}
           onNewShell={onNewShell}
+          onCreateGroup={onCreateGroup}
+          onRenameGroup={onRenameGroup}
+          onDeleteGroup={onDeleteGroup}
+          onMoveToGroup={onMoveToGroup}
         />
       </div>
       <SidebarUsage />

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import type { RepoInfo, CommandState, TerminalTabData } from "../../lib/types";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import type { RepoInfo, RepoGroup, CommandState, TerminalTabData } from "../../lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
 import tabKindMeta from "../../lib/tabKindMeta";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
 import ProjectItem from "./ProjectItem";
+import GroupHeader from "./GroupHeader";
 import CollapsibleSection from "./CollapsibleSection";
 import AssistantList from "./AssistantList";
 import TerminalList from "./TerminalList";
@@ -13,6 +14,7 @@ import GitStatusRow from "./GitStatusRow";
 
 interface ProjectListProps {
   repos: RepoInfo[];
+  groups: RepoGroup[];
   activeRepoPath: string | null;
   activeTabId: string | null;
   commands: CommandState[];
@@ -25,10 +27,15 @@ interface ProjectListProps {
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
+  onCreateGroup: (name: string) => void;
+  onRenameGroup: (groupId: string, newName: string) => void;
+  onDeleteGroup: (groupId: string) => void;
+  onMoveToGroup: (repoPath: string, groupId: string | null) => void;
 }
 
 export default function ProjectList({
   repos,
+  groups,
   activeRepoPath,
   activeTabId,
   commands,
@@ -41,11 +48,22 @@ export default function ProjectList({
   onSelectTab,
   onCloseTab,
   onNewShell,
+  onCreateGroup,
+  onRenameGroup,
+  onDeleteGroup,
+  onMoveToGroup,
 }: ProjectListProps) {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
     () => new Set(activeRepoPath ? [activeRepoPath] : []),
   );
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const createGroupSubmittedRef = useRef(false);
 
+  // Auto-expand the active project when activeRepoPath changes externally
+  // (e.g. session restore, programmatic selection). Legitimate useEffect:
+  // syncing local UI state in response to an external prop change.
   useEffect(() => {
     if (!activeRepoPath) return;
     setExpandedPaths((prev) => {
@@ -63,9 +81,30 @@ export default function ProjectList({
         return next;
       });
     } else {
+      setExpandedPaths((prev) => {
+        if (prev.has(repoPath)) return prev;
+        return new Set(prev).add(repoPath);
+      });
+      // Auto-expand the group containing the clicked repo
+      const repo = repos.find((r) => r.path === repoPath);
+      if (repo?.group) {
+        setExpandedGroups((prev) => {
+          if (prev.has(repo.group!)) return prev;
+          return new Set(prev).add(repo.group!);
+        });
+      }
       onSelectRepo(repoPath);
     }
   };
+
+  const handleToggleGroup = useCallback((groupId: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }, []);
 
   const handleAddClick = async () => {
     const selected = await open({
@@ -77,6 +116,17 @@ export default function ProjectList({
       onAddProject(selected);
     }
   };
+
+  const handleCreateGroupSubmit = useCallback(() => {
+    if (createGroupSubmittedRef.current) return;
+    createGroupSubmittedRef.current = true;
+    const trimmed = newGroupName.trim();
+    if (trimmed) {
+      onCreateGroup(trimmed);
+    }
+    setCreatingGroup(false);
+    setNewGroupName("");
+  }, [newGroupName, onCreateGroup]);
 
   // Get tabs for the active project (stable ref from store)
   const projectTabs = useTerminalStore(
@@ -95,85 +145,203 @@ export default function ProjectList({
 
   const commandsBadge = commands.length > 0 ? String(commands.length) : null;
   const gitStatuses = useGitStore((s) => s.projectGitStatus);
-  const sortedRepos = useMemo(() => {
-    return [...repos].sort((a, b) => {
-      const aWorktreeParent = gitStatuses[a.path]?.worktree_parent ?? null;
-      const bWorktreeParent = gitStatuses[b.path]?.worktree_parent ?? null;
 
-      const aGroup = aWorktreeParent ?? a.name;
-      const bGroup = bWorktreeParent ?? b.name;
+  // Build grouped layout
+  const { sortedGroups, groupedRepos, ungroupedRepos } = useMemo(() => {
+    const validGroupIds = new Set(groups.map((g) => g.id));
+    const grouped = new Map<string, RepoInfo[]>();
+    const ungrouped: RepoInfo[] = [];
+
+    for (const repo of repos) {
+      if (repo.group && validGroupIds.has(repo.group)) {
+        const list = grouped.get(repo.group) ?? [];
+        list.push(repo);
+        grouped.set(repo.group, list);
+      } else {
+        ungrouped.push(repo);
+      }
+    }
+
+    // Sort repos within each group (worktree-aware)
+    const sortFn = (a: RepoInfo, b: RepoInfo) => {
+      const aWt = gitStatuses[a.path]?.worktree_parent ?? null;
+      const bWt = gitStatuses[b.path]?.worktree_parent ?? null;
+      const aGroup = aWt ?? a.name;
+      const bGroup = bWt ?? b.name;
       const groupCompare = aGroup.localeCompare(bGroup);
       if (groupCompare !== 0) return groupCompare;
-
-      if (aWorktreeParent == null && bWorktreeParent != null) return -1;
-      if (aWorktreeParent != null && bWorktreeParent == null) return 1;
-
+      if (aWt == null && bWt != null) return -1;
+      if (aWt != null && bWt == null) return 1;
       return a.name.localeCompare(b.name);
-    });
-  }, [repos, gitStatuses]);
+    };
+
+    for (const list of grouped.values()) {
+      list.sort(sortFn);
+    }
+    ungrouped.sort(sortFn);
+
+    const sorted = [...groups]
+      .filter((g) => grouped.has(g.id))
+      .sort((a, b) => a.order - b.order);
+
+    // Also include empty groups so they remain visible
+    const emptyGroups = groups.filter((g) => !grouped.has(g.id));
+    const allSorted = [...sorted, ...emptyGroups.sort((a, b) => a.order - b.order)];
+
+    return { sortedGroups: allSorted, groupedRepos: grouped, ungroupedRepos: ungrouped };
+  }, [repos, groups, gitStatuses]);
+
+  const groupActivity = useMemo(() => {
+    const result: Record<string, { hasAttention: boolean; hasCrash: boolean; hasActivity: boolean }> = {};
+    for (const group of sortedGroups) {
+      const groupRepos = groupedRepos.get(group.id) ?? [];
+      let hasAttention = false;
+      let hasCrash = false;
+      let hasActivity = false;
+      for (const repo of groupRepos) {
+        const a = projectActivity[repo.path];
+        if (a) {
+          if (a.terminalCount > 0 || a.runningCount > 0) hasActivity = true;
+          if (a.hasAttention) hasAttention = true;
+          if (a.hasCrash) hasCrash = true;
+        }
+      }
+      result[group.id] = { hasAttention, hasCrash, hasActivity };
+    }
+    return result;
+  }, [sortedGroups, groupedRepos, projectActivity]);
+
+  const renderRepoItem = (repo: RepoInfo) => {
+    const isActive = repo.path === activeRepoPath;
+    const isExpanded = isActive && expandedPaths.has(repo.path);
+    const worktreeParent = gitStatuses[repo.path]?.worktree_parent ?? null;
+    return (
+      <div key={repo.path}>
+        <ProjectItem
+          repo={repo}
+          isActive={isActive}
+          isExpanded={isExpanded}
+          activity={projectActivity[repo.path]}
+          worktreeParent={worktreeParent}
+          groups={groups}
+          onOpenInEditor={() => onOpenInEditor(repo.path)}
+          onRemove={() => onRemoveProject(repo.path)}
+          onClick={() => handleProjectClick(repo.path)}
+          onAddProject={onAddProject}
+          onMoveToGroup={onMoveToGroup}
+        />
+        {isExpanded && (
+          <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
+            <CollapsibleSection
+              label={tabKindMeta.assistant.label + "s"}
+              icon={tabKindMeta.assistant.icon(14)}
+              badge={assistantTabs.length || null}
+              hasItems={assistantTabs.length > 0}
+              onAdd={onNewAssistant}
+            >
+              <AssistantList
+                assistantTabs={assistantTabs}
+                activeTabId={activeTabId}
+                onSelectTab={onSelectTab}
+                onCloseTab={onCloseTab}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              label={tabKindMeta.terminal.label + "s"}
+              icon={tabKindMeta.terminal.icon(14)}
+              badge={shellTabs.length || null}
+              hasItems={shellTabs.length > 0}
+              onAdd={onNewShell}
+            >
+              <TerminalList
+                tabs={shellTabs}
+                activeTabId={activeTabId}
+                onSelectTab={onSelectTab}
+                onCloseTab={onCloseTab}
+              />
+            </CollapsibleSection>
+
+            <CommandsRow badge={commandsBadge} />
+            <GitStatusRow repoPath={repo.path} />
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-0.5 px-2 pb-2">
-      {sortedRepos.map((repo) => {
-        const isActive = repo.path === activeRepoPath;
-        const isExpanded = isActive && expandedPaths.has(repo.path);
-        const worktreeParent = gitStatuses[repo.path]?.worktree_parent ?? null;
+      {sortedGroups.map((group) => {
+        const groupRepos = groupedRepos.get(group.id) ?? [];
+        const isGroupExpanded = expandedGroups.has(group.id);
         return (
-          <div key={repo.path}>
-            <ProjectItem
-              repo={repo}
-              isActive={isActive}
-              isExpanded={isExpanded}
-              activity={projectActivity[repo.path]}
-              worktreeParent={worktreeParent}
-              onOpenInEditor={() => onOpenInEditor(repo.path)}
-              onRemove={() => onRemoveProject(repo.path)}
-              onClick={() => handleProjectClick(repo.path)}
-              onAddProject={onAddProject}
+          <div key={group.id}>
+            <GroupHeader
+              group={group}
+              repoCount={groupRepos.length}
+              isExpanded={isGroupExpanded}
+              activity={groupActivity[group.id]}
+              onToggle={() => handleToggleGroup(group.id)}
+              onRename={onRenameGroup}
+              onDelete={onDeleteGroup}
             />
-            {isExpanded && (
-              <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
-                <CollapsibleSection
-                  label={tabKindMeta.assistant.label + "s"}
-                  icon={tabKindMeta.assistant.icon(14)}
-                  badge={assistantTabs.length || null}
-                  hasItems={assistantTabs.length > 0}
-                  onAdd={onNewAssistant}
-                >
-                  <AssistantList
-                    assistantTabs={assistantTabs}
-                    activeTabId={activeTabId}
-                    onSelectTab={onSelectTab}
-                    onCloseTab={onCloseTab}
-                  />
-                </CollapsibleSection>
-
-                <CollapsibleSection
-                  label={tabKindMeta.terminal.label + "s"}
-                  icon={tabKindMeta.terminal.icon(14)}
-                  badge={shellTabs.length || null}
-                  hasItems={shellTabs.length > 0}
-                  onAdd={onNewShell}
-                >
-                  <TerminalList
-                    tabs={shellTabs}
-                    activeTabId={activeTabId}
-                    onSelectTab={onSelectTab}
-                    onCloseTab={onCloseTab}
-                  />
-                </CollapsibleSection>
-
-                <CommandsRow badge={commandsBadge} />
-                <GitStatusRow repoPath={repo.path} />
+            {isGroupExpanded && (
+              <div className="pl-2">
+                {groupRepos.length === 0 ? (
+                  <div className="group-empty-hint">No projects in this group</div>
+                ) : (
+                  groupRepos.map(renderRepoItem)
+                )}
               </div>
             )}
           </div>
         );
       })}
+
+      {ungroupedRepos.map(renderRepoItem)}
+
       <button className="btn-ghost w-full mt-1" onClick={handleAddClick}>
         <span>+</span>
         <span>Add Project</span>
       </button>
+      {creatingGroup ? (
+        <form
+          className="group-create-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleCreateGroupSubmit();
+          }}
+        >
+          <input
+            className="group-create-form__input"
+            type="text"
+            placeholder="Group name"
+            autoFocus
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            onBlur={handleCreateGroupSubmit}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                createGroupSubmittedRef.current = true;
+                setCreatingGroup(false);
+                setNewGroupName("");
+              }
+            }}
+          />
+        </form>
+      ) : (
+        <button
+          className="btn-ghost w-full"
+          onClick={() => {
+            createGroupSubmittedRef.current = false;
+            setCreatingGroup(true);
+          }}
+        >
+          <span>+</span>
+          <span>Add Group</span>
+        </button>
+      )}
     </div>
   );
 }
