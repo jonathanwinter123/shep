@@ -109,6 +109,9 @@ export default function ProjectItem({
     try {
       const created = await gitCreateWorktree(repo.path, branchName);
       onAddProject(created.path);
+      if (repo.group) {
+        onMoveToGroup(created.path, repo.group);
+      }
       setWtCreate(null);
       setWtBranchName("");
     } catch (error) {
