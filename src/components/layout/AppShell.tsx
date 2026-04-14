@@ -63,7 +63,7 @@ function PanelLoader() {
 export default function AppShell() {
   useThemeApplicator();
 
-  const { repos, activeRepoPath, fetchRepos, openRepo, addRepo, removeRepo } =
+  const { repos, groups, activeRepoPath, fetchRepos, fetchGroups, openRepo, addRepo, removeRepo, renameGroup, deleteGroup, moveRepoToGroup } =
     useRepoStore();
   const activeConfig = useRepoStore((s) => s.activeConfig);
   const setActiveConfig = useRepoStore((s) => s.setActiveConfig);
@@ -169,6 +169,7 @@ export default function AppShell() {
 
   useEffect(() => {
     fetchRepos();
+    fetchGroups();
     void loadEditorSettings();
     void loadTerminalSettings();
     void loadUsageSettings();
@@ -190,7 +191,7 @@ export default function AppShell() {
       }
     }, 3000);
     return () => window.clearTimeout(updateTimer);
-  }, [fetchRepos, loadEditorSettings, loadTerminalSettings, loadUsageSettings, fetchUsageSnapshots, pushNotice]);
+  }, [fetchRepos, fetchGroups, loadEditorSettings, loadTerminalSettings, loadUsageSettings, fetchUsageSnapshots, pushNotice]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -266,6 +267,12 @@ export default function AppShell() {
 
   const handleRemoveProject = useCallback(
     async (repoPath: string) => {
+      const repoName = repoPath.split("/").filter(Boolean).pop() ?? "this project";
+      const confirmed = await ask(
+        `Remove "${repoName}" from Shep? The files on disk will not be deleted.`,
+        { title: "Remove project", kind: "warning", okLabel: "Remove", cancelLabel: "Cancel" },
+      );
+      if (!confirmed) return;
       try {
         await killProjectPtys(repoPath);
         await removeRepo(repoPath);
@@ -281,6 +288,58 @@ export default function AppShell() {
       }
     },
     [killProjectPtys, pushNotice, removeRepo],
+  );
+
+  const handleRenameGroup = useCallback(
+    async (groupId: string, newName: string) => {
+      try {
+        await renameGroup(groupId, newName);
+      } catch (error) {
+        pushNotice({
+          tone: "error",
+          title: "Couldn’t rename group",
+          message: getErrorMessage(error),
+        });
+      }
+    },
+    [renameGroup, pushNotice],
+  );
+
+  const handleDeleteGroup = useCallback(
+    async (groupId: string) => {
+      const group = groups.find((g) => g.id === groupId);
+      const groupName = group?.name ?? "this group";
+      const confirmed = await ask(
+        `Remove group "${groupName}"? Projects in this group will become ungrouped.`,
+        { title: "Remove group", kind: "warning", okLabel: "Remove", cancelLabel: "Cancel" },
+      );
+      if (!confirmed) return;
+      try {
+        await deleteGroup(groupId);
+      } catch (error) {
+        pushNotice({
+          tone: "error",
+          title: "Couldn’t delete group",
+          message: getErrorMessage(error),
+        });
+      }
+    },
+    [groups, deleteGroup, pushNotice],
+  );
+
+  const handleMoveToGroup = useCallback(
+    async (repoPath: string, groupId: string | null) => {
+      try {
+        await moveRepoToGroup(repoPath, groupId);
+      } catch (error) {
+        pushNotice({
+          tone: "error",
+          title: "Couldn’t move project",
+          message: getErrorMessage(error),
+        });
+      }
+    },
+    [moveRepoToGroup, pushNotice],
   );
 
   const handleStartCommand = useCallback(
@@ -557,6 +616,7 @@ export default function AppShell() {
         {sidebarVisible && (
           <Sidebar
             repos={repos}
+            groups={groups}
             activeRepoPath={activeRepoPath}
             activeTabId={showOverlay ? null : activeTabId}
             commands={commands}
@@ -568,6 +628,9 @@ export default function AppShell() {
             onSelectTab={handleSelectSidebarTab}
             onCloseTab={handleCloseTab}
             onNewShell={handleNewShell}
+            onRenameGroup={handleRenameGroup}
+            onDeleteGroup={handleDeleteGroup}
+            onMoveToGroup={handleMoveToGroup}
           />
         )}
 

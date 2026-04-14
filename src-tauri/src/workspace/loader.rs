@@ -4,8 +4,9 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::config::{
-    CommandConfig, EditorSettings, GlobalConfig, KeybindingSettings, RegisteredRepo, RepoEntry,
-    RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig, normalize_terminal_settings,
+    CommandConfig, EditorSettings, GlobalConfig, GroupEntry, KeybindingSettings, RegisteredRepo,
+    RepoEntry, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
+    normalize_terminal_settings,
 };
 
 static CONFIG_CACHE: Mutex<Option<(GlobalConfig, SystemTime)>> = Mutex::new(None);
@@ -94,6 +95,7 @@ pub fn backfill_global_config_defaults() -> Result<(), String> {
     let content =
         fs::read_to_string(&path).map_err(|e| format!("Failed to read global config: {e}"))?;
     let needs_url_allowlist = !content.contains("urlAllowlist:");
+
     if !needs_url_allowlist {
         return Ok(());
     }
@@ -160,6 +162,7 @@ pub fn list_repos() -> Result<Vec<RepoInfo>, String> {
             RepoInfo {
                 path: entry.path.clone(),
                 name,
+                group: entry.group.clone(),
             }
         })
         .collect();
@@ -182,6 +185,7 @@ pub fn register_repo(repo_path: &str) -> Result<RegisteredRepo, String> {
     if !config.repos.iter().any(|r| r.path == canonical_str) {
         config.repos.push(RepoEntry {
             path: canonical_str.clone(),
+            group: None,
         });
         save_global_config(&config)?;
     }
@@ -301,7 +305,7 @@ pub fn migrate_old_projects() -> Result<(), String> {
         }
 
         // Add to global registry
-        global_config.repos.push(RepoEntry { path: cwd });
+        global_config.repos.push(RepoEntry { path: cwd, group: None });
     }
 
     if !global_config.repos.is_empty() {
@@ -309,6 +313,107 @@ pub fn migrate_old_projects() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+// ── Group operations ───────────────────────────────────────────────
+
+pub fn list_groups() -> Result<Vec<GroupEntry>, String> {
+    let config = load_global_config()?;
+    let mut groups = config.groups;
+    groups.sort_by_key(|g| g.order);
+    Ok(groups)
+}
+
+pub fn create_group(name: &str) -> Result<GroupEntry, String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("Group name cannot be empty".to_string());
+    }
+
+    let mut config = load_global_config()?;
+    let next_order = config.groups.iter().map(|g| g.order).max().unwrap_or(0) + 1;
+
+    let id = format!(
+        "{}-{}",
+        slug_from_name(trimmed),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    );
+
+    let entry = GroupEntry {
+        id,
+        name: trimmed.to_string(),
+        order: next_order,
+    };
+
+    config.groups.push(entry.clone());
+    save_global_config(&config)?;
+    Ok(entry)
+}
+
+pub fn rename_group(group_id: &str, new_name: &str) -> Result<(), String> {
+    let trimmed = new_name.trim();
+    if trimmed.is_empty() {
+        return Err("Group name cannot be empty".to_string());
+    }
+
+    let mut config = load_global_config()?;
+    let group = config
+        .groups
+        .iter_mut()
+        .find(|g| g.id == group_id)
+        .ok_or_else(|| format!("Group not found: {group_id}"))?;
+    group.name = trimmed.to_string();
+    save_global_config(&config)
+}
+
+pub fn delete_group(group_id: &str) -> Result<(), String> {
+    let mut config = load_global_config()?;
+    config.groups.retain(|g| g.id != group_id);
+    // Ungroup any repos that belonged to this group
+    for repo in &mut config.repos {
+        if repo.group.as_deref() == Some(group_id) {
+            repo.group = None;
+        }
+    }
+    save_global_config(&config)
+}
+
+pub fn move_repo_to_group(repo_path: &str, group_id: Option<&str>) -> Result<(), String> {
+    let mut config = load_global_config()?;
+
+    // Validate group exists (if setting, not clearing)
+    if let Some(gid) = group_id {
+        if !config.groups.iter().any(|g| g.id == gid) {
+            return Err(format!("Group not found: {gid}"));
+        }
+    }
+
+    let repo = config
+        .repos
+        .iter_mut()
+        .find(|r| r.path == repo_path)
+        .ok_or_else(|| format!("Repo not found: {repo_path}"))?;
+    repo.group = group_id.map(|s| s.to_string());
+    save_global_config(&config)
+}
+
+fn slug_from_name(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────

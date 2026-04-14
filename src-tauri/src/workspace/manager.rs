@@ -1,6 +1,6 @@
 use super::config::{
-    EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings,
-    WorkspaceConfig,
+    EditorSettings, GroupEntry, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings,
+    UsageSettings, WorkspaceConfig,
 };
 use super::loader;
 
@@ -73,5 +73,29 @@ impl WorkspaceManager {
 
     pub fn save_usage_settings(&self, settings: &UsageSettings) -> Result<(), String> {
         loader::save_usage_settings(settings)
+    }
+
+    pub fn list_groups(&self) -> Result<Vec<GroupEntry>, String> {
+        loader::list_groups()
+    }
+
+    pub fn create_group(&self, name: &str) -> Result<GroupEntry, String> {
+        loader::create_group(name)
+    }
+
+    pub fn rename_group(&self, group_id: &str, new_name: &str) -> Result<(), String> {
+        loader::rename_group(group_id, new_name)
+    }
+
+    pub fn delete_group(&self, group_id: &str) -> Result<(), String> {
+        loader::delete_group(group_id)
+    }
+
+    pub fn move_repo_to_group(
+        &self,
+        repo_path: &str,
+        group_id: Option<&str>,
+    ) -> Result<(), String> {
+        loader::move_repo_to_group(repo_path, group_id)
     }
 }

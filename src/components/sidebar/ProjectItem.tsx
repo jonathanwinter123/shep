@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { RepoInfo } from "../../lib/types";
+import type { RepoInfo, RepoGroup } from "../../lib/types";
 import { getEditorLabel } from "../../lib/editors";
 import { useEditorStore } from "../../stores/useEditorStore";
 import {
   Folder,
   FolderOpen,
+  FolderInput,
   GitFork,
   Plus,
   Copy,
@@ -25,10 +26,13 @@ interface ProjectItemProps {
   isExpanded: boolean;
   activity?: { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean };
   worktreeParent?: string | null;
+  groups: RepoGroup[];
   onClick: () => void;
   onRemove: () => void;
   onOpenInEditor: () => void;
-  onAddProject: (repoPath: string) => void;
+  onAddProject: (repoPath: string) => Promise<void>;
+  onMoveToGroup: (repoPath: string, groupId: string | null) => Promise<void>;
+  onNewGroupForRepo: (repoPath: string) => void;
 }
 
 export default function ProjectItem({
@@ -37,10 +41,13 @@ export default function ProjectItem({
   isExpanded,
   activity,
   worktreeParent,
+  groups,
   onClick,
   onRemove,
   onOpenInEditor,
   onAddProject,
+  onMoveToGroup,
+  onNewGroupForRepo,
 }: ProjectItemProps) {
   const hasActivity = activity && (activity.terminalCount > 0 || activity.runningCount > 0);
   const dotColor = activity?.hasCrash
@@ -103,7 +110,10 @@ export default function ProjectItem({
     setCreatingWorktree(true);
     try {
       const created = await gitCreateWorktree(repo.path, branchName);
-      onAddProject(created.path);
+      await onAddProject(created.path);
+      if (repo.group) {
+        await onMoveToGroup(created.path, repo.group);
+      }
       setWtCreate(null);
       setWtBranchName("");
     } catch (error) {
@@ -127,6 +137,29 @@ export default function ProjectItem({
   const createPathPreview = branchSlugPreview
     ? `.shep-worktrees/${repo.name}/${branchSlugPreview}`
     : null;
+
+  // Build "Move to" submenu children
+  const otherGroups = groups.filter((g) => g.id !== repo.group);
+  const moveToChildren: ContextMenuItem[] = [
+    ...otherGroups.map((g) => ({
+      label: g.name,
+      onClick: () => onMoveToGroup(repo.path, g.id),
+    })),
+    ...(otherGroups.length > 0 || repo.group ? [{ separator: true, label: "_sep_new" }] : []),
+    {
+      label: "New Group",
+      onClick: () => onNewGroupForRepo(repo.path),
+    },
+    ...(repo.group
+      ? [
+          { separator: true, label: "_sep_remove" },
+          {
+            label: "Remove from group",
+            onClick: () => onMoveToGroup(repo.path, null),
+          },
+        ]
+      : []),
+  ];
 
   const menuItems: ContextMenuItem[] = [
     {
@@ -169,6 +202,11 @@ export default function ProjectItem({
           });
       },
     },
+    {
+      label: "Move to",
+      icon: <FolderInput size={14} />,
+      children: moveToChildren,
+    },
     ...(!worktreeParent ? [{
       label: "Create Worktree",
       icon: <Plus size={14} />,
@@ -208,13 +246,14 @@ export default function ProjectItem({
           <span className="sidebar-status-dot" style={{ background: dotColor }} />
         )}
       </div>
-      {menu && (
+      {menu && createPortal(
         <ContextMenu
           x={menu.x}
           y={menu.y}
           items={menuItems}
           onClose={handleClose}
-        />
+        />,
+        document.body,
       )}
       {wtCreate && createPortal(
         <div

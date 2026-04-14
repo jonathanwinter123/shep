@@ -1,6 +1,7 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
 import type {
   RepoInfo,
+  RepoGroup,
   RegisteredRepo,
   WorkspaceConfig,
   PtyColorTheme,
@@ -33,6 +34,28 @@ export function registerRepo(repoPath: string): Promise<RegisteredRepo> {
 
 export function unregisterRepo(repoPath: string): Promise<void> {
   return invoke("unregister_repo", { repoPath });
+}
+
+// ── Group commands ────────────────────────────────────────────────
+
+export function listGroups(): Promise<RepoGroup[]> {
+  return invoke("list_groups");
+}
+
+export function createGroup(name: string): Promise<RepoGroup> {
+  return invoke("create_group", { name });
+}
+
+export function renameGroup(groupId: string, newName: string): Promise<void> {
+  return invoke("rename_group", { groupId, newName });
+}
+
+export function deleteGroup(groupId: string): Promise<void> {
+  return invoke("delete_group", { groupId });
+}
+
+export function moveRepoToGroup(repoPath: string, groupId: string | null): Promise<void> {
+  return invoke("move_repo_to_group", { repoPath, groupId });
 }
 
 export function loadWorkspace(repoPath: string): Promise<WorkspaceConfig> {

@@ -3,6 +3,13 @@
 export interface RepoInfo {
   path: string;
   name: string;
+  group: string | null;
+}
+
+export interface RepoGroup {
+  id: string;
+  name: string;
+  order: number;
 }
 
 export interface CommandConfig {

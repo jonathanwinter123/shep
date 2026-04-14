@@ -10,6 +10,8 @@ pub struct GlobalConfig {
     #[serde(default)]
     pub repos: Vec<RepoEntry>,
     #[serde(default)]
+    pub groups: Vec<GroupEntry>,
+    #[serde(default)]
     pub editor: EditorSettings,
     #[serde(default)]
     pub keybindings: KeybindingSettings,
@@ -28,6 +30,7 @@ impl Default for GlobalConfig {
         GlobalConfig {
             version: 1,
             repos: Vec::new(),
+            groups: Vec::new(),
             editor: EditorSettings::default(),
             keybindings: KeybindingSettings::default(),
             terminal: TerminalSettings::default(),
@@ -224,6 +227,16 @@ impl Default for UsageSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepoEntry {
     pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupEntry {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub order: u32,
 }
 
 // ── Repo info returned to frontend ──────────────────────────────────
@@ -232,6 +245,7 @@ pub struct RepoEntry {
 pub struct RepoInfo {
     pub path: String,
     pub name: String,
+    pub group: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

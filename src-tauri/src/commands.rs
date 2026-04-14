@@ -13,8 +13,8 @@ use crate::pty::session::{PtyColorTheme, PtyOutput};
 use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
 use crate::watcher::GitWatcher;
 use crate::workspace::config::{
-    normalize_terminal_settings, EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo,
-    TerminalSettings, UsageSettings, WorkspaceConfig,
+    normalize_terminal_settings, EditorSettings, GroupEntry, KeybindingSettings, RegisteredRepo,
+    RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
 };
 use crate::workspace::manager::WorkspaceManager;
 
@@ -181,6 +181,47 @@ pub fn open_url(url: &str, workspace: State<'_, WorkspaceManager>) -> Result<(),
     } else {
         Err(format!("open exited with status: {status}"))
     }
+}
+
+// ── Group commands ─────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn list_groups(workspace: State<'_, WorkspaceManager>) -> Result<Vec<GroupEntry>, String> {
+    workspace.list_groups()
+}
+
+#[tauri::command]
+pub fn create_group(
+    name: &str,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<GroupEntry, String> {
+    workspace.create_group(name)
+}
+
+#[tauri::command]
+pub fn rename_group(
+    group_id: &str,
+    new_name: &str,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<(), String> {
+    workspace.rename_group(group_id, new_name)
+}
+
+#[tauri::command]
+pub fn delete_group(
+    group_id: &str,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<(), String> {
+    workspace.delete_group(group_id)
+}
+
+#[tauri::command]
+pub fn move_repo_to_group(
+    repo_path: &str,
+    group_id: Option<&str>,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<(), String> {
+    workspace.move_repo_to_group(repo_path, group_id)
 }
 
 // ── PTY commands ────────────────────────────────────────────────────
