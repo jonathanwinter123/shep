@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { ChevronRight, ChevronDown, Pencil, Trash2 } from "lucide-react";
+import { Folders, Pencil, Trash2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import ContextMenu from "../shared/ContextMenu";
 import type { ContextMenuItem } from "../shared/ContextMenu";
@@ -7,7 +7,6 @@ import type { RepoGroup } from "../../lib/types";
 
 interface GroupHeaderProps {
   group: RepoGroup;
-  repoCount: number;
   isExpanded: boolean;
   activity?: { hasAttention: boolean; hasCrash: boolean; hasActivity: boolean };
   onToggle: () => void;
@@ -17,7 +16,6 @@ interface GroupHeaderProps {
 
 export default function GroupHeader({
   group,
-  repoCount,
   isExpanded,
   activity,
   onToggle,
@@ -106,9 +104,7 @@ export default function GroupHeader({
         aria-expanded={isExpanded}
         aria-label={group.name}
       >
-        <span className="group-header__chevron">
-          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        </span>
+        <Folders size={14} style={{ opacity: isExpanded ? 1 : 0.6, flexShrink: 0 }} />
         {renaming ? (
           <input
             ref={renameInputRef}
@@ -124,11 +120,8 @@ export default function GroupHeader({
           <span className="group-header__name truncate">{group.name}</span>
         )}
         <span className="flex-1" />
-        {repoCount > 0 && (
-          <span className="group-header__count">{repoCount}</span>
-        )}
         {!isExpanded && hasActivity && (
-          <span className="sidebar-status-dot" style={{ marginLeft: repoCount > 0 ? 0 : undefined, background: dotColor }} />
+          <span className="sidebar-status-dot" style={{ background: dotColor }} />
         )}
       </div>
       {menu &&

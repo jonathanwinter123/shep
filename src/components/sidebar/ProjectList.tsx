@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import tabKindMeta from "../../lib/tabKindMeta";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
+import { useRepoStore } from "../../stores/useRepoStore";
 import ProjectItem from "./ProjectItem";
 import GroupHeader from "./GroupHeader";
 import CollapsibleSection from "./CollapsibleSection";
@@ -60,6 +61,7 @@ export default function ProjectList({
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const createGroupSubmittedRef = useRef(false);
+  const pendingMoveRepoPath = useRef<string | null>(null);
 
   // Auto-expand the active project when activeRepoPath changes externally
   // (e.g. session restore, programmatic selection). Legitimate useEffect:
@@ -121,12 +123,20 @@ export default function ProjectList({
     if (createGroupSubmittedRef.current) return;
     createGroupSubmittedRef.current = true;
     const trimmed = newGroupName.trim();
+    const repoToMove = pendingMoveRepoPath.current;
+    pendingMoveRepoPath.current = null;
     if (trimmed) {
-      onCreateGroup(trimmed);
+      if (repoToMove) {
+        useRepoStore.getState().createGroup(trimmed).then((group) => {
+          onMoveToGroup(repoToMove, group.id);
+        });
+      } else {
+        onCreateGroup(trimmed);
+      }
     }
     setCreatingGroup(false);
     setNewGroupName("");
-  }, [newGroupName, onCreateGroup]);
+  }, [newGroupName, onCreateGroup, onMoveToGroup]);
 
   // Get tabs for the active project (stable ref from store)
   const projectTabs = useTerminalStore(
@@ -229,6 +239,11 @@ export default function ProjectList({
           onClick={() => handleProjectClick(repo.path)}
           onAddProject={onAddProject}
           onMoveToGroup={onMoveToGroup}
+          onNewGroupForRepo={(repoPath) => {
+            pendingMoveRepoPath.current = repoPath;
+            createGroupSubmittedRef.current = false;
+            setCreatingGroup(true);
+          }}
         />
         {isExpanded && (
           <div className="mt-1 mb-2 flex flex-col gap-0.5 pl-2">
@@ -279,7 +294,6 @@ export default function ProjectList({
           <div key={group.id}>
             <GroupHeader
               group={group}
-              repoCount={groupRepos.length}
               isExpanded={isGroupExpanded}
               activity={groupActivity[group.id]}
               onToggle={() => handleToggleGroup(group.id)}
@@ -287,7 +301,7 @@ export default function ProjectList({
               onDelete={onDeleteGroup}
             />
             {isGroupExpanded && (
-              <div className="pl-2">
+              <div className="pl-4">
                 {groupRepos.length === 0 ? (
                   <div className="group-empty-hint">No projects in this group</div>
                 ) : (
@@ -305,7 +319,7 @@ export default function ProjectList({
         <span>+</span>
         <span>Add Project</span>
       </button>
-      {creatingGroup ? (
+      {creatingGroup && (
         <form
           className="group-create-form"
           onSubmit={(e) => {
@@ -330,17 +344,6 @@ export default function ProjectList({
             }}
           />
         </form>
-      ) : (
-        <button
-          className="btn-ghost w-full"
-          onClick={() => {
-            createGroupSubmittedRef.current = false;
-            setCreatingGroup(true);
-          }}
-        >
-          <span>+</span>
-          <span>Add Group</span>
-        </button>
       )}
     </div>
   );

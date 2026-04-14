@@ -32,6 +32,7 @@ interface ProjectItemProps {
   onOpenInEditor: () => void;
   onAddProject: (repoPath: string) => void;
   onMoveToGroup: (repoPath: string, groupId: string | null) => void;
+  onNewGroupForRepo: (repoPath: string) => void;
 }
 
 export default function ProjectItem({
@@ -46,6 +47,7 @@ export default function ProjectItem({
   onOpenInEditor,
   onAddProject,
   onMoveToGroup,
+  onNewGroupForRepo,
 }: ProjectItemProps) {
   const hasActivity = activity && (activity.terminalCount > 0 || activity.runningCount > 0);
   const dotColor = activity?.hasCrash
@@ -143,9 +145,14 @@ export default function ProjectItem({
       label: g.name,
       onClick: () => onMoveToGroup(repo.path, g.id),
     })),
+    ...(otherGroups.length > 0 || repo.group ? [{ separator: true, label: "_sep_new" }] : []),
+    {
+      label: "New Group",
+      onClick: () => onNewGroupForRepo(repo.path),
+    },
     ...(repo.group
       ? [
-          ...(otherGroups.length > 0 ? [{ separator: true, label: "_sep" }] : []),
+          { separator: true, label: "_sep_remove" },
           {
             label: "Remove from group",
             onClick: () => onMoveToGroup(repo.path, null),
@@ -195,13 +202,11 @@ export default function ProjectItem({
           });
       },
     },
-    ...(moveToChildren.length > 0
-      ? [{
-          label: "Move to",
-          icon: <FolderInput size={14} />,
-          children: moveToChildren,
-        }]
-      : []),
+    {
+      label: "Move to",
+      icon: <FolderInput size={14} />,
+      children: moveToChildren,
+    },
     ...(!worktreeParent ? [{
       label: "Create Worktree",
       icon: <Plus size={14} />,
