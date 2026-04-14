@@ -5,6 +5,8 @@ import tabKindMeta from "../../lib/tabKindMeta";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
 import { useRepoStore } from "../../stores/useRepoStore";
+import { useNoticeStore } from "../../stores/useNoticeStore";
+import { getErrorMessage } from "../../lib/errors";
 import ProjectItem from "./ProjectItem";
 import GroupHeader from "./GroupHeader";
 import CollapsibleSection from "./CollapsibleSection";
@@ -28,7 +30,6 @@ interface ProjectListProps {
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
-  onCreateGroup: (name: string) => void;
   onRenameGroup: (groupId: string, newName: string) => void;
   onDeleteGroup: (groupId: string) => void;
   onMoveToGroup: (repoPath: string, groupId: string | null) => Promise<void>;
@@ -49,7 +50,6 @@ export default function ProjectList({
   onSelectTab,
   onCloseTab,
   onNewShell,
-  onCreateGroup,
   onRenameGroup,
   onDeleteGroup,
   onMoveToGroup,
@@ -133,18 +133,20 @@ export default function ProjectList({
     const trimmed = newGroupName.trim();
     const repoToMove = pendingMoveRepoPath.current;
     pendingMoveRepoPath.current = null;
-    if (trimmed) {
-      if (repoToMove) {
-        useRepoStore.getState().createGroup(trimmed).then((group) => {
-          onMoveToGroup(repoToMove, group.id);
+    if (trimmed && repoToMove) {
+      useRepoStore.getState().createGroup(trimmed)
+        .then((group) => onMoveToGroup(repoToMove, group.id))
+        .catch((error) => {
+          useNoticeStore.getState().pushNotice({
+            tone: "error",
+            title: "Couldn't create group",
+            message: getErrorMessage(error),
+          });
         });
-      } else {
-        onCreateGroup(trimmed);
-      }
     }
     setCreatingGroup(false);
     setNewGroupName("");
-  }, [newGroupName, onCreateGroup, onMoveToGroup]);
+  }, [newGroupName, onMoveToGroup]);
 
   // Get tabs for the active project (stable ref from store)
   const projectTabs = useTerminalStore(

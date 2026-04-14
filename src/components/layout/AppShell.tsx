@@ -63,7 +63,7 @@ function PanelLoader() {
 export default function AppShell() {
   useThemeApplicator();
 
-  const { repos, groups, activeRepoPath, fetchRepos, fetchGroups, openRepo, addRepo, removeRepo, createGroup, renameGroup, deleteGroup, moveRepoToGroup } =
+  const { repos, groups, activeRepoPath, fetchRepos, fetchGroups, openRepo, addRepo, removeRepo, renameGroup, deleteGroup, moveRepoToGroup } =
     useRepoStore();
   const activeConfig = useRepoStore((s) => s.activeConfig);
   const setActiveConfig = useRepoStore((s) => s.setActiveConfig);
@@ -288,21 +288,6 @@ export default function AppShell() {
       }
     },
     [killProjectPtys, pushNotice, removeRepo],
-  );
-
-  const handleCreateGroup = useCallback(
-    async (name: string) => {
-      try {
-        await createGroup(name);
-      } catch (error) {
-        pushNotice({
-          tone: "error",
-          title: "Couldn’t create group",
-          message: getErrorMessage(error),
-        });
-      }
-    },
-    [createGroup, pushNotice],
   );
 
   const handleRenameGroup = useCallback(
@@ -643,7 +628,6 @@ export default function AppShell() {
             onSelectTab={handleSelectSidebarTab}
             onCloseTab={handleCloseTab}
             onNewShell={handleNewShell}
-            onCreateGroup={handleCreateGroup}
             onRenameGroup={handleRenameGroup}
             onDeleteGroup={handleDeleteGroup}
             onMoveToGroup={handleMoveToGroup}

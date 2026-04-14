@@ -21,7 +21,6 @@ interface SidebarProps {
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
-  onCreateGroup: (name: string) => void;
   onRenameGroup: (groupId: string, newName: string) => void;
   onDeleteGroup: (groupId: string) => void;
   onMoveToGroup: (repoPath: string, groupId: string | null) => Promise<void>;
@@ -41,7 +40,6 @@ export default function Sidebar({
   onSelectTab,
   onCloseTab,
   onNewShell,
-  onCreateGroup,
   onRenameGroup,
   onDeleteGroup,
   onMoveToGroup,
@@ -108,7 +106,6 @@ export default function Sidebar({
           onSelectTab={onSelectTab}
           onCloseTab={onCloseTab}
           onNewShell={onNewShell}
-          onCreateGroup={onCreateGroup}
           onRenameGroup={onRenameGroup}
           onDeleteGroup={onDeleteGroup}
           onMoveToGroup={onMoveToGroup}

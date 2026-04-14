@@ -314,23 +314,12 @@ select {
   outline: 2px solid rgba(122, 162, 247, 0.75);
   outline-offset: 2px;
 }
-.group-header__chevron {
-  display: flex;
-  align-items: center;
-  opacity: 0.5;
-}
 .group-header__name {
   font-weight: 600;
   font-size: var(--text-label);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
-}
-.group-header__count {
-  font-size: 10px;
-  color: var(--text-muted);
-  opacity: 0.6;
-  margin-left: auto;
 }
 .group-header__rename-input {
   background: var(--surface-active);
@@ -351,11 +340,6 @@ select {
   color: var(--text-muted);
   opacity: 0.5;
   font-style: italic;
-}
-.sidebar-separator {
-  height: 1px;
-  margin: 6px 0;
-  background: rgba(255, 255, 255, 0.06);
 }
 .group-create-form {
   padding: 2px 0;
