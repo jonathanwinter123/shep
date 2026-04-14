@@ -30,8 +30,8 @@ interface ProjectItemProps {
   onClick: () => void;
   onRemove: () => void;
   onOpenInEditor: () => void;
-  onAddProject: (repoPath: string) => void;
-  onMoveToGroup: (repoPath: string, groupId: string | null) => void;
+  onAddProject: (repoPath: string) => Promise<void>;
+  onMoveToGroup: (repoPath: string, groupId: string | null) => Promise<void>;
   onNewGroupForRepo: (repoPath: string) => void;
 }
 
@@ -110,9 +110,9 @@ export default function ProjectItem({
     setCreatingWorktree(true);
     try {
       const created = await gitCreateWorktree(repo.path, branchName);
-      onAddProject(created.path);
+      await onAddProject(created.path);
       if (repo.group) {
-        onMoveToGroup(created.path, repo.group);
+        await onMoveToGroup(created.path, repo.group);
       }
       setWtCreate(null);
       setWtBranchName("");

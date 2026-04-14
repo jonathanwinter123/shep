@@ -14,7 +14,7 @@ interface SidebarProps {
   activeTabId: string | null;
   commands: CommandState[];
   onSelectRepo: (repoPath: string) => void;
-  onAddProject: (repoPath: string) => void;
+  onAddProject: (repoPath: string) => Promise<void>;
   onRemoveProject: (repoPath: string) => void;
   onNewAssistant: () => void;
   onOpenInEditor: (repoPath: string) => void;
@@ -24,7 +24,7 @@ interface SidebarProps {
   onCreateGroup: (name: string) => void;
   onRenameGroup: (groupId: string, newName: string) => void;
   onDeleteGroup: (groupId: string) => void;
-  onMoveToGroup: (repoPath: string, groupId: string | null) => void;
+  onMoveToGroup: (repoPath: string, groupId: string | null) => Promise<void>;
 }
 
 export default function Sidebar({

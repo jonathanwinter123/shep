@@ -21,7 +21,7 @@ interface ProjectListProps {
   commands: CommandState[];
   projectActivity: Record<string, { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean }>;
   onSelectRepo: (repoPath: string) => void;
-  onAddProject: (repoPath: string) => void;
+  onAddProject: (repoPath: string) => Promise<void>;
   onRemoveProject: (repoPath: string) => void;
   onNewAssistant: () => void;
   onOpenInEditor: (repoPath: string) => void;
@@ -31,7 +31,7 @@ interface ProjectListProps {
   onCreateGroup: (name: string) => void;
   onRenameGroup: (groupId: string, newName: string) => void;
   onDeleteGroup: (groupId: string) => void;
-  onMoveToGroup: (repoPath: string, groupId: string | null) => void;
+  onMoveToGroup: (repoPath: string, groupId: string | null) => Promise<void>;
 }
 
 export default function ProjectList({
@@ -72,7 +72,15 @@ export default function ProjectList({
       if (prev.has(activeRepoPath)) return prev;
       return new Set(prev).add(activeRepoPath);
     });
-  }, [activeRepoPath]);
+    // Also expand the parent group if the active repo belongs to one
+    const activeRepo = repos.find((r) => r.path === activeRepoPath);
+    if (activeRepo?.group) {
+      setExpandedGroups((prev) => {
+        if (prev.has(activeRepo.group!)) return prev;
+        return new Set(prev).add(activeRepo.group!);
+      });
+    }
+  }, [activeRepoPath, repos]);
 
   const handleProjectClick = (repoPath: string) => {
     if (repoPath === activeRepoPath) {
@@ -190,13 +198,7 @@ export default function ProjectList({
     }
     ungrouped.sort(sortFn);
 
-    const sorted = [...groups]
-      .filter((g) => grouped.has(g.id))
-      .sort((a, b) => a.order - b.order);
-
-    // Also include empty groups so they remain visible
-    const emptyGroups = groups.filter((g) => !grouped.has(g.id));
-    const allSorted = [...sorted, ...emptyGroups.sort((a, b) => a.order - b.order)];
+    const allSorted = [...groups].sort((a, b) => a.order - b.order);
 
     return { sortedGroups: allSorted, groupedRepos: grouped, ungroupedRepos: ungrouped };
   }, [repos, groups, gitStatuses]);
