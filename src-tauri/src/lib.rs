@@ -3,6 +3,7 @@ mod git;
 mod menu;
 mod pty;
 mod session_history;
+mod tab_state;
 mod usage;
 mod watcher;
 mod workspace;
