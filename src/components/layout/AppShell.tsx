@@ -228,6 +228,12 @@ export default function AppShell() {
             return [] as PersistedTab[];
           });
 
+          const restoredCommandNames = new Set<string>(
+            persisted
+              .filter((p) => p.tabType === "command" && p.commandName)
+              .map((p) => p.commandName as string),
+          );
+
           if (persisted.length > 0) {
             seedTabCounter(persisted.map((p) => p.id));
 
@@ -268,7 +274,7 @@ export default function AppShell() {
           }
 
           for (const cmd of config.commands) {
-            if (cmd.autostart) {
+            if (cmd.autostart && !restoredCommandNames.has(cmd.name)) {
               const { cols, rows } = getTerminalDimensions();
               await startCommand(cmd, cols, rows);
             }
