@@ -12,6 +12,8 @@ pub struct GlobalConfig {
     #[serde(default)]
     pub groups: Vec<GroupEntry>,
     #[serde(default)]
+    pub projects: ProjectSettings,
+    #[serde(default)]
     pub editor: EditorSettings,
     #[serde(default)]
     pub keybindings: KeybindingSettings,
@@ -31,6 +33,7 @@ impl Default for GlobalConfig {
             version: 1,
             repos: Vec::new(),
             groups: Vec::new(),
+            projects: ProjectSettings::default(),
             editor: EditorSettings::default(),
             keybindings: KeybindingSettings::default(),
             terminal: TerminalSettings::default(),
@@ -43,6 +46,20 @@ impl Default for GlobalConfig {
 pub struct EditorSettings {
     #[serde(default, rename = "preferredEditor")]
     pub preferred_editor: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectSettings {
+    #[serde(default = "default_true", rename = "autoImportWorktrees")]
+    pub auto_import_worktrees: bool,
+}
+
+impl Default for ProjectSettings {
+    fn default() -> Self {
+        ProjectSettings {
+            auto_import_worktrees: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

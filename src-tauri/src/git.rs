@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::process::Command;
 
 #[derive(serde::Serialize, Clone, Default)]
@@ -213,6 +214,11 @@ pub fn list_worktrees(path: &str) -> Result<Vec<WorktreeEntry>, String> {
 
     for line in stdout.lines() {
         if let Some(rest) = line.strip_prefix("worktree ") {
+            let canonical_path = Path::new(rest)
+                .canonicalize()
+                .unwrap_or_else(|_| Path::new(rest).to_path_buf())
+                .to_string_lossy()
+                .to_string();
             // Flush previous entry
             if let Some(p) = current_path.take() {
                 entries.push(WorktreeEntry {
@@ -221,7 +227,7 @@ pub fn list_worktrees(path: &str) -> Result<Vec<WorktreeEntry>, String> {
                     is_main: entries.is_empty(),
                 });
             }
-            current_path = Some(rest.to_string());
+            current_path = Some(canonical_path);
             current_branch = None;
         } else if let Some(rest) = line.strip_prefix("branch refs/heads/") {
             current_branch = Some(rest.to_string());

@@ -6,8 +6,10 @@ import type {
   WorkspaceConfig,
   PtyColorTheme,
   PtyOutput,
+  ProjectSettings,
   GitStatus,
   ChangedFile,
+  WorktreeEntry,
   CreatedWorktree,
   EditorSettings,
   KeybindingSettings,
@@ -73,8 +75,16 @@ export function getEditorSettings(): Promise<EditorSettings> {
   return invoke("get_editor_settings");
 }
 
+export function getProjectSettings(): Promise<ProjectSettings> {
+  return invoke("get_project_settings");
+}
+
 export function saveEditorSettings(settings: EditorSettings): Promise<void> {
   return invoke("save_editor_settings", { settings });
+}
+
+export function saveProjectSettings(settings: ProjectSettings): Promise<void> {
+  return invoke("save_project_settings", { settings });
 }
 
 export function getKeybindingSettings(): Promise<KeybindingSettings> {
@@ -195,6 +205,10 @@ export function gitCurrentBranch(path: string): Promise<string> {
 
 export function gitListBranches(path: string): Promise<string[]> {
   return invoke("git_list_branches", { path });
+}
+
+export function gitListWorktrees(path: string): Promise<WorktreeEntry[]> {
+  return invoke("git_list_worktrees", { path });
 }
 
 export function gitCreateWorktree(path: string, branchName: string): Promise<CreatedWorktree> {

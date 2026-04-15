@@ -13,8 +13,8 @@ use crate::pty::session::{PtyColorTheme, PtyOutput};
 use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
 use crate::watcher::GitWatcher;
 use crate::workspace::config::{
-    normalize_terminal_settings, EditorSettings, GroupEntry, KeybindingSettings, RegisteredRepo,
-    RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
+    normalize_terminal_settings, EditorSettings, GroupEntry, KeybindingSettings, ProjectSettings,
+    RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
 };
 use crate::workspace::manager::WorkspaceManager;
 
@@ -66,11 +66,26 @@ pub fn get_editor_settings(
 }
 
 #[tauri::command]
+pub fn get_project_settings(
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<ProjectSettings, String> {
+    workspace.load_project_settings()
+}
+
+#[tauri::command]
 pub fn save_editor_settings(
     settings: EditorSettings,
     workspace: State<'_, WorkspaceManager>,
 ) -> Result<(), String> {
     workspace.save_editor_settings(&settings)
+}
+
+#[tauri::command]
+pub fn save_project_settings(
+    settings: ProjectSettings,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<(), String> {
+    workspace.save_project_settings(&settings)
 }
 
 #[tauri::command]
