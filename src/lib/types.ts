@@ -67,6 +67,7 @@ export interface TerminalTab {
   commandName: string | null; // null = blank shell or assistant
   assistantId: string | null; // null = not an assistant tab
   sessionMode: SessionMode | null; // null = not an assistant tab
+  sessionId: string | null; // pre-generated UUID for assistant resume; null otherwise
 }
 
 // ── Tab activity tracking ────────────────────────────────────────────
@@ -85,6 +86,7 @@ export interface CodingAssistant {
   name: string;
   command: string;
   yoloFlag: string | null;
+  sessionIdFlag: string | null; // e.g., "--session-id"; null if unsupported
 }
 
 export interface AssistantConfig {
@@ -308,4 +310,20 @@ export interface FileContents {
   content: string;
   truncated: boolean;
   size: number;
+}
+
+// ── Persisted tabs ────────────────────────────────────────────────
+
+export type PersistedTabType = "shell" | "command" | "assistant";
+
+export interface PersistedTab {
+  id: string;
+  position: number;
+  label: string;
+  tabType: PersistedTabType;
+  commandName: string | null;
+  assistantId: string | null;
+  sessionMode: SessionMode | null;
+  sessionId: string | null;
+  isActive: boolean;
 }
