@@ -22,6 +22,7 @@ import type {
   SessionMessage,
   FileEntry,
   FileContents,
+  PersistedTab,
 } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -304,4 +305,18 @@ export function listDirectory(path: string, depth: number): Promise<FileEntry[]>
 
 export function readFileContents(path: string, maxBytes: number): Promise<FileContents> {
   return invoke("read_file_contents", { path, maxBytes });
+}
+
+// ── Tab state commands ──────────────────────────────────────────────
+
+export function loadTabState(repoPath: string): Promise<PersistedTab[]> {
+  return invoke("load_tab_state", { repoPath });
+}
+
+export function saveTabState(repoPath: string, tabs: PersistedTab[]): Promise<void> {
+  return invoke("save_tab_state", { repoPath, tabs });
+}
+
+export function clearTabState(repoPath: string): Promise<void> {
+  return invoke("clear_tab_state", { repoPath });
 }
