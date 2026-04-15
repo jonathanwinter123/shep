@@ -37,6 +37,10 @@ export interface EditorSettings {
   preferredEditor: PreferredEditor | null;
 }
 
+export interface ProjectSettings {
+  autoImportWorktrees: boolean;
+}
+
 export interface KeybindingSettings {
   shiftEnterNewline: boolean;
   optionDeleteWord: boolean;

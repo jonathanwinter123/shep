@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::config::{
-    CommandConfig, EditorSettings, GlobalConfig, GroupEntry, KeybindingSettings, RegisteredRepo,
+    CommandConfig, EditorSettings, GlobalConfig, GroupEntry, KeybindingSettings, ProjectSettings, RegisteredRepo,
     RepoEntry, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
     normalize_terminal_settings,
 };
@@ -109,9 +109,19 @@ pub fn load_editor_settings() -> Result<EditorSettings, String> {
     Ok(load_global_config()?.editor)
 }
 
+pub fn load_project_settings() -> Result<ProjectSettings, String> {
+    Ok(load_global_config()?.projects)
+}
+
 pub fn save_editor_settings(settings: &EditorSettings) -> Result<(), String> {
     let mut config = load_global_config()?;
     config.editor = settings.clone();
+    save_global_config(&config)
+}
+
+pub fn save_project_settings(settings: &ProjectSettings) -> Result<(), String> {
+    let mut config = load_global_config()?;
+    config.projects = settings.clone();
     save_global_config(&config)
 }
 

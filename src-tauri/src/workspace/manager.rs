@@ -1,6 +1,6 @@
 use super::config::{
-    EditorSettings, GroupEntry, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings,
-    UsageSettings, WorkspaceConfig,
+    EditorSettings, GroupEntry, KeybindingSettings, ProjectSettings, RegisteredRepo, RepoInfo,
+    TerminalSettings, UsageSettings, WorkspaceConfig,
 };
 use super::loader;
 
@@ -47,8 +47,16 @@ impl WorkspaceManager {
         loader::load_editor_settings()
     }
 
+    pub fn load_project_settings(&self) -> Result<ProjectSettings, String> {
+        loader::load_project_settings()
+    }
+
     pub fn save_editor_settings(&self, settings: &EditorSettings) -> Result<(), String> {
         loader::save_editor_settings(settings)
+    }
+
+    pub fn save_project_settings(&self, settings: &ProjectSettings) -> Result<(), String> {
+        loader::save_project_settings(settings)
     }
 
     pub fn load_keybinding_settings(&self) -> Result<KeybindingSettings, String> {

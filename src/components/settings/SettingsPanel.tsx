@@ -7,6 +7,7 @@ import { KEYBINDING_PRESETS } from "../../lib/keybindingPresets";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useThemeStore } from "../../stores/useThemeStore";
 import { useKeybindingStore } from "../../stores/useKeybindingStore";
+import { useProjectSettingsStore } from "../../stores/useProjectSettingsStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUpdateStore } from "../../stores/useUpdateStore";
@@ -70,6 +71,13 @@ export default function SettingsPanel() {
   const loadKbSettings = useKeybindingStore((s) => s.loadSettings);
   const setKbEnabled = useKeybindingStore((s) => s.setEnabled);
 
+  const projectSettings = useProjectSettingsStore((s) => s.settings);
+  const projectHasLoaded = useProjectSettingsStore((s) => s.hasLoaded);
+  const projectIsSaving = useProjectSettingsStore((s) => s.isSaving);
+  const projectError = useProjectSettingsStore((s) => s.error);
+  const loadProjectSettings = useProjectSettingsStore((s) => s.loadSettings);
+  const updateProjectSettings = useProjectSettingsStore((s) => s.updateSettings);
+
   const termSettings = useTerminalSettingsStore((s) => s.settings);
   const termHasLoaded = useTerminalSettingsStore((s) => s.hasLoaded);
   const termIsSaving = useTerminalSettingsStore((s) => s.isSaving);
@@ -97,10 +105,11 @@ export default function SettingsPanel() {
 
   useEffect(() => {
     if (!hasLoaded) void loadSettings();
+    if (!projectHasLoaded) void loadProjectSettings();
     if (!kbHasLoaded) void loadKbSettings();
     if (!termHasLoaded) void loadTermSettings();
     if (!usageHasLoaded) void loadUsageSettings();
-  }, [hasLoaded, loadSettings, kbHasLoaded, loadKbSettings, termHasLoaded, loadTermSettings, usageHasLoaded, loadUsageSettings]);
+  }, [hasLoaded, loadSettings, projectHasLoaded, loadProjectSettings, kbHasLoaded, loadKbSettings, termHasLoaded, loadTermSettings, usageHasLoaded, loadUsageSettings]);
 
   useEffect(() => {
     let cancelled = false;
@@ -354,6 +363,27 @@ export default function SettingsPanel() {
 
       {kbIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving keybindings...</div>}
       {kbError && <div className="mt-2 text-sm text-red-300">{kbError}</div>}
+
+      <hr className="settings-divider" />
+
+      {/* ── Projects ───────────────────────────────────────── */}
+      <h2 className="section-label !p-0 mb-4">Projects</h2>
+
+      <div className="settings-row">
+        <span className="settings-row__label flex items-center gap-2">
+          <span>Auto-import Worktrees</span>
+          <InfoTip text="When enabled, adding a main repo also imports its existing Git worktrees. Adding a worktree directly still adds its main repo so the relationship stays intact." />
+        </span>
+        <button
+          onClick={() => void updateProjectSettings({ autoImportWorktrees: !projectSettings.autoImportWorktrees })}
+          className={`option-card option-card--compact ${projectSettings.autoImportWorktrees ? "selected" : ""}`}
+        >
+          {projectSettings.autoImportWorktrees ? "On" : "Off"}
+        </button>
+      </div>
+
+      {projectIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving project settings...</div>}
+      {projectError && <div className="mt-2 text-sm text-red-300">{projectError}</div>}
 
       <hr className="settings-divider" />
 
