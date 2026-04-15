@@ -368,6 +368,9 @@ export function usePty() {
         // Resuming a specific session (user picked from history).
         command = `${command} --resume ${resumeSessionId}`;
         tabSessionId = resumeSessionId;
+        if (mode === "yolo" && assistant.yoloFlag) {
+          command = `${command} ${assistant.yoloFlag}`;
+        }
       } else if (assistant.sessionIdFlag) {
         // Fresh launch; pre-generate a UUID so we can resume later.
         const uuid = crypto.randomUUID();
