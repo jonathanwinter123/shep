@@ -123,7 +123,67 @@ fn migrate(conn: &Connection) -> Result<(), String> {
         ).map_err(|e| format!("Failed to run migration v2: {e}"))?;
     }
 
+    if version < 3 {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS tab_state (
+                id TEXT NOT NULL,
+                repo_path TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                label TEXT NOT NULL,
+                tab_type TEXT NOT NULL,
+                command_name TEXT,
+                assistant_id TEXT,
+                session_mode TEXT,
+                session_id TEXT,
+                is_active INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (repo_path, id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_tab_state_repo ON tab_state(repo_path, position);
+
+            INSERT INTO schema_version (version) VALUES (3);"
+        ).map_err(|e| format!("Failed to run migration v3: {e}"))?;
+    }
+
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migration_v3_creates_tab_state_table() {
+        let db = UsageDb::open_in_memory();
+        let conn = db.conn.lock().unwrap();
+
+        // Table exists
+        let table_exists: bool = conn
+            .query_row(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='tab_state'",
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v == 1),
+            )
+            .unwrap_or(false);
+        assert!(table_exists, "tab_state table should exist after migration");
+
+        // Schema version is at least 3
+        let version: i64 = conn
+            .query_row("SELECT MAX(version) FROM schema_version", [], |r| r.get(0))
+            .unwrap();
+        assert!(version >= 3, "schema_version should be >= 3, got {}", version);
+
+        // Can insert and read back a row with all columns
+        conn.execute(
+            "INSERT INTO tab_state (id, repo_path, position, label, tab_type, command_name, assistant_id, session_mode, session_id, is_active)
+             VALUES ('tab-1', '/repo', 0, 'Terminal', 'shell', NULL, NULL, NULL, NULL, 1)",
+            [],
+        ).unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM tab_state WHERE repo_path = '/repo'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
 }
 
 fn seed_pricing(conn: &Connection) -> Result<(), String> {
