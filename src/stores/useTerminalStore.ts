@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { TerminalTab, TabActivity } from "../lib/types";
+import type { TerminalTab, TabActivity, PersistedTab, PersistedTabType } from "../lib/types";
+import { saveTabState } from "../lib/tauri";
 
 interface ProjectTerminalState {
   tabs: TerminalTab[];
@@ -239,3 +240,57 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     return ps?.tabs ?? [];
   },
 }));
+
+// ── Persistence: serialize projectState to the backend on change ────────
+
+function toPersistedTab(tab: TerminalTab, position: number, isActive: boolean): PersistedTab {
+  let tabType: PersistedTabType = "shell";
+  if (tab.assistantId) tabType = "assistant";
+  else if (tab.commandName) tabType = "command";
+
+  return {
+    id: tab.id,
+    position,
+    label: tab.label,
+    tabType,
+    commandName: tab.commandName,
+    assistantId: tab.assistantId,
+    sessionMode: tab.sessionMode,
+    sessionId: tab.sessionId,
+    isActive,
+  };
+}
+
+const SAVE_DEBOUNCE_MS = 300;
+const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleSave(repoPath: string) {
+  const existing = pendingTimers.get(repoPath);
+  if (existing) clearTimeout(existing);
+
+  const timer = setTimeout(() => {
+    pendingTimers.delete(repoPath);
+    const ps = useTerminalStore.getState().projectState[repoPath];
+    if (!ps) return;
+    const tabs = ps.tabs.map((tab, i) =>
+      toPersistedTab(tab, i, tab.id === ps.activeTabId),
+    );
+    void saveTabState(repoPath, tabs).catch((err) => {
+      if (import.meta.env.DEV) console.error("saveTabState failed:", err);
+    });
+  }, SAVE_DEBOUNCE_MS);
+
+  pendingTimers.set(repoPath, timer);
+}
+
+// Subscribe once at module load. Any change to projectState in any project
+// schedules a save for that project.
+let previousProjectState: Record<string, ProjectTerminalState> = {};
+useTerminalStore.subscribe((state) => {
+  for (const [repoPath, ps] of Object.entries(state.projectState)) {
+    if (previousProjectState[repoPath] !== ps) {
+      scheduleSave(repoPath);
+    }
+  }
+  previousProjectState = state.projectState;
+});
