@@ -26,7 +26,7 @@ import { useGitWatcher } from "../../hooks/useGitWatcher";
 import { computeTerminalSize } from "../../lib/terminalMeasure";
 import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit, refreshUsageData } from "../../lib/tauri";
+import { getUsername, getComputerName, openInEditor, saveWorkspace, shutdownAndQuit, refreshUsageData, loadTabState } from "../../lib/tauri";
 import { useEditorStore } from "../../stores/useEditorStore";
 import { useTerminalSettingsStore } from "../../stores/useTerminalSettingsStore";
 import { useUsageStore } from "../../stores/useUsageStore";
@@ -40,7 +40,8 @@ import { eventToCombo } from "../../lib/keyCombo";
 import { getAction } from "../../lib/actionRegistry";
 import { useShortcutStore } from "../../stores/useShortcutStore";
 
-import type { CommandConfig, CommandState, TerminalTab, SessionMode, WorkspaceConfig } from "../../lib/types";
+import { seedTabCounter } from "../../stores/useTerminalStore";
+import type { CommandConfig, CommandState, TerminalTab, SessionMode, WorkspaceConfig, PersistedTab } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
 
 // Stable empty arrays to avoid infinite re-render loops with zustand v5's
@@ -222,6 +223,50 @@ export default function AppShell() {
         if (isFirstVisit) {
           useCommandStore.getState().loadCommands(repoPath, config.commands);
 
+          const persisted = await loadTabState(repoPath).catch((err) => {
+            if (import.meta.env.DEV) console.error("loadTabState failed:", err);
+            return [] as PersistedTab[];
+          });
+
+          if (persisted.length > 0) {
+            seedTabCounter(persisted.map((p) => p.id));
+
+            const { cols, rows } = getTerminalDimensions();
+
+            for (const p of persisted) {
+              try {
+                if (p.tabType === "shell") {
+                  await spawnBlankShell(cols, rows, { restoreId: p.id, restoreLabel: p.label });
+                } else if (p.tabType === "command" && p.commandName) {
+                  const cmd = config.commands.find((c) => c.name === p.commandName);
+                  if (cmd) {
+                    await startCommand(cmd, cols, rows, { restoreId: p.id, restoreLabel: p.label });
+                  }
+                } else if (p.tabType === "assistant" && p.assistantId) {
+                  await launchAssistant(
+                    p.assistantId,
+                    cols,
+                    rows,
+                    p.sessionMode ?? "standard",
+                    p.sessionId ?? undefined,
+                    { restoreId: p.id, restoreLabel: p.label },
+                  );
+                }
+              } catch (err) {
+                pushNotice({
+                  tone: "error",
+                  title: "Couldn't restore tab",
+                  message: `${p.label}: ${getErrorMessage(err)}`,
+                });
+              }
+            }
+
+            const activePersisted = persisted.find((p) => p.isActive);
+            if (activePersisted) {
+              useTerminalStore.getState().setActiveTab(activePersisted.id);
+            }
+          }
+
           for (const cmd of config.commands) {
             if (cmd.autostart) {
               const { cols, rows } = getTerminalDimensions();
@@ -237,7 +282,7 @@ export default function AppShell() {
         });
       }
     },
-    [activeRepoPath, openRepo, startCommand, getTerminalDimensions, pushNotice],
+    [activeRepoPath, openRepo, startCommand, spawnBlankShell, launchAssistant, getTerminalDimensions, pushNotice],
   );
 
   const handleAddProject = useCallback(

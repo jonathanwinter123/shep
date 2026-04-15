@@ -207,7 +207,7 @@ export function usePty() {
   );
 
   const startCommand = useCallback(
-    async (command: CommandConfig, cols: number, rows: number) => {
+    async (command: CommandConfig, cols: number, rows: number, opts?: { restoreId?: string; restoreLabel?: string }) => {
       if (!activeRepoPath) return;
       const commandName = command.name;
 
@@ -231,10 +231,10 @@ export function usePty() {
         if (existing) {
           setActiveTab(existing.id);
         } else {
-          const id = nextTabId();
+          const id = opts?.restoreId ?? nextTabId();
           addTab({
             id,
-            label: commandName,
+            label: opts?.restoreLabel ?? commandName,
             ptyId,
             repoPath: activeRepoPath,
             commandName,
@@ -304,7 +304,7 @@ export function usePty() {
   );
 
   const spawnBlankShell = useCallback(
-    async (cols: number, rows: number) => {
+    async (cols: number, rows: number, opts?: { restoreId?: string; restoreLabel?: string }) => {
       if (!activeRepoPath) return;
 
       try {
@@ -319,10 +319,10 @@ export function usePty() {
         );
         if (!ptyId) return;
 
-        const id = nextTabId();
+        const id = opts?.restoreId ?? nextTabId();
         addTab({
           id,
-          label: "Terminal",
+          label: opts?.restoreLabel ?? "Terminal",
           ptyId,
           repoPath: activeRepoPath,
           commandName: null,
@@ -354,6 +354,7 @@ export function usePty() {
       rows: number,
       mode: SessionMode = "standard",
       resumeSessionId?: string,
+      opts?: { restoreId?: string; restoreLabel?: string },
     ) => {
       if (!activeRepoPath) return;
       const assistant = CODING_ASSISTANTS.find((a) => a.id === assistantId);
@@ -392,10 +393,10 @@ export function usePty() {
         );
         if (!ptyId) return;
 
-        const id = nextTabId();
+        const id = opts?.restoreId ?? nextTabId();
         addTab({
           id,
-          label: assistant.name,
+          label: opts?.restoreLabel ?? assistant.name,
           ptyId,
           repoPath: activeRepoPath,
           commandName: null,
