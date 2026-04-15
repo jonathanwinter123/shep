@@ -29,7 +29,7 @@ Shep gives each repo a dedicated workspace for terminals, AI coding agents, comm
 
 ## Download
 
-Download the latest `.dmg` from [GitHub Releases](https://github.com/stumptowndoug/shep/releases).
+Download the latest `.dmg` from [GitHub Releases](https://github.com/jonathanwinter123/shep/releases).
 
 After downloading:
 

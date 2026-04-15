@@ -65,9 +65,9 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/stumptowndoug/shep/releases/latest/download/latest.json"
+        "https://github.com/jonathanwinter123/shep/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFENUI5MjhFQ0I1QThGM0IKUldRN2oxckxqcEpiSGZocmVQUDBpSFN4dDFZempVSWgrMDNzZmFCWHphTkpSR2xvaDZvMzAyNVUK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZDNzVBREJDMzQ5MjE2MUQKUldRZEZwSTB2SzExL0laeEFnbE0rdDNOYWdkLzY5eDJtYTQyVG1aV0lpZ2lqWW5Ka0hTOHhKOTgK"
     }
   }
 }

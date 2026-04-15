@@ -21,7 +21,7 @@ fi
 
 SIGNATURE=$(cat "$SIG_FILE")
 PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-DOWNLOAD_URL="https://github.com/stumptowndoug/shep/releases/download/v${VERSION}/shep.app.tar.gz"
+DOWNLOAD_URL="https://github.com/jonathanwinter123/shep/releases/download/v${VERSION}/shep.app.tar.gz"
 
 cat > latest.json <<EOF
 {

@@ -7,3 +7,5 @@ target/
 .planning/
 .worktrees/
 latest.json
+*.key
+*.key.pub
