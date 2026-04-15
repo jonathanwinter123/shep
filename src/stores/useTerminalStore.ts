@@ -38,6 +38,16 @@ export function nextTabId(): string {
   return `tab-${++tabCounter}`;
 }
 
+export function seedTabCounter(fromIds: string[]): void {
+  for (const id of fromIds) {
+    const match = /^tab-(\d+)$/.exec(id);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      if (Number.isFinite(n) && n > tabCounter) tabCounter = n;
+    }
+  }
+}
+
 export const useTerminalStore = create<TerminalStore>((set, get) => ({
   projectState: {},
   activeProjectPath: null,
