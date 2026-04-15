@@ -6,6 +6,7 @@ use tauri::{Emitter, State};
 
 use crate::git;
 use crate::git::{ChangedFile, CreatedWorktree, GitStatus, WorktreeEntry};
+use crate::tab_state::{self, PersistedTab};
 use crate::session_history::{SessionMessage, SessionSummary};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::{PtyColorTheme, PtyOutput};
@@ -908,4 +909,31 @@ pub async fn kill_port(pid: u32) -> Result<(), String> {
             .map_err(|e| format!("Failed to force-kill process {pid}: {e}"))?;
     }
     Ok(())
+}
+
+// ── Tab state commands ───────────────────────────────────────────
+
+#[tauri::command]
+pub fn load_tab_state(
+    repo_path: &str,
+    db: State<'_, UsageDb>,
+) -> Result<Vec<PersistedTab>, String> {
+    tab_state::load_tabs(&db, repo_path)
+}
+
+#[tauri::command]
+pub fn save_tab_state(
+    repo_path: &str,
+    tabs: Vec<PersistedTab>,
+    db: State<'_, UsageDb>,
+) -> Result<(), String> {
+    tab_state::save_tabs(&db, repo_path, &tabs)
+}
+
+#[tauri::command]
+pub fn clear_tab_state(
+    repo_path: &str,
+    db: State<'_, UsageDb>,
+) -> Result<(), String> {
+    tab_state::clear_tabs(&db, repo_path)
 }

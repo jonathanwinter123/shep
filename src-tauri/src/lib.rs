@@ -132,6 +132,9 @@ pub fn run() {
             commands::open_url,
             commands::list_directory,
             commands::read_file_contents,
+            commands::load_tab_state,
+            commands::save_tab_state,
+            commands::clear_tab_state,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
