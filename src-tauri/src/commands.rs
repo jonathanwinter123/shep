@@ -34,8 +34,13 @@ pub fn register_repo(
 pub fn unregister_repo(
     repo_path: &str,
     workspace: State<'_, WorkspaceManager>,
+    db: State<'_, UsageDb>,
 ) -> Result<(), String> {
-    workspace.unregister_repo(repo_path)
+    workspace.unregister_repo(repo_path)?;
+    // Best-effort: remove persisted tabs for this repo. Ignore errors so a DB
+    // hiccup doesn't prevent the repo from unregistering.
+    let _ = tab_state::clear_tabs(&db, repo_path);
+    Ok(())
 }
 
 #[tauri::command]
