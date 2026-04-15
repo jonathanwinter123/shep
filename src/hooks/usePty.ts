@@ -240,6 +240,7 @@ export function usePty() {
             commandName,
             assistantId: null,
             sessionMode: null,
+            sessionId: null,
           });
         }
 
@@ -327,6 +328,7 @@ export function usePty() {
           commandName: null,
           assistantId: null,
           sessionMode: null,
+          sessionId: null,
         });
 
         return ptyId;
@@ -384,6 +386,7 @@ export function usePty() {
           commandName: null,
           assistantId,
           sessionMode: mode,
+          sessionId: null, // overwritten for assistants in launchAssistant
         });
 
         return ptyId;
