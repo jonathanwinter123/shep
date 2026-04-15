@@ -360,9 +360,24 @@ export function usePty() {
       if (!assistant) return;
 
       let command = assistant.command;
+      // Track the session ID we'll store on the tab. Filled below.
+      let tabSessionId: string | null = null;
+
       if (resumeSessionId) {
+        // Resuming a specific session (user picked from history).
         command = `${command} --resume ${resumeSessionId}`;
+        tabSessionId = resumeSessionId;
+      } else if (assistant.sessionIdFlag) {
+        // Fresh launch; pre-generate a UUID so we can resume later.
+        const uuid = crypto.randomUUID();
+        command = `${command} ${assistant.sessionIdFlag} ${uuid}`;
+        tabSessionId = uuid;
+
+        if (mode === "yolo" && assistant.yoloFlag) {
+          command = `${command} ${assistant.yoloFlag}`;
+        }
       } else if (mode === "yolo" && assistant.yoloFlag) {
+        // Assistant doesn't support session ID preallocation.
         command = `${command} ${assistant.yoloFlag}`;
       }
 
@@ -386,7 +401,7 @@ export function usePty() {
           commandName: null,
           assistantId,
           sessionMode: mode,
-          sessionId: null, // overwritten for assistants in launchAssistant
+          sessionId: tabSessionId,
         });
 
         return ptyId;
