@@ -151,6 +151,15 @@ fn migrate(conn: &Connection) -> Result<(), String> {
         ).map_err(|e| format!("Failed to run migration v3 data backfill: {e}"))?;
     }
 
+    if version < 4 {
+        conn.execute_batch(
+            "DELETE FROM usage_messages WHERE provider = 'pi';
+             DELETE FROM usage_daily WHERE provider = 'pi';
+             DELETE FROM ingest_cursors WHERE provider = 'pi';
+             INSERT INTO schema_version (version) VALUES (4);"
+        ).map_err(|e| format!("Failed to run migration v4: {e}"))?;
+    }
+
     Ok(())
 }
 

@@ -7,6 +7,7 @@ const DEFAULT_SETTINGS: UsageSettings = {
   codex: { show: true, budgetMode: "subscription", monthlyBudget: null },
   gemini: { show: false, budgetMode: "subscription", monthlyBudget: null },
   opencode: { show: true, budgetMode: "custom", monthlyBudget: 100 },
+  pi: { show: true, budgetMode: "custom", monthlyBudget: null },
 };
 
 interface UsageSettingsStore {

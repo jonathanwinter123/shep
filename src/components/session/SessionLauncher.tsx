@@ -124,6 +124,26 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         </div>
       </div>
 
+      {/* Description + docs link for selected assistant */}
+      {selectedAssistant && (selectedAssistant.description || selectedAssistant.docsUrl) && (
+        <div className="mb-6 text-xs" style={{ color: "var(--text-muted)" }}>
+          {selectedAssistant.description && (
+            <p className="leading-relaxed">{selectedAssistant.description}</p>
+          )}
+          {selectedAssistant.docsUrl && (
+            <a
+              href={selectedAssistant.docsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-block underline decoration-dotted"
+              style={{ color: "rgb(122, 162, 247)" }}
+            >
+              Docs →
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Mode picker */}
       {selectedAssistant && (
         <div className="mb-6">

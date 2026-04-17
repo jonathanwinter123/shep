@@ -143,6 +143,8 @@ export interface CodingAssistant {
   name: string;
   command: string;
   yoloFlag: string | null;
+  description?: string;
+  docsUrl?: string;
 }
 
 export type AssistantConfig = CodingAssistant;
@@ -210,7 +212,7 @@ export interface PtyColorTheme {
 
 // ── Usage ──────────────────────────────────────────────────────────
 
-export type UsageProvider = "codex" | "claude" | "gemini" | "opencode";
+export type UsageProvider = "codex" | "claude" | "gemini" | "opencode" | "pi";
 
 export type BudgetMode = "subscription" | "custom";
 
@@ -225,6 +227,7 @@ export interface UsageSettings {
   codex: ProviderBudgetConfig;
   gemini: ProviderBudgetConfig;
   opencode: ProviderBudgetConfig;
+  pi: ProviderBudgetConfig;
 }
 export type UsageSourceType = "provider" | "local";
 export type UsageConfidence = "official" | "observed" | "estimated";

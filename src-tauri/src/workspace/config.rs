@@ -225,6 +225,8 @@ pub struct UsageSettings {
     pub gemini: ProviderBudgetConfig,
     #[serde(default = "default_provider_custom")]
     pub opencode: ProviderBudgetConfig,
+    #[serde(default = "default_provider_custom")]
+    pub pi: ProviderBudgetConfig,
 }
 
 impl Default for UsageSettings {
@@ -237,6 +239,7 @@ impl Default for UsageSettings {
                 monthly_budget: Some(100.0),
                 ..ProviderBudgetConfig::default_custom()
             },
+            pi: ProviderBudgetConfig::default_custom(),
         }
     }
 }

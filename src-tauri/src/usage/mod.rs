@@ -120,6 +120,7 @@ pub fn get_all_usage_snapshots(db: &UsageDb, enabled: &EnabledProviders) -> Vec<
         codex_snapshot(&conn),
         gemini_snapshot(&conn),
         opencode_snapshot(&conn),
+        pi_snapshot(&conn),
     ]
 }
 
@@ -133,6 +134,7 @@ pub fn get_usage_snapshot(db: &UsageDb, provider: &str, enabled: &EnabledProvide
         "claude" => Ok(claude_snapshot(&conn)),
         "gemini" => Ok(gemini_snapshot(&conn)),
         "opencode" => Ok(opencode_snapshot(&conn)),
+        "pi" => Ok(pi_snapshot(&conn)),
         other => Err(format!("Unsupported usage provider: {other}")),
     }
 }
@@ -417,6 +419,39 @@ fn opencode_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
 
     ProviderUsageSnapshot {
         provider: "opencode".to_string(),
+        status: if local.is_some() { "ready".to_string() } else { "unavailable".to_string() },
+        fetched_at,
+        summary_windows,
+        extra_windows: Vec::new(),
+        local_details: local,
+        error: None,
+    }
+}
+
+fn pi_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
+    let fetched_at = helpers::now_iso_string();
+    let local = queries::local_details(conn, "pi");
+    let mut summary_windows = Vec::new();
+
+    if let Some(ref details) = local {
+        for (window, tokens) in [("5h", details.tokens_5h), ("7d", details.tokens_7d), ("30d", details.tokens_30d)] {
+            summary_windows.push(UsageWindowSnapshot {
+                provider: "pi".to_string(),
+                window: window.to_string(),
+                label: window.to_string(),
+                source_type: "local".to_string(),
+                confidence: "observed".to_string(),
+                used_percent: None,
+                remaining_percent: None,
+                reset_at: None,
+                token_total: Some(tokens),
+                pace_status: None,
+            });
+        }
+    }
+
+    ProviderUsageSnapshot {
+        provider: "pi".to_string(),
         status: if local.is_some() { "ready".to_string() } else { "unavailable".to_string() },
         fetched_at,
         summary_windows,

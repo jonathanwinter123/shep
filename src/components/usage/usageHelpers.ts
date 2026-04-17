@@ -1,7 +1,7 @@
 import type { ProviderUsageSnapshot, UsageProvider, UsageWindowSnapshot } from "../../lib/types";
 
 const WINDOW_PRIORITY = ["5h", "7d", "30d"];
-export const ALL_USAGE_PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini", "opencode"];
+export const ALL_USAGE_PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini", "opencode", "pi"];
 export const TONE_COLORS: Record<string, string> = {
   low: "rgba(52, 211, 153, 0.75)",
   medium: "rgba(245, 158, 11, 0.75)",
@@ -37,6 +37,8 @@ export function getProviderLabel(provider: UsageProvider): string {
       return "Gemini";
     case "opencode":
       return "opencode";
+    case "pi":
+      return "pi";
   }
 }
 
