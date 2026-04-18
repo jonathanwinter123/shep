@@ -1,10 +1,11 @@
 use rusqlite::{params, Connection};
 use std::collections::{BTreeMap, HashMap};
+use std::path::{Path, PathBuf};
 
 use super::types::{
     LocalUsageDetails, UsageBreakdownItem, UsageNamedTokens, UsageOverview,
     UsageOverviewProvider, UsageProject, UsageTask, UsageTrendBucket,
-    UsageTrendProviderValue,
+    UsageCost, UsageProjectAliasReviewItem, UsageTrendProviderValue,
 };
 use super::helpers::now_epoch_seconds;
 
@@ -79,7 +80,20 @@ fn calculate_cost(pricing: &ModelPricing, input: i64, output: i64, cache_read: i
         / 1_000_000.0
 }
 
-fn resolved_cost(
+fn cost_detail(amount: Option<f64>, kind: &str, basis: &str, confidence: &str) -> UsageCost {
+    UsageCost {
+        amount,
+        kind: kind.to_string(),
+        basis: basis.to_string(),
+        confidence: confidence.to_string(),
+    }
+}
+
+fn unknown_cost() -> UsageCost {
+    cost_detail(None, "unknown", "none", "observed")
+}
+
+fn resolved_cost_detail(
     pricing_provider: &str,
     model: &str,
     input: i64,
@@ -90,13 +104,70 @@ fn resolved_cost(
     recorded_cost: f64,
     has_recorded_cost: bool,
     pricing: &PricingMap,
-) -> Option<f64> {
+) -> UsageCost {
     if has_recorded_cost {
-        return Some(recorded_cost);
+        if recorded_cost == 0.0 {
+            return cost_detail(Some(0.0), "free", "provider", "official");
+        }
+        return cost_detail(Some(recorded_cost), "recorded", "provider", "official");
     }
 
     find_pricing(pricing_provider, model, pricing)
-        .map(|p| calculate_cost(p, input, output, cache_read, cache_write, thoughts))
+        .map(|p| {
+            cost_detail(
+                Some(calculate_cost(p, input, output, cache_read, cache_write, thoughts)),
+                "estimated",
+                "local-pricing",
+                "estimated",
+            )
+        })
+        .unwrap_or_else(unknown_cost)
+}
+
+#[derive(Clone, Default)]
+struct CostAccumulator {
+    amount: f64,
+    has_cost: bool,
+    kind: Option<String>,
+    basis: Option<String>,
+    confidence: Option<String>,
+    mixed: bool,
+}
+
+impl CostAccumulator {
+    fn add(&mut self, cost: UsageCost) {
+        let Some(amount) = cost.amount else {
+            return;
+        };
+        self.amount += amount;
+        self.has_cost = true;
+
+        if self.kind.as_deref().is_some_and(|kind| kind != cost.kind)
+            || self.basis.as_deref().is_some_and(|basis| basis != cost.basis)
+            || self.confidence.as_deref().is_some_and(|confidence| confidence != cost.confidence)
+        {
+            self.mixed = true;
+        }
+
+        self.kind.get_or_insert(cost.kind);
+        self.basis.get_or_insert(cost.basis);
+        self.confidence.get_or_insert(cost.confidence);
+    }
+
+    fn finish(self) -> UsageCost {
+        if !self.has_cost {
+            return unknown_cost();
+        }
+        if self.mixed {
+            return cost_detail(Some(self.amount), "mixed", "none", "observed");
+        }
+        cost_detail(
+            Some(self.amount),
+            self.kind.as_deref().unwrap_or("unknown"),
+            self.basis.as_deref().unwrap_or("none"),
+            self.confidence.as_deref().unwrap_or("observed"),
+        )
+    }
 }
 
 fn local_month_cutoff(conn: &Connection) -> i64 {
@@ -107,18 +178,240 @@ fn local_month_cutoff(conn: &Connection) -> i64 {
     ).unwrap_or(0)
 }
 
+struct ProjectAliasResolution {
+    canonical_id: String,
+    display_name: String,
+    canonical_path: Option<String>,
+    repo_root: Option<String>,
+    confidence: f64,
+    reason: String,
+}
+
+fn path_display_name(path: &Path) -> String {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("unknown")
+        .to_string()
+}
+
+fn find_git_root(mut path: PathBuf) -> Option<PathBuf> {
+    if path.is_file() {
+        path.pop();
+    }
+    loop {
+        if path.join(".git").exists() {
+            return Some(path);
+        }
+        if !path.pop() {
+            return None;
+        }
+    }
+}
+
+fn resolve_path_alias(path: PathBuf) -> Option<ProjectAliasResolution> {
+    let expanded = if path.starts_with("~") {
+        let home = dirs::home_dir()?;
+        let rest = path.strip_prefix("~").ok()?;
+        home.join(rest)
+    } else {
+        path
+    };
+    let canonical_path = expanded.canonicalize().ok()?;
+    let git_root = find_git_root(canonical_path.clone());
+    let canonical_id_path = git_root.as_ref().unwrap_or(&canonical_path);
+    Some(ProjectAliasResolution {
+        canonical_id: canonical_id_path.to_string_lossy().to_string(),
+        display_name: path_display_name(canonical_id_path),
+        canonical_path: Some(canonical_path.to_string_lossy().to_string()),
+        repo_root: git_root.map(|path| path.to_string_lossy().to_string()),
+        confidence: 1.0,
+        reason: "path-git-root".to_string(),
+    })
+}
+
+fn encoded_home_prefixes() -> Vec<String> {
+    let mut prefixes = Vec::new();
+    if let Some(home) = dirs::home_dir().and_then(|home| home.to_str().map(str::to_string)) {
+        let encoded_home = home.replace('/', "-");
+        prefixes.push(format!("{encoded_home}-dev--shep-worktrees-"));
+        prefixes.push(format!("{encoded_home}--shep-worktrees-"));
+        prefixes.push(format!("{encoded_home}-dev-"));
+        prefixes.push(format!("{encoded_home}-"));
+    }
+    prefixes
+}
+
+fn resolve_project_alias(raw_label: &str) -> ProjectAliasResolution {
+    let label = raw_label.trim();
+    if label.is_empty() || label == "unknown" {
+        return ProjectAliasResolution {
+            canonical_id: "unknown".to_string(),
+            display_name: "unknown".to_string(),
+            canonical_path: None,
+            repo_root: None,
+            confidence: 0.2,
+            reason: "missing-label".to_string(),
+        };
+    }
+
+    if (label.starts_with('/') || label.starts_with("~/"))
+        && resolve_path_alias(PathBuf::from(label)).is_some()
+    {
+        return resolve_path_alias(PathBuf::from(label)).unwrap();
+    }
+
+    for prefix in encoded_home_prefixes() {
+        if let Some(rest) = label.strip_prefix(&prefix) {
+            let display = rest.trim_matches('-');
+            if !display.is_empty() {
+                let reason = if prefix.contains("shep-worktrees") {
+                    "encoded-worktree-label"
+                } else {
+                    "encoded-path-basename"
+                };
+                return ProjectAliasResolution {
+                    canonical_id: display.to_string(),
+                    display_name: display.to_string(),
+                    canonical_path: None,
+                    repo_root: None,
+                    confidence: if reason == "encoded-worktree-label" { 0.55 } else { 0.7 },
+                    reason: reason.to_string(),
+                };
+            }
+        }
+    }
+
+    ProjectAliasResolution {
+        canonical_id: label.to_string(),
+        display_name: label.to_string(),
+        canonical_path: None,
+        repo_root: None,
+        confidence: 0.85,
+        reason: "provider-basename".to_string(),
+    }
+}
+
+fn ensure_project_aliases(conn: &Connection) {
+    let mut stmt = match conn.prepare(
+        "SELECT provider, COALESCE(project, 'unknown'), COUNT(DISTINCT session_id), COALESCE(SUM(tokens_total), 0)
+         FROM usage_messages
+         GROUP BY provider, COALESCE(project, 'unknown')",
+    ) {
+        Ok(stmt) => stmt,
+        Err(_) => return,
+    };
+
+    let rows = match stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, i64>(3)?,
+        ))
+    }) {
+        Ok(rows) => rows,
+        Err(_) => return,
+    };
+
+    for row in rows.flatten() {
+        let (provider, raw_label, _sessions, _tokens) = row;
+        let resolution = resolve_project_alias(&raw_label);
+        let now = now_epoch_seconds() as i64;
+
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO usage_projects (
+                canonical_id, display_name, canonical_path, repo_root, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?5)",
+            params![
+                resolution.canonical_id,
+                resolution.display_name,
+                resolution.canonical_path,
+                resolution.repo_root,
+                now,
+            ],
+        );
+
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO project_aliases (
+                raw_label, provider, canonical_id, confidence, reviewed, reason, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, 0, ?5, ?6, ?6)",
+            params![
+                raw_label,
+                provider,
+                resolution.canonical_id,
+                resolution.confidence,
+                resolution.reason,
+                now,
+            ],
+        );
+    }
+}
+
+pub fn project_alias_review_queue(conn: &Connection) -> Vec<UsageProjectAliasReviewItem> {
+    ensure_project_aliases(conn);
+
+    let mut stmt = match conn.prepare(
+        "SELECT
+            a.raw_label,
+            a.provider,
+            a.canonical_id,
+            COALESCE(p.display_name, a.canonical_id),
+            a.confidence,
+            COALESCE(a.reason, ''),
+            COUNT(DISTINCT m.session_id),
+            COALESCE(SUM(m.tokens_total), 0)
+         FROM project_aliases a
+         LEFT JOIN usage_projects p ON p.canonical_id = a.canonical_id
+         LEFT JOIN usage_messages m
+            ON m.provider = a.provider
+           AND COALESCE(m.project, 'unknown') = a.raw_label
+         WHERE a.reviewed = 0 AND a.confidence < 0.8
+         GROUP BY a.raw_label, a.provider, a.canonical_id, p.display_name, a.confidence, a.reason
+         ORDER BY 8 DESC, a.confidence ASC
+         LIMIT 50",
+    ) {
+        Ok(stmt) => stmt,
+        Err(_) => return Vec::new(),
+    };
+
+    let rows = match stmt.query_map([], |row| {
+        Ok(UsageProjectAliasReviewItem {
+            raw_label: row.get(0)?,
+            provider: row.get(1)?,
+            canonical_id: row.get(2)?,
+            display_name: row.get(3)?,
+            confidence: row.get(4)?,
+            reason: row.get(5)?,
+            sessions: row.get::<_, i64>(6)? as u64,
+            tokens: row.get::<_, i64>(7)? as u64,
+        })
+    }) {
+        Ok(rows) => rows.filter_map(|row| row.ok()).collect(),
+        Err(_) => Vec::new(),
+    };
+    rows
+}
+
 /// Calculate cost for a windowed query (total tokens by type for a given provider/cutoff).
 fn windowed_cost(conn: &Connection, provider: &str, cutoff: i64, pricing: &PricingMap) -> Option<f64> {
-    let mut stmt = conn.prepare(
+    windowed_cost_detail(conn, provider, cutoff, pricing).amount
+}
+
+fn windowed_cost_detail(conn: &Connection, provider: &str, cutoff: i64, pricing: &PricingMap) -> UsageCost {
+    let stmt = conn.prepare(
         "SELECT COALESCE(pricing_provider, provider), COALESCE(model, 'unknown'),
                 SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts),
                 COALESCE(SUM(recorded_cost), 0), MAX(CASE WHEN recorded_cost IS NOT NULL THEN 1 ELSE 0 END)
          FROM usage_messages WHERE provider = ?1 AND timestamp >= ?2
          GROUP BY COALESCE(pricing_provider, provider), model"
-    ).ok()?;
+    ).ok();
 
-    let mut total_cost = 0.0;
-    let mut has_any = false;
+    let Some(mut stmt) = stmt else {
+        return unknown_cost();
+    };
+
+    let mut costs = CostAccumulator::default();
 
     let rows = stmt.query_map(params![provider, cutoff], |row| {
         Ok((
@@ -132,11 +425,15 @@ fn windowed_cost(conn: &Connection, provider: &str, cutoff: i64, pricing: &Prici
             row.get::<_, f64>(7)?,
             row.get::<_, i64>(8)?,
         ))
-    }).ok()?;
+    });
+
+    let Ok(rows) = rows else {
+        return unknown_cost();
+    };
 
     for row in rows.flatten() {
         let (pricing_provider, model, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost) = row;
-        if let Some(cost) = resolved_cost(
+        costs.add(resolved_cost_detail(
             &pricing_provider,
             &model,
             input,
@@ -147,13 +444,10 @@ fn windowed_cost(conn: &Connection, provider: &str, cutoff: i64, pricing: &Prici
             recorded_cost,
             has_recorded_cost != 0,
             pricing,
-        ) {
-            total_cost += cost;
-            has_any = true;
-        }
+        ));
     }
 
-    if has_any { Some(total_cost) } else { None }
+    costs.finish()
 }
 
 /// Query the DB for local usage details for a given provider.
@@ -209,6 +503,11 @@ pub fn local_details(conn: &Connection, provider: &str) -> Option<LocalUsageDeta
     let cost_30d = windowed_cost(conn, provider, t30d, &pricing);
     let cost_total = windowed_cost(conn, provider, 0, &pricing);
     let cost_month = windowed_cost(conn, provider, month_cutoff, &pricing);
+    let cost_5h_detail = windowed_cost_detail(conn, provider, t5h, &pricing);
+    let cost_7d_detail = windowed_cost_detail(conn, provider, t7d, &pricing);
+    let cost_30d_detail = windowed_cost_detail(conn, provider, t30d, &pricing);
+    let cost_total_detail = windowed_cost_detail(conn, provider, 0, &pricing);
+    let cost_month_detail = windowed_cost_detail(conn, provider, month_cutoff, &pricing);
 
     let top_models = query_top_models(conn, provider, &pricing);
     let top_tasks = query_top_tasks(conn, provider, &pricing);
@@ -226,10 +525,15 @@ pub fn local_details(conn: &Connection, provider: &str) -> Option<LocalUsageDeta
         tokens_7d: tokens_7d as u64,
         tokens_30d: tokens_30d as u64,
         cost_total,
+        cost_total_detail,
         cost_month,
+        cost_month_detail,
         cost_5h,
+        cost_5h_detail,
         cost_7d,
+        cost_7d_detail,
         cost_30d,
+        cost_30d_detail,
         top_models,
         top_tasks,
         top_projects,
@@ -300,6 +604,11 @@ pub fn windowed_details(conn: &Connection, provider: &str, window: &str) -> Opti
     let cost_7d = windowed_cost(conn, provider, t7d, &pricing);
     let cost_30d = windowed_cost(conn, provider, t30d, &pricing);
     let cost_month = windowed_cost(conn, provider, month_cutoff, &pricing);
+    let cost_window_detail = windowed_cost_detail(conn, provider, cutoff, &pricing);
+    let cost_5h_detail = windowed_cost_detail(conn, provider, t5h, &pricing);
+    let cost_7d_detail = windowed_cost_detail(conn, provider, t7d, &pricing);
+    let cost_30d_detail = windowed_cost_detail(conn, provider, t30d, &pricing);
+    let cost_month_detail = windowed_cost_detail(conn, provider, month_cutoff, &pricing);
 
     let top_models = query_top_models_since(conn, provider, cutoff, &pricing);
     let top_tasks = query_top_tasks_since(conn, provider, cutoff, &pricing);
@@ -317,10 +626,15 @@ pub fn windowed_details(conn: &Connection, provider: &str, window: &str) -> Opti
         tokens_7d: tokens_7d as u64,
         tokens_30d: tokens_30d as u64,
         cost_total: cost_window,
+        cost_total_detail: cost_window_detail,
         cost_month,
+        cost_month_detail,
         cost_5h,
+        cost_5h_detail,
         cost_7d,
+        cost_7d_detail,
         cost_30d,
+        cost_30d_detail,
         top_models,
         top_tasks,
         top_projects,
@@ -362,7 +676,7 @@ fn query_top_models_since(conn: &Connection, provider: &str, since: i64, pricing
     };
     rows.filter_map(|r| r.ok())
     .map(|(pricing_provider, name, tokens, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost)| {
-        let cost = resolved_cost(
+        let cost_detail = resolved_cost_detail(
             &pricing_provider,
             &name,
             input,
@@ -374,7 +688,7 @@ fn query_top_models_since(conn: &Connection, provider: &str, since: i64, pricing
             has_recorded_cost != 0,
             pricing,
         );
-        UsageNamedTokens { name, tokens, cost }
+        UsageNamedTokens { name, tokens, cost: cost_detail.amount, cost_detail }
     })
     .collect()
 }
@@ -418,7 +732,7 @@ fn query_top_tasks_since(conn: &Connection, provider: &str, since: i64, pricing:
     };
     rows.filter_map(|r| r.ok())
     .map(|(session_id, project, tokens, model, updated_at, pricing_provider, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost)| {
-        let cost = model.as_deref().and_then(|name| resolved_cost(
+        let cost_detail = model.as_deref().map(|name| resolved_cost_detail(
             &pricing_provider,
             name,
             input,
@@ -429,12 +743,13 @@ fn query_top_tasks_since(conn: &Connection, provider: &str, since: i64, pricing:
             recorded_cost,
             has_recorded_cost != 0,
             pricing,
-        ));
+        )).unwrap_or_else(unknown_cost);
         UsageTask {
             id: session_id.clone(),
             label: session_id,
             tokens: tokens as u64,
-            cost,
+            cost: cost_detail.amount,
+            cost_detail,
             model,
             project: if project.is_empty() { None } else { Some(project) },
             updated_at: updated_at.map(|t| t.to_string()),
@@ -476,29 +791,32 @@ fn query_top_projects_since(conn: &Connection, provider: &str, since: i64, prici
     };
     rows.filter_map(|r| r.ok())
     .map(|(name, tokens, sessions, _input, _output, _cache_read, _cache_write, _thoughts)| {
-        let cost = windowed_cost_for_project(conn, provider, since, &name, pricing);
+        let cost_detail = windowed_cost_for_project_detail(conn, provider, since, &name, pricing);
         UsageProject {
             name,
             tokens: tokens as u64,
-            cost,
+            cost: cost_detail.amount,
+            cost_detail,
             sessions: Some(sessions as u64),
         }
     })
     .collect()
 }
 
-/// Calculate cost for a specific project by summing per-model costs.
-fn windowed_cost_for_project(conn: &Connection, provider: &str, since: i64, project: &str, pricing: &PricingMap) -> Option<f64> {
-    let mut stmt = conn.prepare(
+fn windowed_cost_for_project_detail(conn: &Connection, provider: &str, since: i64, project: &str, pricing: &PricingMap) -> UsageCost {
+    let stmt = conn.prepare(
         "SELECT COALESCE(pricing_provider, provider), COALESCE(model, 'unknown'),
                 SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts),
                 COALESCE(SUM(recorded_cost), 0), MAX(CASE WHEN recorded_cost IS NOT NULL THEN 1 ELSE 0 END)
          FROM usage_messages WHERE provider = ?1 AND timestamp >= ?2 AND COALESCE(project, 'unknown') = ?3
          GROUP BY COALESCE(pricing_provider, provider), model"
-    ).ok()?;
+    ).ok();
 
-    let mut total_cost = 0.0;
-    let mut has_any = false;
+    let Some(mut stmt) = stmt else {
+        return unknown_cost();
+    };
+
+    let mut costs = CostAccumulator::default();
 
     let rows = stmt.query_map(params![provider, since, project], |row| {
         Ok((
@@ -512,11 +830,15 @@ fn windowed_cost_for_project(conn: &Connection, provider: &str, since: i64, proj
             row.get::<_, f64>(7)?,
             row.get::<_, i64>(8)?,
         ))
-    }).ok()?;
+    });
+
+    let Ok(rows) = rows else {
+        return unknown_cost();
+    };
 
     for row in rows.flatten() {
         let (pricing_provider, model, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost) = row;
-        if let Some(cost) = resolved_cost(
+        costs.add(resolved_cost_detail(
             &pricing_provider,
             &model,
             input,
@@ -527,13 +849,10 @@ fn windowed_cost_for_project(conn: &Connection, provider: &str, since: i64, proj
             recorded_cost,
             has_recorded_cost != 0,
             pricing,
-        ) {
-            total_cost += cost;
-            has_any = true;
-        }
+        ));
     }
 
-    if has_any { Some(total_cost) } else { None }
+    costs.finish()
 }
 
 pub fn usage_overview(conn: &Connection, window: &str) -> Option<UsageOverview> {
@@ -552,6 +871,11 @@ pub fn usage_overview(conn: &Connection, window: &str) -> Option<UsageOverview> 
     let total_tokens: u64 = providers.iter().map(|p| p.tokens).sum();
     let total_cost_value: f64 = providers.iter().filter_map(|p| p.cost).sum();
     let total_cost = providers.iter().any(|p| p.cost.is_some()).then_some(total_cost_value);
+    let mut total_costs = CostAccumulator::default();
+    for provider in &providers {
+        total_costs.add(provider.cost_detail.clone());
+    }
+    let total_cost_detail = total_costs.finish();
     let top_models = query_top_models_all(conn, cutoff, &pricing, bucket_count, mode);
     let top_projects = query_top_projects_all(conn, cutoff, &pricing, bucket_count, mode);
     let active_projects = count_distinct(conn, cutoff, "COALESCE(project, '')", true, mode);
@@ -561,6 +885,7 @@ pub fn usage_overview(conn: &Connection, window: &str) -> Option<UsageOverview> 
         window: window.to_string(),
         total_tokens,
         total_cost,
+        total_cost_detail,
         active_projects,
         active_sessions,
         providers,
@@ -588,21 +913,26 @@ fn query_provider_summaries(
         Err(_) => return Vec::new(),
     };
 
-    let raw: Vec<(String, u64, Option<f64>)> = match stmt
+    let raw: Vec<(String, u64, u64, u64, u64, u64, u64, UsageCost)> = match stmt
         .query_map(params![since], |row| {
             let provider: String = row.get(0)?;
             let tokens = row.get::<_, i64>(1)? as u64;
-            let cost = windowed_cost_for_provider(conn, &provider, since, pricing);
-            Ok((provider, tokens, cost))
+            let input = row.get::<_, i64>(2)? as u64;
+            let output = row.get::<_, i64>(3)? as u64;
+            let cache_read = row.get::<_, i64>(4)? as u64;
+            let cache_write = row.get::<_, i64>(5)? as u64;
+            let thoughts = row.get::<_, i64>(6)? as u64;
+            let cost_detail = windowed_cost_for_provider_detail(conn, &provider, since, pricing);
+            Ok((provider, tokens, input, output, cache_read, cache_write, thoughts, cost_detail))
         }) {
         Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
         Err(_) => return Vec::new(),
     };
 
-    let total_tokens: u64 = raw.iter().map(|(_, tokens, _)| *tokens).sum();
+    let total_tokens: u64 = raw.iter().map(|(_, tokens, _, _, _, _, _, _)| *tokens).sum();
 
     raw.into_iter()
-        .map(|(provider, tokens, cost)| UsageOverviewProvider {
+        .map(|(provider, tokens, tokens_input, tokens_output, tokens_cache_read, tokens_cache_write, tokens_thoughts, cost)| UsageOverviewProvider {
             trend: trend
                 .iter()
                 .map(|bucket| {
@@ -616,7 +946,13 @@ fn query_provider_summaries(
                 .collect(),
             provider,
             tokens,
-            cost,
+            tokens_input,
+            tokens_output,
+            tokens_cache_read,
+            tokens_cache_write,
+            tokens_thoughts,
+            cost: cost.amount,
+            cost_detail: cost,
             share_percent: if total_tokens > 0 {
                 tokens as f64 / total_tokens as f64 * 100.0
             } else {
@@ -681,7 +1017,7 @@ fn query_top_models_all(
     };
     rows.filter_map(|r| r.ok())
     .map(|(provider, pricing_provider, label, tokens, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost)| {
-        let cost = resolved_cost(
+        let cost_detail = resolved_cost_detail(
             &pricing_provider,
             &label,
             input,
@@ -698,7 +1034,13 @@ fn query_top_models_all(
             provider,
             label,
             tokens: tokens as u64,
-            cost,
+            tokens_input: input as u64,
+            tokens_output: output as u64,
+            tokens_cache_read: cache_read as u64,
+            tokens_cache_write: cache_write as u64,
+            tokens_thoughts: thoughts as u64,
+            cost: cost_detail.amount,
+            cost_detail,
             sessions: None,
             trend,
         }
@@ -715,7 +1057,8 @@ fn query_top_projects_all(
 ) -> Vec<UsageBreakdownItem> {
     let mut stmt = match conn
         .prepare(
-            "SELECT provider, COALESCE(project, 'unknown'), SUM(tokens_total), COUNT(DISTINCT session_id)
+            "SELECT provider, COALESCE(project, 'unknown'), SUM(tokens_total), COUNT(DISTINCT session_id),
+                    SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts)
              FROM usage_messages
              WHERE timestamp >= ?1
              GROUP BY provider, project
@@ -732,20 +1075,31 @@ fn query_top_projects_all(
             row.get::<_, String>(1)?,
             row.get::<_, i64>(2)?,
             row.get::<_, i64>(3)?,
+            row.get::<_, i64>(4)?,
+            row.get::<_, i64>(5)?,
+            row.get::<_, i64>(6)?,
+            row.get::<_, i64>(7)?,
+            row.get::<_, i64>(8)?,
         ))
     }) {
         Ok(rows) => rows,
         Err(_) => return Vec::new(),
     };
     rows.filter_map(|r| r.ok())
-    .map(|(provider, label, tokens, sessions)| {
-        let cost = windowed_cost_for_project(conn, &provider, since, &label, pricing);
+    .map(|(provider, label, tokens, sessions, input, output, cache_read, cache_write, thoughts)| {
+        let cost_detail = windowed_cost_for_project_detail(conn, &provider, since, &label, pricing);
         let trend = query_named_trend(conn, since, bucket_count, mode, "project", &provider, &label);
         UsageBreakdownItem {
-            cost,
+            cost: cost_detail.amount,
+            cost_detail,
             provider,
             label,
             tokens: tokens as u64,
+            tokens_input: input as u64,
+            tokens_output: output as u64,
+            tokens_cache_read: cache_read as u64,
+            tokens_cache_write: cache_write as u64,
+            tokens_thoughts: thoughts as u64,
             sessions: Some(sessions as u64),
             trend,
         }
@@ -768,18 +1122,21 @@ fn query_named_trend(
     }
 }
 
-fn windowed_cost_for_provider(conn: &Connection, provider: &str, since: i64, pricing: &PricingMap) -> Option<f64> {
-    let mut stmt = conn.prepare(
+fn windowed_cost_for_provider_detail(conn: &Connection, provider: &str, since: i64, pricing: &PricingMap) -> UsageCost {
+    let stmt = conn.prepare(
         "SELECT COALESCE(pricing_provider, provider), COALESCE(model, 'unknown'),
                 SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_read), SUM(tokens_cache_write), SUM(tokens_thoughts),
                 COALESCE(SUM(recorded_cost), 0), MAX(CASE WHEN recorded_cost IS NOT NULL THEN 1 ELSE 0 END)
          FROM usage_messages
          WHERE provider = ?1 AND timestamp >= ?2
          GROUP BY COALESCE(pricing_provider, provider), model"
-    ).ok()?;
+    ).ok();
 
-    let mut total_cost = 0.0;
-    let mut has_any = false;
+    let Some(mut stmt) = stmt else {
+        return unknown_cost();
+    };
+
+    let mut costs = CostAccumulator::default();
 
     let rows = stmt.query_map(params![provider, since], |row| {
         Ok((
@@ -793,11 +1150,15 @@ fn windowed_cost_for_provider(conn: &Connection, provider: &str, since: i64, pri
             row.get::<_, f64>(7)?,
             row.get::<_, i64>(8)?,
         ))
-    }).ok()?;
+    });
+
+    let Ok(rows) = rows else {
+        return unknown_cost();
+    };
 
     for row in rows.flatten() {
         let (pricing_provider, model, input, output, cache_read, cache_write, thoughts, recorded_cost, has_recorded_cost) = row;
-        if let Some(cost) = resolved_cost(
+        costs.add(resolved_cost_detail(
             &pricing_provider,
             &model,
             input,
@@ -808,13 +1169,10 @@ fn windowed_cost_for_provider(conn: &Connection, provider: &str, since: i64, pri
             recorded_cost,
             has_recorded_cost != 0,
             pricing,
-        ) {
-            total_cost += cost;
-            has_any = true;
-        }
+        ));
     }
 
-    if has_any { Some(total_cost) } else { None }
+    costs.finish()
 }
 
 fn count_distinct(conn: &Connection, since: i64, field: &str, skip_empty: bool, mode: BucketMode) -> u64 {
@@ -898,7 +1256,7 @@ fn query_trend_hourly(
     pricing: &PricingMap,
 ) -> Vec<UsageTrendBucket> {
     let hour_start = align_to_local_hour(conn, since);
-    let mut bucket_map: BTreeMap<i64, BTreeMap<String, (u64, f64, bool)>> = BTreeMap::new();
+    let mut bucket_map: BTreeMap<i64, BTreeMap<String, (u64, CostAccumulator)>> = BTreeMap::new();
     let mut stmt = match conn
         .prepare(
             "SELECT provider,
@@ -947,9 +1305,9 @@ fn query_trend_hourly(
             continue;
         }
         let provider_map = bucket_map.entry(bucket_idx).or_default();
-        let entry = provider_map.entry(provider).or_insert((0, 0.0, false));
+        let entry = provider_map.entry(provider).or_default();
         entry.0 += tokens as u64;
-        if let Some(cost) = resolved_cost(
+        entry.1.add(resolved_cost_detail(
             &pricing_provider,
             &model,
             input,
@@ -960,10 +1318,7 @@ fn query_trend_hourly(
             recorded_cost,
             has_recorded_cost != 0,
             pricing,
-        ) {
-            entry.1 += cost;
-            entry.2 = true;
-        }
+        ));
     }
 
     build_trend_buckets(bucket_count, hour_start, 3600, bucket_map)
@@ -977,7 +1332,7 @@ fn query_trend_daily(
 ) -> Vec<UsageTrendBucket> {
     let day_start = cutoff_local_date(conn, since);
     let cutoff_date = day_start.clone();
-    let mut bucket_map: BTreeMap<i64, BTreeMap<String, (u64, f64, bool)>> = BTreeMap::new();
+    let mut bucket_map: BTreeMap<i64, BTreeMap<String, (u64, CostAccumulator)>> = BTreeMap::new();
     let mut stmt = match conn
         .prepare(
             "SELECT provider,
@@ -1041,9 +1396,9 @@ fn query_trend_daily(
             continue;
         }
         let provider_map = bucket_map.entry(bucket_idx).or_default();
-        let entry = provider_map.entry(provider).or_insert((0, 0.0, false));
+        let entry = provider_map.entry(provider).or_default();
         entry.0 += tokens as u64;
-        if let Some(cost) = resolved_cost(
+        entry.1.add(resolved_cost_detail(
             &pricing_provider,
             &model,
             input,
@@ -1054,10 +1409,7 @@ fn query_trend_daily(
             recorded_cost,
             has_recorded_cost != 0,
             pricing,
-        ) {
-            entry.1 += cost;
-            entry.2 = true;
-        }
+        ));
     }
 
     let start_epoch = day_start_epoch(conn, &day_start);
@@ -1068,7 +1420,7 @@ fn build_trend_buckets(
     bucket_count: i64,
     start_epoch: i64,
     bucket_span_secs: i64,
-    bucket_map: BTreeMap<i64, BTreeMap<String, (u64, f64, bool)>>,
+    bucket_map: BTreeMap<i64, BTreeMap<String, (u64, CostAccumulator)>>,
 ) -> Vec<UsageTrendBucket> {
     (0..bucket_count)
         .map(|bucket_idx| {
@@ -1076,21 +1428,35 @@ fn build_trend_buckets(
             let end = start + bucket_span_secs;
             let providers = bucket_map
                 .get(&bucket_idx)
-                .map(|items| items.iter().map(|(provider, (tokens, cost, has_cost))| UsageTrendProviderValue {
+                .map(|items| items.iter().map(|(provider, (tokens, cost_accumulator))| {
+                    let cost_detail = CostAccumulator {
+                        amount: cost_accumulator.amount,
+                        has_cost: cost_accumulator.has_cost,
+                        kind: cost_accumulator.kind.clone(),
+                        basis: cost_accumulator.basis.clone(),
+                        confidence: cost_accumulator.confidence.clone(),
+                        mixed: cost_accumulator.mixed,
+                    }.finish();
+                    UsageTrendProviderValue {
                     provider: provider.clone(),
                     tokens: *tokens,
-                    cost: (*has_cost).then_some(*cost),
-                }).collect::<Vec<_>>())
+                    cost: cost_detail.amount,
+                    cost_detail,
+                }}).collect::<Vec<_>>())
                 .unwrap_or_default();
             let tokens = providers.iter().map(|p| p.tokens).sum();
-            let cost_sum: f64 = providers.iter().filter_map(|p| p.cost).sum();
-            let has_cost = providers.iter().any(|p| p.cost.is_some());
+            let mut costs = CostAccumulator::default();
+            for provider in &providers {
+                costs.add(provider.cost_detail.clone());
+            }
+            let cost_detail = costs.finish();
             UsageTrendBucket {
                 start,
                 end,
                 label: String::new(),
                 tokens,
-                cost: has_cost.then_some(cost_sum),
+                cost: cost_detail.amount,
+                cost_detail,
                 providers,
             }
         })

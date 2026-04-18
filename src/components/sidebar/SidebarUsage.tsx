@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
 import { useUsageSettingsStore } from "../../stores/useUsageSettingsStore";
 import { useUIStore } from "../../stores/useUIStore";
@@ -8,40 +8,241 @@ import {
   TONE_COLORS,
   TONE_TRACK,
   barTone,
-  formatPercent,
-  formatTokenCount,
-  formatCost,
   computePace,
+  formatCost,
+  formatPercent,
+  formatReset,
+  formatTokenCount,
+  getProviderLabel,
+  paceLabel,
   syntheticBudgetWindow,
+  type PaceStatus,
 } from "../usage/usageHelpers";
-const WINDOWS: { key: TimeWindow; label: string }[] = [
+import type { UsageProvider, UsageSettings, ProviderUsageSnapshot } from "../../lib/types";
+import type { UsageWindowSnapshot } from "../../lib/types";
+
+type SidebarWindow = Extract<TimeWindow, "5h" | "7d">;
+
+const WINDOWS: { key: SidebarWindow; label: string }[] = [
   { key: "5h", label: "5h" },
   { key: "7d", label: "7d" },
 ];
 
+const PACE_LABEL_COLORS: Record<PaceStatus, string> = {
+  under: "rgba(52, 211, 153, 0.8)",
+  on: "var(--text-muted)",
+  over: "rgba(248, 113, 113, 0.8)",
+};
+
+interface SidebarUtilizationItem {
+  id: string;
+  provider: UsageProvider;
+  label: string;
+  pct: number;
+  tokens: number;
+  sublabel: string;
+  pace: { status: PaceStatus; elapsedPct: number } | null;
+  meta?: string;
+}
+
+interface TooltipState {
+  item: SidebarUtilizationItem;
+  rect: DOMRect;
+}
+
+function sidebarProviderWindows(provider: UsageProvider, snap: ProviderUsageSnapshot, window: SidebarWindow): UsageWindowSnapshot[] {
+  const windows = snap.summaryWindows
+    .filter((sw) => sw.usedPercent != null && sw.sourceType === "provider")
+    .filter((sw) => sw.window === window || sw.window.startsWith("24h_"));
+
+  if (provider !== "gemini") return windows;
+
+  const pro = windows.find((sw) => sw.window === "24h_pro");
+  return pro ? [pro] : windows;
+}
+
+function windowTokenTotal(snap: ProviderUsageSnapshot, window: SidebarWindow): number {
+  if (!snap.localDetails) return 0;
+  return window === "5h" ? snap.localDetails.tokens5h : snap.localDetails.tokens7d;
+}
+
+function windowCostTotal(snap: ProviderUsageSnapshot, window: SidebarWindow): number | null {
+  if (!snap.localDetails) return null;
+  return window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d;
+}
+
+function buildUtilizationItems(
+  snapshots: Record<string, ProviderUsageSnapshot>,
+  settings: UsageSettings,
+  window: SidebarWindow,
+): SidebarUtilizationItem[] {
+  const items: SidebarUtilizationItem[] = [];
+
+  ALL_USAGE_PROVIDERS.forEach((provider) => {
+    const config = settings[provider];
+    const snap = snapshots[provider];
+    if (!config.show || config.budgetMode !== "custom" || config.monthlyBudget == null || config.monthlyBudget <= 0 || !snap?.localDetails) return;
+
+    const budget = config.monthlyBudget;
+    const periodCost = windowCostTotal(snap, window);
+    const budgetWindow = syntheticBudgetWindow(provider, window, periodCost, budget);
+    if (!budgetWindow || budgetWindow.usedPercent == null || budgetWindow.limit == null || budgetWindow.used == null) return;
+
+    const pace = computePace(budgetWindow);
+    const tokens = windowTokenTotal(snap, window);
+
+    items.push({
+      id: `budget-${provider}`,
+      provider,
+      label: `${window} Budget`,
+      pct: budgetWindow.usedPercent,
+      tokens,
+      sublabel: `${formatCost(budgetWindow.used)} spent of ${formatCost(budgetWindow.limit)}`,
+      pace,
+    });
+  });
+
+  ALL_USAGE_PROVIDERS.forEach((provider) => {
+    const config = settings[provider];
+    const snap = snapshots[provider];
+    if (!config.show || !snap) return;
+    const tokens = windowTokenTotal(snap, window);
+
+    sidebarProviderWindows(provider, snap, window)
+      .forEach((w) => {
+        const pace = computePace(w);
+        items.push({
+          id: w.windowId,
+          provider,
+          label: w.window.startsWith("24h_") ? w.label : `${w.label} limit`,
+          pct: w.usedPercent!,
+          tokens,
+          sublabel: w.remainingPercent != null ? `${formatPercent(w.remainingPercent)} remaining` : "",
+          pace,
+          meta: w.resetAt ? `resets in ${formatReset(w.resetAt)}` : undefined,
+        });
+      });
+  });
+
+  // Show providers with show=true even if $0/no activity
+  const seenProviders = new Set(items.map((i) => i.provider));
+  ALL_USAGE_PROVIDERS.forEach((provider) => {
+    const config = settings[provider];
+    if (!config.show || seenProviders.has(provider)) return;
+    const snap = snapshots[provider];
+    const cost = snap?.localDetails ? ((window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d) ?? 0) : 0;
+    const tokens = snap?.localDetails ? (window === "5h" ? snap.localDetails.tokens5h : snap.localDetails.tokens7d) : 0;
+
+    if (config.budgetMode === "custom" && config.monthlyBudget != null && config.monthlyBudget > 0) {
+      items.push({
+        id: `budget-${provider}`,
+        provider,
+        label: `${window} Budget`,
+        pct: 0,
+        tokens,
+        sublabel: `${formatCost(cost)} spent of ${formatCost(config.monthlyBudget)}`,
+        pace: null,
+      });
+    } else {
+      items.push({
+        id: `cost-${provider}`,
+        provider,
+        label: `${window} Cost`,
+        pct: 0,
+        tokens,
+        sublabel: formatCost(cost),
+        pace: null,
+      });
+    }
+  });
+
+  return items.sort((a, b) => b.tokens - a.tokens || b.pct - a.pct);
+}
+
+function UsageTooltip({ tip }: { tip: TooltipState }) {
+  const { item } = tip;
+  const top = tip.rect.top + tip.rect.height / 2;
+  const left = tip.rect.right + 10;
+
+  return (
+    <div
+      className="sidebar-usage__tooltip"
+      style={{ top, left, transform: "translateY(-50%)" }}
+    >
+      <div className="sidebar-usage__tooltip-header">
+        {assistantLogoSrc[item.provider] && (
+          <img
+            src={assistantLogoSrc[item.provider]}
+            alt=""
+            className={`sidebar-usage__icon ${getAssistantLogoClass(item.provider) ?? ""}`}
+            style={{ opacity: 1 }}
+          />
+        )}
+        <span>{getProviderLabel(item.provider)}</span>
+        <span className="sidebar-usage__tooltip-window">{item.label}</span>
+      </div>
+
+      <div className="sidebar-usage__tooltip-rows">
+        <div className="sidebar-usage__tooltip-row sidebar-usage__tooltip-row--total">
+          <span>Used</span>
+          <span>{formatPercent(item.pct)}</span>
+        </div>
+        <div className="sidebar-usage__tooltip-row">
+          <span>Tokens</span>
+          <span>{formatTokenCount(item.tokens)}</span>
+        </div>
+        {item.sublabel && (
+          <div className="sidebar-usage__tooltip-row">
+            <span>Detail</span>
+            <span>{item.sublabel}</span>
+          </div>
+        )}
+        {item.pace && (
+          <div className="sidebar-usage__tooltip-row">
+            <span>Pace</span>
+            <span style={{ color: PACE_LABEL_COLORS[item.pace.status] }}>{paceLabel(item.pace.status)}</span>
+          </div>
+        )}
+        {item.meta && (
+          <div className="sidebar-usage__tooltip-row">
+            <span>Reset</span>
+            <span>{item.meta.replace(/^resets in /, "")}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SidebarUsage() {
   const snapshots = useUsageStore((s) => s.snapshots);
-  const window = useUsageStore((s) => s.window);
+  const window = useUsageStore((s) => s.sidebarWindow);
   const usageSettings = useUsageSettingsStore((s) => s.settings);
-  const { setWindow } = useUsageStore.getState();
+  const { setSidebarWindow } = useUsageStore.getState();
   const { toggleUsagePanel } = useUIStore.getState();
 
-  const providers = useMemo(() => ALL_USAGE_PROVIDERS.filter((p) => usageSettings[p].show), [usageSettings]);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  const hasData = Object.keys(snapshots).length > 0;
-  if (!hasData || providers.length === 0) return null;
+  const items = useMemo(
+    () => buildUtilizationItems(snapshots, usageSettings, window),
+    [snapshots, usageSettings, window],
+  );
+
+  const handleMouseLeave = useCallback(() => setTooltip(null), []);
+
+  if (items.length === 0) return null;
 
   return (
     <div className="sidebar-usage">
       <div className="sidebar-usage__header">
-        <div className="section-label !p-0">Usage</div>
+        <div className="section-label !p-0">Utilization</div>
         <div className="sidebar-usage__window-toggle">
           {WINDOWS.map((tw) => (
             <button
               key={tw.key}
               type="button"
               className={`sidebar-usage__window-btn ${window === tw.key ? "sidebar-usage__window-btn--active" : ""}`}
-              onClick={() => setWindow(tw.key)}
+              onClick={() => setSidebarWindow(tw.key)}
             >
               {tw.label}
             </button>
@@ -50,96 +251,51 @@ export default function SidebarUsage() {
       </div>
 
       <div className="sidebar-usage__providers">
-        {providers.map((provider) => {
-          const snapshot = snapshots[provider] ?? null;
-          if (!snapshot) return null;
-
-          const local = snapshot.localDetails;
-          const budgetWindow = window === "5h" || window === "7d" ? window : null;
-          const providerConfig = usageSettings[provider];
-          const syntheticWindow = providerConfig.budgetMode === "custom"
-            && budgetWindow
-            ? syntheticBudgetWindow(
-                provider,
-                budgetWindow,
-                local ? budgetWindow === "5h" ? local.cost5h : local.cost7d : null,
-                providerConfig.monthlyBudget,
-              )
-            : null;
-          // For providers with 24h quota windows (Gemini), pick the most-used tier
-          const quota24h = providerConfig.budgetMode === "subscription"
-            ? snapshot.summaryWindows
-                .filter((sw) => sw.window.startsWith("24h_") && sw.usedPercent != null)
-                .sort((a, b) => (b.usedPercent ?? 0) - (a.usedPercent ?? 0))[0] ?? null
-            : null;
-          const providerWindow = snapshot.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null)
-            ?? quota24h;
-          const w = providerWindow ?? syntheticWindow ?? snapshot.summaryWindows.find((sw) => sw.window === window) ?? null;
-          const pct = w?.usedPercent;
-          const hasPercent = pct != null;
-          const clampedPct = hasPercent ? Math.min(pct, 100) : 0;
-
-          const pace = computePace(w);
-          const tone = barTone(pace, pct);
-
-          const tokens = local
-            ? window === "5h" ? local.tokens5h : window === "7d" ? local.tokens7d : local.tokens30d
-            : w?.tokenTotal ?? null;
-          const cost = local
-            ? window === "5h" ? local.cost5h : window === "7d" ? local.cost7d : local.cost30d
-            : null;
-
-          const logoSrc = assistantLogoSrc[provider];
+        {items.map((item) => {
+          const tone = barTone(item.pace, item.pct);
+          const logoSrc = assistantLogoSrc[item.provider];
 
           return (
             <button
-              key={provider}
+              key={item.id}
               type="button"
               className="sidebar-usage__row"
               onClick={toggleUsagePanel}
+              onMouseEnter={(e) => setTooltip({ item, rect: e.currentTarget.getBoundingClientRect() })}
+              onMouseLeave={handleMouseLeave}
             >
               {logoSrc ? (
-                <img src={logoSrc} alt={provider} className={`sidebar-usage__icon ${getAssistantLogoClass(provider) ?? ""}`} />
+                <img src={logoSrc} alt={item.provider} className={`sidebar-usage__icon ${getAssistantLogoClass(item.provider) ?? ""}`} />
               ) : (
-                <span className="sidebar-usage__name">{provider}</span>
+                <span className="sidebar-usage__name">{item.provider}</span>
               )}
 
               <div className="sidebar-usage__bar-wrap">
                 <div className="sidebar-usage__bar">
-                  <div
-                    className="sidebar-usage__bar-track"
-                    style={{ background: TONE_TRACK[tone] }}
-                  />
+                  <div className="sidebar-usage__bar-track" style={{ background: TONE_TRACK[tone] }} />
                   <div
                     className="sidebar-usage__bar-fill"
-                    style={{
-                      width: `${clampedPct}%`,
-                      background: TONE_COLORS[tone],
-                    }}
+                    style={{ width: `${Math.min(item.pct, 100)}%`, background: TONE_COLORS[tone] }}
                   />
-                  {pace && pct != null && pct > 0 && (
+                  {item.pace && (
                     <div
                       className="sidebar-usage__bar-pace"
-                      style={{ left: `${Math.min(pace.elapsedPct, 100)}%` }}
-                      title={`${Math.round(pace.elapsedPct)}% of window elapsed`}
+                      style={{ left: `${Math.min(item.pace.elapsedPct, 100)}%` }}
+                      title={`${Math.round(item.pace.elapsedPct)}% of window elapsed`}
                     />
                   )}
                 </div>
               </div>
 
               <span className="sidebar-usage__value">
-                {hasPercent ? formatPercent(pct) : ""}
-              </span>
-              <span className="sidebar-usage__cost">
-                {cost != null && cost > 0 ? formatCost(cost) : ""}
-              </span>
-              <span className="sidebar-usage__tokens">
-                {tokens != null && tokens > 0 ? formatTokenCount(tokens) : ""}
+                {formatPercent(item.pct)}
               </span>
             </button>
           );
         })}
       </div>
+
+      {tooltip && <UsageTooltip tip={tooltip} />}
     </div>
   );
 }

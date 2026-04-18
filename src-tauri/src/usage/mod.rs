@@ -6,7 +6,7 @@ mod queries;
 pub mod types;
 
 pub use db::UsageDb;
-pub use types::{LocalUsageDetails, ProviderUsageSnapshot, UsageOverview};
+pub use types::{LocalUsageDetails, ProviderUsageSnapshot, UsageOverview, UsageProjectAliasReviewItem};
 
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -120,6 +120,7 @@ pub fn get_all_usage_snapshots(db: &UsageDb, enabled: &EnabledProviders) -> Vec<
         codex_snapshot(&conn),
         gemini_snapshot(&conn),
         opencode_snapshot(&conn),
+        pi_snapshot(&conn),
     ]
 }
 
@@ -133,6 +134,7 @@ pub fn get_usage_snapshot(db: &UsageDb, provider: &str, enabled: &EnabledProvide
         "claude" => Ok(claude_snapshot(&conn)),
         "gemini" => Ok(gemini_snapshot(&conn)),
         "opencode" => Ok(opencode_snapshot(&conn)),
+        "pi" => Ok(pi_snapshot(&conn)),
         other => Err(format!("Unsupported usage provider: {other}")),
     }
 }
@@ -148,6 +150,11 @@ pub fn get_usage_overview(db: &UsageDb, window: &str) -> Result<UsageOverview, S
     let conn = db.conn.lock().unwrap();
     queries::usage_overview(&conn, window)
         .ok_or_else(|| format!("Unsupported usage overview window: {window}"))
+}
+
+pub fn get_project_alias_review_queue(db: &UsageDb) -> Vec<UsageProjectAliasReviewItem> {
+    let conn = db.conn.lock().unwrap();
+    queries::project_alias_review_queue(&conn)
 }
 
 /// Run background ingestion in a loop until fully caught up.
@@ -280,10 +287,15 @@ fn codex_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
     if let Some(ref details) = local {
         summary_windows.push(UsageWindowSnapshot {
             provider: "codex".to_string(),
+            window_id: "codex-local-30d".to_string(),
             window: "30d".to_string(),
             label: "30d".to_string(),
+            scope: "reporting".to_string(),
+            limit: None,
+            used: None,
             source_type: "local".to_string(),
             confidence: "observed".to_string(),
+            cost_kind: "estimated".to_string(),
             used_percent: None,
             remaining_percent: None,
             reset_at: None,
@@ -325,10 +337,15 @@ fn claude_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
     if let Some(ref details) = local {
         summary_windows.push(UsageWindowSnapshot {
             provider: "claude".to_string(),
+            window_id: "claude-local-30d".to_string(),
             window: "30d".to_string(),
             label: "30d".to_string(),
+            scope: "reporting".to_string(),
+            limit: None,
+            used: None,
             source_type: "local".to_string(),
             confidence: "observed".to_string(),
+            cost_kind: "estimated".to_string(),
             used_percent: None,
             remaining_percent: None,
             reset_at: None,
@@ -369,10 +386,15 @@ fn gemini_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
         for (window, tokens) in [("5h", details.tokens_5h), ("7d", details.tokens_7d), ("30d", details.tokens_30d)] {
             summary_windows.push(UsageWindowSnapshot {
                 provider: "gemini".to_string(),
+                window_id: format!("gemini-local-{window}"),
                 window: window.to_string(),
                 label: window.to_string(),
+                scope: "reporting".to_string(),
+                limit: None,
+                used: None,
                 source_type: "local".to_string(),
                 confidence: "observed".to_string(),
+                cost_kind: "estimated".to_string(),
                 used_percent: None,
                 remaining_percent: None,
                 reset_at: None,
@@ -402,10 +424,15 @@ fn opencode_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
         for (window, tokens) in [("5h", details.tokens_5h), ("7d", details.tokens_7d), ("30d", details.tokens_30d)] {
             summary_windows.push(UsageWindowSnapshot {
                 provider: "opencode".to_string(),
+                window_id: format!("opencode-local-{window}"),
                 window: window.to_string(),
                 label: window.to_string(),
+                scope: "reporting".to_string(),
+                limit: None,
+                used: None,
                 source_type: "local".to_string(),
                 confidence: "observed".to_string(),
+                cost_kind: "mixed".to_string(),
                 used_percent: None,
                 remaining_percent: None,
                 reset_at: None,
@@ -417,6 +444,44 @@ fn opencode_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
 
     ProviderUsageSnapshot {
         provider: "opencode".to_string(),
+        status: if local.is_some() { "ready".to_string() } else { "unavailable".to_string() },
+        fetched_at,
+        summary_windows,
+        extra_windows: Vec::new(),
+        local_details: local,
+        error: None,
+    }
+}
+
+fn pi_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
+    let fetched_at = helpers::now_iso_string();
+    let local = queries::local_details(conn, "pi");
+    let mut summary_windows = Vec::new();
+
+    if let Some(ref details) = local {
+        for (window, tokens) in [("5h", details.tokens_5h), ("7d", details.tokens_7d), ("30d", details.tokens_30d)] {
+            summary_windows.push(UsageWindowSnapshot {
+                provider: "pi".to_string(),
+                window_id: format!("pi-local-{window}"),
+                window: window.to_string(),
+                label: window.to_string(),
+                scope: "reporting".to_string(),
+                limit: None,
+                used: None,
+                source_type: "local".to_string(),
+                confidence: "observed".to_string(),
+                cost_kind: "mixed".to_string(),
+                used_percent: None,
+                remaining_percent: None,
+                reset_at: None,
+                token_total: Some(tokens),
+                pace_status: None,
+            });
+        }
+    }
+
+    ProviderUsageSnapshot {
+        provider: "pi".to_string(),
         status: if local.is_some() { "ready".to_string() } else { "unavailable".to_string() },
         fetched_at,
         summary_windows,

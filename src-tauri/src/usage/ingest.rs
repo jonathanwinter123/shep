@@ -32,6 +32,10 @@ pub fn ingest_all(conn: &Connection) -> bool {
         Ok(done) => { if !done { all_done = false; } }
         Err(e) => eprintln!("OpenCode ingest error: {e}"),
     }
+    match ingest_pi(conn, MAX_FILES_PER_CYCLE) {
+        Ok(done) => { if !done { all_done = false; } }
+        Err(e) => eprintln!("pi ingest error: {e}"),
+    }
     if let Err(e) = prune_old_messages(conn) {
         eprintln!("Prune error: {e}");
     }
@@ -622,6 +626,192 @@ fn ingest_opencode(conn: &Connection) -> Result<bool, String> {
     upsert_cursor(conn, cursor_key, "opencode", file_size, max_rowid, mtime)?;
     conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
     Ok(true)
+}
+
+// ── pi ────────────────────────────────────────────────────
+
+fn ingest_pi(conn: &Connection, budget: usize) -> Result<bool, String> {
+    let sessions_dir = home_join(".pi/agent/sessions")?;
+    if !sessions_dir.exists() {
+        return Ok(true);
+    }
+
+    let files = walk_files(&sessions_dir);
+    let jsonl_files: Vec<_> = files
+        .into_iter()
+        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl"))
+        .collect();
+
+    conn.execute_batch("BEGIN").map_err(|e| e.to_string())?;
+
+    let mut processed = 0;
+    let mut skipped_remaining = false;
+
+    for path in &jsonl_files {
+        if processed >= budget {
+            skipped_remaining = true;
+            break;
+        }
+        let path_str = path.to_string_lossy().to_string();
+        let meta = match fs::metadata(path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let file_size = meta.len() as i64;
+        let mtime = file_mtime(&meta);
+        let cursor = get_cursor(conn, &path_str);
+        let needs_work = match &cursor {
+            Some((size, _, mt)) => *size != file_size || *mt != mtime,
+            None => true,
+        };
+        if !needs_work {
+            continue;
+        }
+
+        processed += 1;
+        if let Err(e) = ingest_pi_file(conn, path) {
+            eprintln!("pi ingest error for {}: {e}", path.display());
+        }
+    }
+
+    if !skipped_remaining {
+        clean_cursors(conn, "pi", &jsonl_files);
+    }
+
+    conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+    Ok(!skipped_remaining)
+}
+
+fn ingest_pi_file(conn: &Connection, path: &Path) -> Result<(), String> {
+    let path_str = path.to_string_lossy().to_string();
+    let meta = fs::metadata(path).map_err(|e| e.to_string())?;
+    let file_size = meta.len() as i64;
+    let mtime = file_mtime(&meta);
+
+    let cursor = get_cursor(conn, &path_str);
+    let offset = match &cursor {
+        Some((size, off, mt)) => {
+            if *size == file_size && *mt == mtime {
+                return Ok(());
+            }
+            *off
+        }
+        None => 0,
+    };
+
+    // Filename format: <iso-timestamp>_<uuid>.jsonl — session id is the uuid.
+    let file_stem = path.file_stem().and_then(|n| n.to_str()).unwrap_or_default();
+    let session_id = file_stem.rsplit_once('_')
+        .map(|(_, uuid)| uuid.to_string())
+        .unwrap_or_else(|| file_stem.to_string());
+
+    let project = read_pi_project(path).unwrap_or_else(|| "unknown".to_string());
+
+    let file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut reader = BufReader::new(file);
+    reader.seek(SeekFrom::Start(offset as u64)).map_err(|e| e.to_string())?;
+
+    let mut new_offset = offset;
+    let mut line = String::new();
+
+    loop {
+        line.clear();
+        let bytes_read = reader.read_line(&mut line).map_err(|e| e.to_string())?;
+        if bytes_read == 0 {
+            break;
+        }
+        new_offset += bytes_read as i64;
+
+        let row: Value = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        if row.get("type").and_then(Value::as_str) != Some("message") {
+            continue;
+        }
+        let message = match row.get("message") {
+            Some(m) if m.is_object() => m,
+            _ => continue,
+        };
+        if message.get("role").and_then(Value::as_str) != Some("assistant") {
+            continue;
+        }
+        let usage = match message.get("usage") {
+            Some(u) if u.is_object() => u,
+            _ => continue,
+        };
+
+        let input = as_u64(usage.get("input"));
+        let output = as_u64(usage.get("output"));
+        let cache_read = as_u64(usage.get("cacheRead"));
+        let cache_write = as_u64(usage.get("cacheWrite"));
+        let mut total = as_u64(usage.get("totalTokens"));
+        if total == 0 {
+            total = input + output + cache_read + cache_write;
+        }
+
+        let model = message.get("model").and_then(Value::as_str).unwrap_or("unknown");
+        let pi_provider = message.get("provider").and_then(Value::as_str).unwrap_or("pi");
+        let pricing_provider = map_pi_provider(pi_provider);
+
+        let ts = row.get("timestamp").and_then(Value::as_str)
+            .and_then(parse_iso_timestamp)
+            .unwrap_or(0);
+
+        // PI records $0 for OAuth/subscription sessions, which would understate
+        // token value when list-rate pricing is available. Preserve only
+        // positive recorded costs; otherwise let the pricing table estimate.
+        let recorded_cost = usage
+            .get("cost")
+            .and_then(|cost| cost.get("total"))
+            .and_then(Value::as_f64)
+            .filter(|cost| *cost > 0.0);
+
+        conn.execute(
+            "INSERT INTO usage_messages (
+                provider, session_id, project, model, timestamp,
+                tokens_input, tokens_output, tokens_cache_write, tokens_cache_read,
+                tokens_thoughts, tokens_total, pricing_provider, recorded_cost
+             ) VALUES (
+                'pi', ?1, ?2, ?3, ?4,
+                ?5, ?6, ?7, ?8,
+                0, ?9, ?10, ?11
+             )",
+            params![
+                session_id, project, model, ts as i64,
+                input as i64, output as i64, cache_write as i64, cache_read as i64,
+                total as i64, pricing_provider, recorded_cost
+            ],
+        ).map_err(|e| e.to_string())?;
+    }
+
+    upsert_cursor(conn, &path_str, "pi", file_size, new_offset, mtime)?;
+    Ok(())
+}
+
+/// Map pi's provider name (from message.provider) to the pricing_provider
+/// key used in the model_pricing table. Unknown providers pass through, which
+/// means tokens are tracked but no cost is computed.
+fn map_pi_provider(pi_provider: &str) -> String {
+    match pi_provider {
+        "anthropic" => "claude".to_string(),
+        "openai" | "azure" => "codex".to_string(),
+        p if p.starts_with("google") => "gemini".to_string(),
+        other => other.to_string(),
+    }
+}
+
+/// Read the first-line session event to extract the cwd, then return the
+/// last path segment as project name. Falls back to None on any error.
+fn read_pi_project(path: &Path) -> Option<String> {
+    let file = fs::File::open(path).ok()?;
+    let mut reader = BufReader::new(file);
+    let mut line = String::new();
+    reader.read_line(&mut line).ok()?;
+    let row: Value = serde_json::from_str(&line).ok()?;
+    let cwd = row.get("cwd").and_then(Value::as_str)?;
+    Some(cwd.rsplit('/').find(|s| !s.is_empty()).unwrap_or("unknown").to_string())
 }
 
 // ── Maintenance ───────────────────────────────────────────

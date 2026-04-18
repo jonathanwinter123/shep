@@ -151,6 +151,45 @@ fn migrate(conn: &Connection) -> Result<(), String> {
         ).map_err(|e| format!("Failed to run migration v3 data backfill: {e}"))?;
     }
 
+    if version < 4 {
+        conn.execute_batch(
+            "DELETE FROM usage_messages WHERE provider = 'pi';
+             DELETE FROM usage_daily WHERE provider = 'pi';
+             DELETE FROM ingest_cursors WHERE provider = 'pi';
+             INSERT INTO schema_version (version) VALUES (4);"
+        ).map_err(|e| format!("Failed to run migration v4: {e}"))?;
+    }
+
+    if version < 5 {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS usage_projects (
+                canonical_id TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                canonical_path TEXT,
+                repo_root TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS project_aliases (
+                raw_label TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                canonical_id TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                reviewed INTEGER NOT NULL DEFAULT 0,
+                reason TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                PRIMARY KEY (raw_label, provider)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_project_aliases_canonical
+                ON project_aliases(canonical_id);
+
+            INSERT INTO schema_version (version) VALUES (5);"
+        ).map_err(|e| format!("Failed to run migration v5: {e}"))?;
+    }
+
     Ok(())
 }
 

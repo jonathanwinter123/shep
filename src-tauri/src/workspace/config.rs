@@ -215,6 +215,13 @@ fn default_provider_custom() -> ProviderBudgetConfig {
     ProviderBudgetConfig::default_custom()
 }
 
+fn default_provider_custom_hidden() -> ProviderBudgetConfig {
+    ProviderBudgetConfig {
+        show: false,
+        ..ProviderBudgetConfig::default_custom()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageSettings {
     #[serde(default = "default_provider_subscription")]
@@ -225,6 +232,8 @@ pub struct UsageSettings {
     pub gemini: ProviderBudgetConfig,
     #[serde(default = "default_provider_custom")]
     pub opencode: ProviderBudgetConfig,
+    #[serde(default = "default_provider_custom_hidden")]
+    pub pi: ProviderBudgetConfig,
 }
 
 impl Default for UsageSettings {
@@ -237,6 +246,7 @@ impl Default for UsageSettings {
                 monthly_budget: Some(100.0),
                 ..ProviderBudgetConfig::default_custom()
             },
+            pi: ProviderBudgetConfig::default_custom(),
         }
     }
 }

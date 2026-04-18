@@ -1,7 +1,7 @@
 import type { ProviderUsageSnapshot, UsageProvider, UsageWindowSnapshot } from "../../lib/types";
 
 const WINDOW_PRIORITY = ["5h", "7d", "30d"];
-export const ALL_USAGE_PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini", "opencode"];
+export const ALL_USAGE_PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini", "opencode", "pi"];
 export const TONE_COLORS: Record<string, string> = {
   low: "rgba(52, 211, 153, 0.75)",
   medium: "rgba(245, 158, 11, 0.75)",
@@ -37,6 +37,8 @@ export function getProviderLabel(provider: UsageProvider): string {
       return "Gemini";
     case "opencode":
       return "opencode";
+    case "pi":
+      return "pi";
   }
 }
 
@@ -47,7 +49,7 @@ export function formatPercent(value: number | null): string {
 
 export function formatTokenCount(value: number | null): string {
   if (value == null) return "n/a";
-  if (value >= 1_000_000_000) return `${Math.round(value / 1_000_000_000)}B`;
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
   if (value >= 100_000_000) return `${Math.round(value / 1_000_000)}M`;
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `${Math.round(value / 1_000)}K`;
@@ -56,8 +58,7 @@ export function formatTokenCount(value: number | null): string {
 
 export function formatCost(value: number | null): string {
   if (value == null) return "";
-  if (value >= 1_000) return `$${Math.round(value / 1_000)}K`;
-  if (value >= 100) return `$${Math.round(value)}`;
+  if (value >= 100) return `$${Math.round(value).toLocaleString()}`;
   if (value >= 0.01) return `$${value.toFixed(2)}`;
   if (value > 0) return "<$0.01";
   return "$0";
@@ -179,11 +180,10 @@ export function syntheticBudgetWindow(
   const now = new Date();
   const month = currentMonthRange(now);
   const budgetRange = window === "5h" ? currentFiveHourBlock(now) : currentSevenDayBlock(now);
-  const monthDays = Math.max(Math.round((month.end.getTime() - month.start.getTime()) / (24 * 60 * 60 * 1000)), 1);
-  const monthDurationMs = monthDays * 8 * 60 * 60 * 1000;
+  const monthDurationMs = month.end.getTime() - month.start.getTime();
   const rangeDurationMs = window === "5h"
     ? 5 * 60 * 60 * 1000
-    : 7 * 8 * 60 * 60 * 1000;
+    : 7 * 24 * 60 * 60 * 1000;
 
   if (monthDurationMs <= 0 || rangeDurationMs <= 0) return null;
 
@@ -192,10 +192,15 @@ export function syntheticBudgetWindow(
 
   return {
     provider,
+    windowId: `${provider}-budget-${window}`,
     window,
     label: window,
+    scope: "reporting",
+    limit: windowBudget,
+    used: cost,
     sourceType: "local",
     confidence: "estimated",
+    costKind: "estimated",
     usedPercent: (cost / windowBudget) * 100,
     remainingPercent: Math.max(100 - (cost / windowBudget) * 100, 0),
     resetAt: new Date(budgetRange.end).toISOString(),
