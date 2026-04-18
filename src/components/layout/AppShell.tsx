@@ -174,6 +174,9 @@ export default function AppShell() {
     void loadTerminalSettings();
     void loadUsageSettings();
     void fetchUsageSnapshots();
+    const usageRefreshTimer = window.setTimeout(() => {
+      void fetchUsageSnapshots();
+    }, 3000);
     void refreshUsageData();
     void initNotifications();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
@@ -190,7 +193,10 @@ export default function AppShell() {
         );
       }
     }, 3000);
-    return () => window.clearTimeout(updateTimer);
+    return () => {
+      window.clearTimeout(updateTimer);
+      window.clearTimeout(usageRefreshTimer);
+    };
   }, [fetchRepos, fetchGroups, loadEditorSettings, loadTerminalSettings, loadUsageSettings, fetchUsageSnapshots, pushNotice]);
 
   useEffect(() => {

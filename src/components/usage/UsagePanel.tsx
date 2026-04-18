@@ -6,7 +6,10 @@ import type {
   UsageCost,
   UsageBreakdownItem,
   UsageOverview,
+  UsageProvider,
   UsageTrendBucket,
+  UsageSettings,
+  ProviderUsageSnapshot,
 } from "../../lib/types";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { useUsageStore, type TimeWindow } from "../../stores/useUsageStore";
@@ -23,8 +26,8 @@ import {
   getProviderLabel,
   computePace,
   paceLabel,
+  type PaceStatus,
 } from "./usageHelpers";
-import type { UsageSettings, ProviderUsageSnapshot } from "../../lib/types";
 
 const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
   { key: "5h", label: "5 hour" },
@@ -485,7 +488,7 @@ function UtilizationSection({
 }) {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const nextMonth = new Date(now.getFullYear(), now.getMonth + 1, 1);
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const elapsedMonthPct = Math.min(Math.max(((now.getTime() - monthStart.getTime()) / (nextMonth.getTime() - monthStart.getTime())) * 100, 0), 100);
 
   // 1. Collect and standardize all items
