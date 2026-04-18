@@ -15,6 +15,7 @@ import {
   formatTokenCount,
   getProviderLabel,
   paceLabel,
+  syntheticBudgetWindow,
   type PaceStatus,
 } from "../usage/usageHelpers";
 import type { UsageProvider, UsageSettings, ProviderUsageSnapshot } from "../../lib/types";
@@ -60,15 +61,14 @@ function sidebarProviderWindows(provider: UsageProvider, snap: ProviderUsageSnap
   return pro ? [pro] : windows;
 }
 
-function currentMonthElapsedPct(now: Date): number {
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return Math.min(Math.max(((now.getTime() - monthStart.getTime()) / (nextMonth.getTime() - monthStart.getTime())) * 100, 0), 100);
-}
-
 function windowTokenTotal(snap: ProviderUsageSnapshot, window: SidebarWindow): number {
   if (!snap.localDetails) return 0;
   return window === "5h" ? snap.localDetails.tokens5h : snap.localDetails.tokens7d;
+}
+
+function windowCostTotal(snap: ProviderUsageSnapshot, window: SidebarWindow): number | null {
+  if (!snap.localDetails) return null;
+  return window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d;
 }
 
 function buildUtilizationItems(
@@ -76,30 +76,29 @@ function buildUtilizationItems(
   settings: UsageSettings,
   window: SidebarWindow,
 ): SidebarUtilizationItem[] {
-  const now = new Date();
-  const elapsedMonthPct = currentMonthElapsedPct(now);
   const items: SidebarUtilizationItem[] = [];
 
   ALL_USAGE_PROVIDERS.forEach((provider) => {
     const config = settings[provider];
     const snap = snapshots[provider];
-    if (!config.show || config.budgetMode !== "custom" || config.monthlyBudget == null || config.monthlyBudget <= 0 || !snap?.localDetails?.costMonth) return;
+    if (!config.show || config.budgetMode !== "custom" || config.monthlyBudget == null || config.monthlyBudget <= 0 || !snap?.localDetails) return;
 
     const budget = config.monthlyBudget;
-    const currentMonthCost = snap.localDetails.costMonth;
-    const usedPct = (currentMonthCost / budget) * 100;
+    const periodCost = windowCostTotal(snap, window);
+    const budgetWindow = syntheticBudgetWindow(provider, window, periodCost, budget);
+    if (!budgetWindow || budgetWindow.usedPercent == null || budgetWindow.limit == null || budgetWindow.used == null) return;
+
+    const pace = computePace(budgetWindow);
     const tokens = windowTokenTotal(snap, window);
-    const delta = usedPct - elapsedMonthPct;
-    const paceStatus: PaceStatus = delta <= -10 ? "under" : delta >= 10 ? "over" : "on";
 
     items.push({
       id: `budget-${provider}`,
       provider,
-      label: "Monthly Budget",
-      pct: usedPct,
+      label: `${window} Budget`,
+      pct: budgetWindow.usedPercent,
       tokens,
-      sublabel: `${formatCost(currentMonthCost)} spent of ${formatCost(budget)}`,
-      pace: { status: paceStatus, elapsedPct: elapsedMonthPct },
+      sublabel: `${formatCost(budgetWindow.used)} spent of ${formatCost(budgetWindow.limit)}`,
+      pace,
     });
   });
 

@@ -180,11 +180,10 @@ export function syntheticBudgetWindow(
   const now = new Date();
   const month = currentMonthRange(now);
   const budgetRange = window === "5h" ? currentFiveHourBlock(now) : currentSevenDayBlock(now);
-  const monthDays = Math.max(Math.round((month.end.getTime() - month.start.getTime()) / (24 * 60 * 60 * 1000)), 1);
-  const monthDurationMs = monthDays * 8 * 60 * 60 * 1000;
+  const monthDurationMs = month.end.getTime() - month.start.getTime();
   const rangeDurationMs = window === "5h"
     ? 5 * 60 * 60 * 1000
-    : 7 * 8 * 60 * 60 * 1000;
+    : 7 * 24 * 60 * 60 * 1000;
 
   if (monthDurationMs <= 0 || rangeDurationMs <= 0) return null;
 
