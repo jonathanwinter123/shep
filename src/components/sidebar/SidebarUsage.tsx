@@ -124,6 +124,38 @@ function buildUtilizationItems(
       });
   });
 
+  // Show providers with show=true even if $0/no activity
+  const seenProviders = new Set(items.map((i) => i.provider));
+  ALL_USAGE_PROVIDERS.forEach((provider) => {
+    const config = settings[provider];
+    if (!config.show || seenProviders.has(provider)) return;
+    const snap = snapshots[provider];
+    const cost = snap?.localDetails ? ((window === "5h" ? snap.localDetails.cost5h : snap.localDetails.cost7d) ?? 0) : 0;
+    const tokens = snap?.localDetails ? (window === "5h" ? snap.localDetails.tokens5h : snap.localDetails.tokens7d) : 0;
+
+    if (config.budgetMode === "custom" && config.monthlyBudget != null && config.monthlyBudget > 0) {
+      items.push({
+        id: `budget-${provider}`,
+        provider,
+        label: `${window} Budget`,
+        pct: 0,
+        tokens,
+        sublabel: `${formatCost(cost)} spent of ${formatCost(config.monthlyBudget)}`,
+        pace: null,
+      });
+    } else {
+      items.push({
+        id: `cost-${provider}`,
+        provider,
+        label: `${window} Cost`,
+        pct: 0,
+        tokens,
+        sublabel: formatCost(cost),
+        pace: null,
+      });
+    }
+  });
+
   return items.sort((a, b) => b.tokens - a.tokens || b.pct - a.pct);
 }
 
