@@ -99,10 +99,15 @@ fn claude_window(window: &str, value: &Value) -> UsageWindowSnapshot {
     let used = value.get("utilization").and_then(Value::as_f64);
     UsageWindowSnapshot {
         provider: "claude".to_string(),
+        window_id: format!("claude-{window}"),
         window: window.to_string(),
         label: window.replace('_', " "),
+        scope: if window == "5h" { "session" } else { "plan" }.to_string(),
+        limit: Some(100.0),
+        used,
         source_type: "provider".to_string(),
         confidence: "official".to_string(),
+        cost_kind: "included".to_string(),
         used_percent: used,
         remaining_percent: used.map(|v| (100.0 - v).max(0.0)),
         reset_at: value.get("resets_at").and_then(Value::as_str).map(ToString::to_string),
@@ -115,10 +120,15 @@ fn percent_window(provider: &str, label: &str, value: &Value) -> UsageWindowSnap
     let used = value.get("used_percent").and_then(Value::as_f64);
     UsageWindowSnapshot {
         provider: provider.to_string(),
+        window_id: format!("{provider}-{label}"),
         window: label.to_string(),
         label: label.to_string(),
+        scope: if label == "5h" { "session" } else { "plan" }.to_string(),
+        limit: Some(100.0),
+        used,
         source_type: "provider".to_string(),
         confidence: "official".to_string(),
+        cost_kind: "included".to_string(),
         used_percent: used,
         remaining_percent: used.map(|v| (100.0 - v).max(0.0)),
         reset_at: value.get("reset_at").map(|v| v.to_string()),
@@ -343,10 +353,15 @@ fn gemini_buckets_to_windows(buckets: &[GeminiQuotaBucket]) -> Result<Vec<UsageW
         let used_pct = ((1.0 - remaining) * 100.0).max(0.0);
         UsageWindowSnapshot {
             provider: "gemini".to_string(),
+            window_id: format!("gemini-24h-{tier}"),
             window: format!("24h_{tier}"),
             label: format!("24h {tier}"),
+            scope: "plan".to_string(),
+            limit: Some(100.0),
+            used: Some(used_pct),
             source_type: "provider".to_string(),
             confidence: "official".to_string(),
+            cost_kind: "included".to_string(),
             used_percent: Some(used_pct),
             remaining_percent: Some((remaining * 100.0).max(0.0)),
             reset_at: reset.clone(),

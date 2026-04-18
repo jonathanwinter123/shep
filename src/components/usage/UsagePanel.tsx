@@ -3,6 +3,7 @@ import { RefreshCcw } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { getUsageOverview, refreshUsageData } from "../../lib/tauri";
 import type {
+  UsageCost,
   UsageBreakdownItem,
   UsageOverview,
   UsageTrendBucket,
@@ -23,7 +24,7 @@ import {
   computePace,
   paceLabel,
 } from "./usageHelpers";
-import type { UsageSettings, ProviderUsageSnapshot, UsageWindowSnapshot } from "../../lib/types";
+import type { UsageSettings, ProviderUsageSnapshot } from "../../lib/types";
 
 const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
   { key: "5h", label: "5 hour" },
@@ -34,6 +35,28 @@ const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
 
 function presentCost(value: number | null): string {
   return value != null ? formatCost(value) : "—";
+}
+
+function costKindLabel(costDetail: UsageCost): string {
+  switch (costDetail.kind) {
+    case "recorded":
+      return "Recorded";
+    case "estimated":
+      return "List-price";
+    case "included":
+      return "Included";
+    case "free":
+      return "Free";
+    case "mixed":
+      return "Mixed";
+    case "unknown":
+      return "Unknown";
+  }
+}
+
+function costKindMeta(costDetail: UsageCost): string {
+  const label = costKindLabel(costDetail);
+  return costDetail.confidence === "official" ? `${label} · official` : label;
 }
 
 function formatHourLabel(date: Date): string {
@@ -316,8 +339,8 @@ function Sparkline({
 }: {
   values: number[];
 }) {
-  const width = 96;
-  const height = 26;
+  const width = 110;
+  const height = 22;
   const max = Math.max(...values, 1);
   const points = values.map((value, index) => {
     const x = values.length === 1 ? width : (index / (values.length - 1)) * width;
@@ -330,12 +353,63 @@ function Sparkline({
       <polyline
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.5"
         strokeLinejoin="round"
         strokeLinecap="round"
         points={points}
       />
     </svg>
+  );
+}
+
+function UsageListHeader({
+  title = "Name",
+  withSparklines = false,
+}: {
+  title?: string;
+  withSparklines?: boolean;
+}) {
+  return (
+    <div className="usage-list__row usage-list__row--header" aria-hidden="true">
+      <div className="usage-list__heading">{title}</div>
+      <div className="usage-list__values">
+        <div className="usage-list__col-trend">
+          {withSparklines && <span className="usage-list__heading">Trend</span>}
+        </div>
+        <span className="usage-list__heading usage-list__col-metric">Est. Cost</span>
+        <span className="usage-list__heading usage-list__col-metric">Input</span>
+        <span className="usage-list__heading usage-list__col-metric">Output</span>
+        <span className="usage-list__heading usage-list__col-metric">Cache</span>
+        <span className="usage-list__heading usage-list__col-total">Total</span>
+      </div>
+    </div>
+  );
+}
+
+function TokenMetricColumns({
+  cost,
+  input,
+  output,
+  cacheRead,
+  cacheWrite,
+  total,
+}: {
+  cost: number | null;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  total: number;
+}) {
+  const cache = cacheRead + cacheWrite;
+  return (
+    <>
+      <span className="usage-list__metric usage-list__col-metric">{presentCost(cost)}</span>
+      <span className="usage-list__metric usage-list__col-metric">{formatTokenCount(input)}</span>
+      <span className="usage-list__metric usage-list__col-metric">{formatTokenCount(output)}</span>
+      <span className="usage-list__metric usage-list__col-metric">{formatTokenCount(cache)}</span>
+      <strong className="usage-list__metric usage-list__metric--primary usage-list__col-total">{formatTokenCount(total)}</strong>
+    </>
   );
 }
 
@@ -352,30 +426,37 @@ function BreakdownList({
   showSessions?: boolean;
   withSparklines?: boolean;
 }) {
+  const sortedItems = [...items].sort((a, b) => b.tokens - a.tokens);
+  const headerTitle = title.endsWith(" Breakdown") ? title.replace(" Breakdown", "") : title;
+  const singularTitle = headerTitle.endsWith("s") ? headerTitle.slice(0, -1) : headerTitle;
+
   return (
     <section className="usage-section">
-      <div className="usage-section__header">
-        <h3 className="section-label !p-0">{title}</h3>
-      </div>
-      {items.length > 0 ? (
+      {sortedItems.length > 0 ? (
         <div className="usage-list">
-          {items.map((item) => (
+          <UsageListHeader title={singularTitle} withSparklines={withSparklines} />
+          {sortedItems.map((item) => (
             <div key={`${item.provider}-${item.label}`} className="usage-list__row">
               <div className="usage-list__info">
                 <span className="usage-list__label">{item.label}</span>
                 <span className="usage-list__meta">
                   {getProviderLabel(item.provider)}
                   {showSessions && item.sessions != null ? ` • ${item.sessions} sessions` : ""}
+                  {` • ${costKindMeta(item.costDetail)}`}
                 </span>
               </div>
               <div className="usage-list__values">
-                {withSparklines && (
-                  <div className="usage-list__sparkline-wrap">
-                    <Sparkline values={item.trend} />
-                  </div>
-                )}
-                <span className="usage-list__metric">{presentCost(item.cost)}</span>
-                <strong className="usage-list__metric usage-list__metric--primary">{formatTokenCount(item.tokens)}</strong>
+                <div className="usage-list__col-trend">
+                  {withSparklines && <Sparkline values={item.trend} />}
+                </div>
+                <TokenMetricColumns
+                  cost={item.cost}
+                  input={item.tokensInput}
+                  output={item.tokensOutput}
+                  cacheRead={item.tokensCacheRead}
+                  cacheWrite={item.tokensCacheWrite}
+                  total={item.tokens}
+                />
               </div>
             </div>
           ))}
@@ -393,171 +474,140 @@ const PACE_LABEL_COLORS: Record<string, string> = {
   over: "rgba(248, 113, 113, 0.8)",
 };
 
-function CustomBudgets({ snapshots, settings }: { snapshots: Record<string, ProviderUsageSnapshot>; settings: UsageSettings }) {
-  const budgetProviders = ALL_USAGE_PROVIDERS.filter((p) => {
-    const config = settings[p];
-    if (!config.show || config.budgetMode !== "custom" || config.monthlyBudget == null || config.monthlyBudget <= 0) return false;
-    const snap = snapshots[p];
-    return snap?.localDetails?.costMonth != null;
-  });
-
-  if (budgetProviders.length === 0) return null;
-
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const elapsedPct = Math.min(Math.max(((now.getTime() - monthStart.getTime()) / (nextMonth.getTime() - monthStart.getTime())) * 100, 0), 100);
-
-  return (
-    <>
-      <hr className="settings-divider" />
-      <section className="usage-section">
-        <div className="usage-section__header">
-          <h3 className="section-label !p-0">Monthly Budgets</h3>
-          <span className="usage-section__hint">Current month</span>
-        </div>
-        <div className="usage-limits">
-          {budgetProviders.map((provider) => {
-            const config = settings[provider];
-            const budget = config.monthlyBudget!;
-            const snap = snapshots[provider]!;
-            const currentMonthCost = snap.localDetails!.costMonth!;
-            const usedPct = Math.min((currentMonthCost / budget) * 100, 999);
-            const delta = usedPct - elapsedPct;
-            const paceStatus = delta <= -10 ? "under" : delta >= 10 ? "over" : "on";
-            const tone = barTone({ status: paceStatus, elapsedPct }, usedPct);
-            const logoSrc = assistantLogoSrc[provider];
-
-            return (
-              <div key={provider} className="usage-limit">
-                <div className="usage-limit__header">
-                  <span className="usage-limit__provider">
-                    {logoSrc && <img src={logoSrc} alt="" className={`usage-list__icon ${getAssistantLogoClass(provider) ?? ""}`} />}
-                    {getProviderLabel(provider)}
-                  </span>
-                  <span className="usage-limit__pct">{formatPercent(usedPct)} of budget</span>
-                </div>
-                <div className="usage-limit__bar">
-                  <div className="usage-limit__bar-track" style={{ background: TONE_TRACK[tone] }} />
-                  <div
-                    className="usage-limit__bar-fill"
-                    style={{
-                      width: `${Math.min(usedPct, 100)}%`,
-                      background: TONE_COLORS[tone],
-                    }}
-                  />
-                  <div
-                    className="usage-limit__bar-pace"
-                    style={{ left: `${Math.min(elapsedPct, 100)}%` }}
-                  />
-                </div>
-                <div className="usage-limit__meta">
-                  <span>{presentCost(currentMonthCost)} spent of {presentCost(budget)}</span>
-                  <span style={{ color: PACE_LABEL_COLORS[paceStatus] }}>{paceLabel(paceStatus)}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-    </>
-  );
-}
-
-function ProviderLimits({
+function UtilizationSection({
   snapshots,
+  settings,
   window,
 }: {
   snapshots: Record<string, ProviderUsageSnapshot>;
+  settings: UsageSettings;
   window: TimeWindow;
 }) {
-  if (window !== "5h" && window !== "7d") return null;
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonth = new Date(now.getFullYear(), now.getMonth + 1, 1);
+  const elapsedMonthPct = Math.min(Math.max(((now.getTime() - monthStart.getTime()) / (nextMonth.getTime() - monthStart.getTime())) * 100, 0), 100);
 
-  const providers = ALL_USAGE_PROVIDERS.filter((p) => {
+  // 1. Collect and standardize all items
+  const items: Array<{
+    id: string;
+    provider: UsageProvider;
+    label: string;
+    pct: number;
+    sublabel: string;
+    pace: { status: PaceStatus; elapsedPct: number } | null;
+    meta?: string;
+  }> = [];
+
+  // Add Budgets
+  ALL_USAGE_PROVIDERS.forEach((p) => {
+    const config = settings[p];
     const snap = snapshots[p];
-    if (!snap) return false;
-    // Rate Limits only shows providers with actual provider API data, not synthetic budget windows
-    const w = snap.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null && sw.sourceType === "provider")
-      ?? snap.summaryWindows.find((sw) => sw.window.startsWith("24h_") && sw.usedPercent != null && sw.sourceType === "provider");
-    return w?.usedPercent != null;
+    if (!config.show || config.budgetMode !== "custom" || config.monthlyBudget == null || config.monthlyBudget <= 0 || !snap?.localDetails?.costMonth) return;
+
+    const budget = config.monthlyBudget;
+    const currentMonthCost = snap.localDetails.costMonth;
+    const usedPct = (currentMonthCost / budget) * 100;
+    const delta = usedPct - elapsedMonthPct;
+    const paceStatus: PaceStatus = delta <= -10 ? "under" : delta >= 10 ? "over" : "on";
+
+    items.push({
+      id: `budget-${p}`,
+      provider: p,
+      label: "Monthly Budget",
+      pct: usedPct,
+      sublabel: `${presentCost(currentMonthCost)} spent of ${presentCost(budget)}`,
+      pace: { status: paceStatus, elapsedPct: elapsedMonthPct },
+    });
   });
 
-  if (providers.length === 0) return null;
+  // Add Subscription Windows
+  if (window === "5h" || window === "7d") {
+    ALL_USAGE_PROVIDERS.forEach((provider) => {
+      const snap = snapshots[provider];
+      if (!snap) return;
+      snap.summaryWindows
+        .filter((sw) => sw.usedPercent != null && sw.sourceType === "provider")
+        .filter((sw) => sw.window === window || sw.window.startsWith("24h_"))
+        .forEach((w) => {
+          const pace = computePace(w);
+          items.push({
+            id: w.windowId,
+            provider,
+            label: w.window.startsWith("24h_") ? w.label : `${w.label} limit`,
+            pct: w.usedPercent!,
+            sublabel: w.remainingPercent != null ? `${formatPercent(w.remainingPercent)} remaining` : "",
+            pace,
+            meta: w.resetAt ? `resets in ${formatReset(w.resetAt)}` : undefined,
+          });
+        });
+    });
+  }
+
+  if (items.length === 0) return null;
+
+  // 2. Sort by utilization percentage descending
+  const sortedItems = [...items].sort((a, b) => b.pct - a.pct);
 
   return (
-    <>
-    <hr className="settings-divider" />
-    <section className="usage-section">
-      <div className="usage-section__header">
-        <h3 className="section-label !p-0">Rate Limits</h3>
-        <span className="usage-section__hint">{window} window</span>
+    <div className="usage-limits">
+      <div className="usage-section__header !mb-4">
+        <h3 className="section-label !p-0">Utilization</h3>
       </div>
-      <div className="usage-limits">
-        {providers.map((provider) => {
-          const snap = snapshots[provider]!;
-          const w = (snap.summaryWindows.find((sw) => sw.window === window && sw.usedPercent != null && sw.sourceType === "provider")
-            ?? snap.summaryWindows.find((sw) => sw.window.startsWith("24h_") && sw.usedPercent != null && sw.sourceType === "provider")) as UsageWindowSnapshot;
-          const pct = w.usedPercent ?? 0;
-          const remaining = w.remainingPercent;
-          const pace = computePace(w);
-          const tone = barTone(pace, w.usedPercent);
-          const logoSrc = assistantLogoSrc[provider];
+      {sortedItems.map((item) => {
+        const tone = barTone(item.pace, item.pct);
+        const logoSrc = assistantLogoSrc[item.provider];
 
-          return (
-            <div key={provider} className="usage-limit">
-              <div className="usage-limit__header">
-                <span className="usage-limit__provider">
-                  {logoSrc ? <img src={logoSrc} alt="" className={`usage-list__icon ${getAssistantLogoClass(provider) ?? ""}`} /> : null}
-                  {getProviderLabel(provider)}
-                </span>
-                <span className="usage-limit__pct">{formatPercent(pct)} used</span>
-              </div>
-              <div className="usage-limit__bar">
-                <div
-                  className="usage-limit__bar-track"
-                  style={{ background: TONE_TRACK[tone] }}
-                />
-                <div
-                  className="usage-limit__bar-fill"
-                  style={{
-                    width: `${Math.min(pct, 100)}%`,
-                    background: TONE_COLORS[tone],
-                  }}
-                />
-                {pace && pct > 0 && (
-                  <div
-                    className="usage-limit__bar-pace"
-                    style={{ left: `${Math.min(pace.elapsedPct, 100)}%` }}
-                  />
-                )}
-              </div>
-              <div className="usage-limit__meta">
-                {remaining != null && (
-                  <span>{formatPercent(remaining)} remaining</span>
-                )}
-                {pace && (
-                  <span style={{ color: PACE_LABEL_COLORS[pace.status] }}>
-                    {paceLabel(pace.status)}
-                  </span>
-                )}
-                {w.resetAt && (
-                  <span>resets in {formatReset(w.resetAt)}</span>
-                )}
-              </div>
+        return (
+          <div key={item.id} className="usage-limit">
+            <div className="usage-limit__header">
+              <span className="usage-limit__provider">
+                {logoSrc && <img src={logoSrc} alt="" className={`usage-list__icon ${getAssistantLogoClass(item.provider) ?? ""}`} />}
+                {getProviderLabel(item.provider)} · {item.label}
+              </span>
+              <span className="usage-limit__pct">{formatPercent(item.pct)}</span>
             </div>
-          );
-        })}
-      </div>
-    </section>
-    </>
+            <div className="usage-limit__bar">
+              <div className="usage-limit__bar-track" style={{ background: TONE_TRACK[tone] }} />
+              <div
+                className="usage-limit__bar-fill"
+                style={{
+                  width: `${Math.min(item.pct, 100)}%`,
+                  background: TONE_COLORS[tone],
+                }}
+              />
+              {item.pace && (
+                <div
+                  className="usage-limit__bar-pace"
+                  style={{ left: `${Math.min(item.pace.elapsedPct, 100)}%` }}
+                />
+              )}
+            </div>
+            <div className="usage-limit__meta">
+              <span>{item.sublabel}</span>
+              {item.pace && (
+                <span style={{ color: PACE_LABEL_COLORS[item.pace.status] }}>{paceLabel(item.pace.status)}</span>
+              )}
+              {item.meta && <span>{item.meta}</span>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
-
 function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snapshots: Record<string, ProviderUsageSnapshot> }) {
   const usageSettings = useUsageSettingsStore((s) => s.settings);
   const chart = overview.window === "30d" || overview.window === "365d"
     ? <ActivityHeatmap trend={overview.trend} window={overview.window as TimeWindow} />
     : <ActivityBarChart trend={overview.trend} window={overview.window as TimeWindow} />;
+
+  // Sort providers by tokens descending
+  const sortedProviders = [...overview.providers].sort((a, b) => b.tokens - a.tokens);
+
+  const totalInput = overview.providers.reduce((sum, p) => sum + p.tokensInput, 0);
+  const totalOutput = overview.providers.reduce((sum, p) => sum + p.tokensOutput, 0);
+  const totalCache = overview.providers.reduce((sum, p) => sum + p.tokensCacheRead + p.tokensCacheWrite, 0);
 
   return (
     <>
@@ -568,10 +618,11 @@ function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snaps
         <div className="usage-activity">
           <div className="usage-activity__summary">
             <div className="usage-stats">
-              <Stat label="Total Tokens" value={formatTokenCount(overview.totalTokens)} />
-              <Stat label="Estimated Cost" value={presentCost(overview.totalCost)} />
-              <Stat label="Active Projects" value={`${overview.activeProjects}`} />
-              <Stat label="Active Sessions" value={`${overview.activeSessions}`} />
+              <Stat label="Est. Cost" value={presentCost(overview.totalCost)} meta={costKindMeta(overview.totalCostDetail)} />
+              <Stat label="Input" value={formatTokenCount(totalInput)} />
+              <Stat label="Output" value={formatTokenCount(totalOutput)} />
+              <Stat label="Cache" value={formatTokenCount(totalCache)} />
+              <Stat label="Total" value={formatTokenCount(overview.totalTokens)} />
             </div>
           </div>
           <div className="usage-activity__chart">
@@ -580,14 +631,10 @@ function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snaps
         </div>
       </section>
 
-      <hr className="settings-divider" />
-
       <section className="usage-section">
-        <div className="usage-section__header">
-          <h3 className="section-label !p-0">Providers</h3>
-        </div>
         <div className="usage-list">
-          {overview.providers.map((provider) => {
+          <UsageListHeader title="Provider" withSparklines />
+          {sortedProviders.map((provider) => {
             const logoSrc = assistantLogoSrc[provider.provider];
             return (
               <div key={provider.provider} className="usage-list__row">
@@ -596,14 +643,22 @@ function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snaps
                     {logoSrc ? <img src={logoSrc} alt="" className={`usage-list__icon ${getAssistantLogoClass(provider.provider) ?? ""}`} /> : null}
                     {getProviderLabel(provider.provider)}
                   </span>
-                  <span className="usage-list__meta">{formatPercent(provider.sharePercent)} of total</span>
+                  <span className="usage-list__meta">
+                    {formatPercent(provider.sharePercent)} of total • {costKindMeta(provider.costDetail)}
+                  </span>
                 </div>
                 <div className="usage-list__values">
-                  <div className="usage-list__sparkline-wrap">
+                  <div className="usage-list__col-trend">
                     <Sparkline values={provider.trend} />
                   </div>
-                  <span className="usage-list__metric">{presentCost(provider.cost)}</span>
-                  <strong className="usage-list__metric usage-list__metric--primary">{formatTokenCount(provider.tokens)}</strong>
+                  <TokenMetricColumns
+                    cost={provider.cost}
+                    input={provider.tokensInput}
+                    output={provider.tokensOutput}
+                    cacheRead={provider.tokensCacheRead}
+                    cacheWrite={provider.tokensCacheWrite}
+                    total={provider.tokens}
+                  />
                 </div>
               </div>
             );
@@ -611,26 +666,20 @@ function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snaps
         </div>
       </section>
 
-      <CustomBudgets
-        snapshots={snapshots}
-        settings={usageSettings}
-      />
-
-      <ProviderLimits
-        snapshots={snapshots}
-        window={overview.window as TimeWindow}
-      />
-
-      <hr className="settings-divider" />
+      <section className="usage-section">
+        <UtilizationSection
+          snapshots={snapshots}
+          settings={usageSettings}
+          window={overview.window as TimeWindow}
+        />
+      </section>
 
       <BreakdownList
-        title="Tool Breakdown"
+        title="Model Breakdown"
         emptyLabel="No model activity yet for this window."
         items={overview.topModels}
         withSparklines
       />
-
-      <hr className="settings-divider" />
 
       <BreakdownList
         title="Project Breakdown"
@@ -639,8 +688,6 @@ function OverviewPanel({ overview, snapshots }: { overview: UsageOverview; snaps
         showSessions
         withSparklines
       />
-
-      <hr className="settings-divider" />
 
       <section className="usage-section">
         <div className="usage-section__header">

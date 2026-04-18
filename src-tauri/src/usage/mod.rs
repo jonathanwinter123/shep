@@ -6,7 +6,7 @@ mod queries;
 pub mod types;
 
 pub use db::UsageDb;
-pub use types::{LocalUsageDetails, ProviderUsageSnapshot, UsageOverview};
+pub use types::{LocalUsageDetails, ProviderUsageSnapshot, UsageOverview, UsageProjectAliasReviewItem};
 
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -152,6 +152,11 @@ pub fn get_usage_overview(db: &UsageDb, window: &str) -> Result<UsageOverview, S
         .ok_or_else(|| format!("Unsupported usage overview window: {window}"))
 }
 
+pub fn get_project_alias_review_queue(db: &UsageDb) -> Vec<UsageProjectAliasReviewItem> {
+    let conn = db.conn.lock().unwrap();
+    queries::project_alias_review_queue(&conn)
+}
+
 /// Run background ingestion in a loop until fully caught up.
 /// Processes a small batch per cycle and releases the DB lock between cycles
 /// so UI queries (usage snapshots, etc.) aren't starved.
@@ -282,10 +287,15 @@ fn codex_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
     if let Some(ref details) = local {
         summary_windows.push(UsageWindowSnapshot {
             provider: "codex".to_string(),
+            window_id: "codex-local-30d".to_string(),
             window: "30d".to_string(),
             label: "30d".to_string(),
+            scope: "reporting".to_string(),
+            limit: None,
+            used: None,
             source_type: "local".to_string(),
             confidence: "observed".to_string(),
+            cost_kind: "estimated".to_string(),
             used_percent: None,
             remaining_percent: None,
             reset_at: None,
@@ -327,10 +337,15 @@ fn claude_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
     if let Some(ref details) = local {
         summary_windows.push(UsageWindowSnapshot {
             provider: "claude".to_string(),
+            window_id: "claude-local-30d".to_string(),
             window: "30d".to_string(),
             label: "30d".to_string(),
+            scope: "reporting".to_string(),
+            limit: None,
+            used: None,
             source_type: "local".to_string(),
             confidence: "observed".to_string(),
+            cost_kind: "estimated".to_string(),
             used_percent: None,
             remaining_percent: None,
             reset_at: None,
@@ -371,10 +386,15 @@ fn gemini_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
         for (window, tokens) in [("5h", details.tokens_5h), ("7d", details.tokens_7d), ("30d", details.tokens_30d)] {
             summary_windows.push(UsageWindowSnapshot {
                 provider: "gemini".to_string(),
+                window_id: format!("gemini-local-{window}"),
                 window: window.to_string(),
                 label: window.to_string(),
+                scope: "reporting".to_string(),
+                limit: None,
+                used: None,
                 source_type: "local".to_string(),
                 confidence: "observed".to_string(),
+                cost_kind: "estimated".to_string(),
                 used_percent: None,
                 remaining_percent: None,
                 reset_at: None,
@@ -404,10 +424,15 @@ fn opencode_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
         for (window, tokens) in [("5h", details.tokens_5h), ("7d", details.tokens_7d), ("30d", details.tokens_30d)] {
             summary_windows.push(UsageWindowSnapshot {
                 provider: "opencode".to_string(),
+                window_id: format!("opencode-local-{window}"),
                 window: window.to_string(),
                 label: window.to_string(),
+                scope: "reporting".to_string(),
+                limit: None,
+                used: None,
                 source_type: "local".to_string(),
                 confidence: "observed".to_string(),
+                cost_kind: "mixed".to_string(),
                 used_percent: None,
                 remaining_percent: None,
                 reset_at: None,
@@ -437,10 +462,15 @@ fn pi_snapshot(conn: &rusqlite::Connection) -> ProviderUsageSnapshot {
         for (window, tokens) in [("5h", details.tokens_5h), ("7d", details.tokens_7d), ("30d", details.tokens_30d)] {
             summary_windows.push(UsageWindowSnapshot {
                 provider: "pi".to_string(),
+                window_id: format!("pi-local-{window}"),
                 window: window.to_string(),
                 label: window.to_string(),
+                scope: "reporting".to_string(),
+                limit: None,
+                used: None,
                 source_type: "local".to_string(),
                 confidence: "observed".to_string(),
+                cost_kind: "mixed".to_string(),
                 used_percent: None,
                 remaining_percent: None,
                 reset_at: None,

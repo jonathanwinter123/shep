@@ -49,7 +49,7 @@ export function formatPercent(value: number | null): string {
 
 export function formatTokenCount(value: number | null): string {
   if (value == null) return "n/a";
-  if (value >= 1_000_000_000) return `${Math.round(value / 1_000_000_000)}B`;
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
   if (value >= 100_000_000) return `${Math.round(value / 1_000_000)}M`;
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `${Math.round(value / 1_000)}K`;
@@ -58,8 +58,7 @@ export function formatTokenCount(value: number | null): string {
 
 export function formatCost(value: number | null): string {
   if (value == null) return "";
-  if (value >= 1_000) return `$${Math.round(value / 1_000)}K`;
-  if (value >= 100) return `$${Math.round(value)}`;
+  if (value >= 100) return `$${Math.round(value).toLocaleString()}`;
   if (value >= 0.01) return `$${value.toFixed(2)}`;
   if (value > 0) return "<$0.01";
   return "$0";
@@ -194,10 +193,15 @@ export function syntheticBudgetWindow(
 
   return {
     provider,
+    windowId: `${provider}-budget-${window}`,
     window,
     label: window,
+    scope: "reporting",
+    limit: windowBudget,
+    used: cost,
     sourceType: "local",
     confidence: "estimated",
+    costKind: "estimated",
     usedPercent: (cost / windowBudget) * 100,
     remainingPercent: Math.max(100 - (cost / windowBudget) * 100, 0),
     resetAt: new Date(budgetRange.end).toISOString(),

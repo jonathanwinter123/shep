@@ -10,7 +10,9 @@ use crate::git;
 use crate::git::{ChangedFile, CreatedWorktree, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::{PtyColorTheme, PtyOutput};
-use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
+use crate::usage::{
+    LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview, UsageProjectAliasReviewItem,
+};
 use crate::watcher::GitWatcher;
 use crate::workspace::config::{
     normalize_terminal_settings, EditorSettings, GroupEntry, KeybindingSettings, ProjectSettings,
@@ -504,6 +506,13 @@ pub async fn get_usage_details(db: State<'_, UsageDb>, provider: String, window:
 #[tauri::command]
 pub async fn get_usage_overview(db: State<'_, UsageDb>, window: String) -> Result<UsageOverview, String> {
     crate::usage::get_usage_overview(&db, &window)
+}
+
+#[tauri::command]
+pub async fn get_project_alias_review_queue(
+    db: State<'_, UsageDb>,
+) -> Result<Vec<UsageProjectAliasReviewItem>, String> {
+    Ok(crate::usage::get_project_alias_review_queue(&db))
 }
 
 #[tauri::command]

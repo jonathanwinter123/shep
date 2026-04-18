@@ -135,6 +135,7 @@ pub fn run() {
             commands::get_usage_snapshot,
             commands::get_usage_details,
             commands::get_usage_overview,
+            commands::get_project_alias_review_queue,
             commands::refresh_usage_data,
             commands::get_memory_stats,
             commands::watch_repo,
