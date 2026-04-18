@@ -749,8 +749,25 @@ export default function UsagePanel() {
 
   return (
     <div className="absolute inset-0 overflow-y-auto py-6">
-      <div className="flex items-center justify-between mb-4 px-6">
-        <h2 className="section-label !p-0">Usage</h2>
+      <div className="usage-window-tabs-row">
+        <div className="usage-window-tabs">
+          {TIME_WINDOWS.map((timeWindow) => (
+            <button
+              key={timeWindow.key}
+              type="button"
+              className={`usage-window-tab ${window === timeWindow.key ? "usage-window-tab--active" : ""}`}
+              onClick={() => {
+                setWindow(timeWindow.key);
+                // fetchOverview depends on window via its useCallback dep —
+                // but the store hasn't flushed yet, so build a fresh fetcher inline.
+                setOverviewLoading(true);
+                getUsageOverview(timeWindow.key).then(setOverview).finally(() => setOverviewLoading(false));
+              }}
+            >
+              {timeWindow.label}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           className="icon-btn"
@@ -759,25 +776,6 @@ export default function UsagePanel() {
         >
           <RefreshCcw size={14} className={isBusy ? "animate-spin" : ""} />
         </button>
-      </div>
-
-      <div className="usage-window-tabs">
-        {TIME_WINDOWS.map((timeWindow) => (
-          <button
-            key={timeWindow.key}
-            type="button"
-            className={`usage-window-tab ${window === timeWindow.key ? "usage-window-tab--active" : ""}`}
-            onClick={() => {
-              setWindow(timeWindow.key);
-              // fetchOverview depends on window via its useCallback dep —
-              // but the store hasn't flushed yet, so build a fresh fetcher inline.
-              setOverviewLoading(true);
-              getUsageOverview(timeWindow.key).then(setOverview).finally(() => setOverviewLoading(false));
-            }}
-          >
-            {timeWindow.label}
-          </button>
-        ))}
       </div>
 
       <div className="usage-panel">
