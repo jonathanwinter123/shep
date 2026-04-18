@@ -748,8 +748,8 @@ export default function UsagePanel() {
   const isBusy = loading || overviewLoading;
 
   return (
-    <div className="absolute inset-0 overflow-y-auto p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="absolute inset-0 overflow-y-auto py-6">
+      <div className="flex items-center justify-between mb-4 px-6">
         <h2 className="section-label !p-0">Usage</h2>
         <button
           type="button"

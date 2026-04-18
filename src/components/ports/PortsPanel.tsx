@@ -88,8 +88,8 @@ export default function PortsPanel() {
   });
 
   return (
-    <div className="absolute inset-0 overflow-y-auto p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="absolute inset-0 overflow-y-auto py-6">
+      <div className="flex items-center justify-between mb-4 px-6">
         <h2 className="section-label !p-0">Ports</h2>
         <button
           className="icon-btn"
@@ -103,7 +103,7 @@ export default function PortsPanel() {
       </div>
 
       {error && (
-        <div className="text-sm mt-4 p-3 rounded-md" style={{ background: "rgba(255,80,80,0.1)", color: "var(--text-danger, #e55)" }}>
+        <div className="text-sm mx-6 mt-2 p-3 rounded-md" style={{ background: "rgba(255,80,80,0.1)", color: "var(--text-danger, #e55)" }}>
           <p className="font-medium mb-1">Scan error</p>
           <p className="opacity-70 font-mono text-xs">{error}</p>
         </div>
@@ -122,8 +122,8 @@ export default function PortsPanel() {
       )}
 
       {groupKeys.map((group) => (
-        <div key={group} className="mb-6">
-          <div className="flex items-center gap-1.5 mb-2 opacity-60">
+        <section key={group} className="settings-section">
+          <div className="flex items-center gap-1.5 settings-section__header opacity-60">
             <Folder size={12} />
             <span className="text-xs font-medium uppercase tracking-wide">{group}</span>
             <span className="text-xs opacity-50">({grouped[group].length})</span>
@@ -195,7 +195,7 @@ export default function PortsPanel() {
               </div>
             ))}
           </div>
-        </div>
+        </section>
       ))}
     </div>
   );

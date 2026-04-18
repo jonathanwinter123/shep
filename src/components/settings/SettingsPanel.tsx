@@ -230,481 +230,484 @@ export default function SettingsPanel() {
   };
 
   return (
-    <div className="absolute inset-0 overflow-y-auto p-6">
+    <div className="absolute inset-0 overflow-y-auto py-6">
       {/* ── Theme ──────────────────────────────────────────── */}
-      {/* ── Theme ──────────────────────────────────────────── */}
-      <h2 className="section-label !p-0 mb-4">Theme</h2>
+      <section className="settings-section">
+        <h2 className="section-label !p-0 settings-section__header">Theme</h2>
 
-      <div className="flex flex-wrap gap-3">
-        {[...DARK_THEMES, ...LIGHT_THEMES, ...TRANSPARENT_THEMES].map((t) => {
-          const active = t.id === themeId;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTheme(t.id)}
-              className={`${optionClass} ${active ? "selected" : ""}`}
-            >
-              <div
-                className="shrink-0 rounded-full"
-                style={{
-                  width: 24,
-                  height: 24,
-                  background: `linear-gradient(135deg, ${t.bgRadial1} 0%, ${t.bgLinearMid} 50%, ${t.bgRadial3} 100%)`,
-                }}
-              />
-              <span>{t.name}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="settings-row mt-5">
-        <span className="settings-row__label flex items-center gap-2">
-          <span>Custom Theme</span>
-          <InfoTip text={"Ghostty-style file: background and foreground, plus palette entries 0 through 15. Download examples from terminalcolors.com/themes/."} />
-        </span>
-        <div className="flex flex-wrap gap-2">
-          {customTheme && (
-            <button
-              onClick={() => setTheme(customTheme.id)}
-              className={`option-card option-card--compact ${themeId === customTheme.id ? "selected" : ""}`}
-            >
-              <div
-                className="shrink-0 rounded-full"
-                style={{
-                  width: 18,
-                  height: 18,
-                  background: `linear-gradient(135deg, ${customTheme.bgRadial1} 0%, ${customTheme.bgLinearMid} 50%, ${customTheme.bgRadial3} 100%)`,
-                }}
-              />
-              <span>Custom</span>
-            </button>
-          )}
-          <button
-            onClick={() => {
-              setThemeError(null);
-              themeFileInputRef.current?.click();
-            }}
-            className="option-card option-card--compact"
-          >
-            <span className="flex items-center gap-2">
-              <Upload size={14} />
-              <span>{customTheme ? "Update Theme" : "Import Theme"}</span>
-            </span>
-          </button>
-          <input
-            ref={themeFileInputRef}
-            type="file"
-            accept=".txt,.conf,.theme,.config"
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0] ?? null;
-              void importThemeFile(file);
-              event.currentTarget.value = "";
-            }}
-          />
+        <div className="flex flex-wrap gap-3">
+          {[...DARK_THEMES, ...LIGHT_THEMES, ...TRANSPARENT_THEMES].map((t) => {
+            const active = t.id === themeId;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTheme(t.id)}
+                className={`${optionClass} ${active ? "selected" : ""}`}
+              >
+                <div
+                  className="shrink-0 rounded-full"
+                  style={{
+                    width: 24,
+                    height: 24,
+                    background: `linear-gradient(135deg, ${t.bgRadial1} 0%, ${t.bgLinearMid} 50%, ${t.bgRadial3} 100%)`,
+                  }}
+                />
+                <span>{t.name}</span>
+              </button>
+            );
+          })}
         </div>
-        {themeError && <div className="mt-2 text-sm text-red-300">{themeError}</div>}
-      </div>
-      <hr className="settings-divider" />
+
+        <div className="settings-row !mb-0 mt-2">
+          <span className="settings-row__label flex items-center gap-2">
+            <span>Custom Theme</span>
+            <InfoTip text={"Ghostty-style file: background and foreground, plus palette entries 0 through 15. Download examples from terminalcolors.com/themes/."} />
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {customTheme && (
+              <button
+                onClick={() => setTheme(customTheme.id)}
+                className={`option-card option-card--compact ${themeId === customTheme.id ? "selected" : ""}`}
+              >
+                <div
+                  className="shrink-0 rounded-full"
+                  style={{
+                    width: 18,
+                    height: 18,
+                    background: `linear-gradient(135deg, ${customTheme.bgRadial1} 0%, ${customTheme.bgLinearMid} 50%, ${customTheme.bgRadial3} 100%)`,
+                  }}
+                />
+                <span>Custom</span>
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setThemeError(null);
+                themeFileInputRef.current?.click();
+              }}
+              className="option-card option-card--compact"
+            >
+              <span className="flex items-center gap-2">
+                <Upload size={14} />
+                <span>{customTheme ? "Update Theme" : "Import Theme"}</span>
+              </span>
+            </button>
+            <input
+              ref={themeFileInputRef}
+              type="file"
+              accept=".txt,.conf,.theme,.config"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                void importThemeFile(file);
+                event.currentTarget.value = "";
+              }}
+            />
+          </div>
+          {themeError && <div className="mt-2 text-sm text-red-300">{themeError}</div>}
+        </div>
+      </section>
 
       {/* ── Editor ─────────────────────────────────────────── */}
-      <h2 className="section-label !p-0 mb-4">Editor</h2>
+      <section className="settings-section">
+        <h2 className="section-label !p-0 settings-section__header">Editor</h2>
 
-      <div className="flex flex-wrap gap-3">
-        {EDITOR_OPTIONS.map((option) => {
-          const active = option.id === settings.preferredEditor;
-          return (
-            <button
-              key={option.id}
-              onClick={() => void setPreferredEditor(option.id)}
-              className={`${optionClass} ${active ? "selected" : ""}`}
-            >
-              <img
-                src={option.logoSrc}
-                alt=""
-                width={20}
-                height={20}
-                className={`shrink-0 ${option.logoClassName ?? ""}`}
-              />
-              <span>{option.label}</span>
-            </button>
-          );
-        })}
-      </div>
+        <div className="flex flex-wrap gap-3">
+          {EDITOR_OPTIONS.map((option) => {
+            const active = option.id === settings.preferredEditor;
+            return (
+              <button
+                key={option.id}
+                onClick={() => void setPreferredEditor(option.id)}
+                className={`${optionClass} ${active ? "selected" : ""}`}
+              >
+                <img
+                  src={option.logoSrc}
+                  alt=""
+                  width={20}
+                  height={20}
+                  className={`shrink-0 ${option.logoClassName ?? ""}`}
+                />
+                <span>{option.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
-      {isSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving...</div>}
-      {error && <div className="mt-2 text-sm text-red-300">{error}</div>}
-
-      <hr className="settings-divider" />
+        {isSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving...</div>}
+        {error && <div className="mt-2 text-sm text-red-300">{error}</div>}
+      </section>
 
       {/* ── Keybindings ────────────────────────────────────── */}
-      <h2 className="section-label !p-0 mb-4">Keybindings</h2>
+      <section className="settings-section">
+        <h2 className="section-label !p-0 settings-section__header">Keybindings</h2>
 
-      <div className="flex flex-wrap gap-3">
-        {KEYBINDING_PRESETS.map((preset) => {
-          const active = kbSettings[preset.id];
-          return (
-            <button
-              key={preset.id}
-              onClick={() => void setKbEnabled(preset.id, !active)}
-              className={`keybinding-card ${active ? "selected" : ""}`}
-            >
-              <span className="keybinding-card__keys">
-                {preset.keys.map((k, i) => (
-                  <kbd key={i} className="keybinding-kbd">{k}</kbd>
-                ))}
-              </span>
-              <span className="keybinding-card__action">{preset.action}</span>
-            </button>
-          );
-        })}
-      </div>
+        <div className="flex flex-wrap gap-3">
+          {KEYBINDING_PRESETS.map((preset) => {
+            const active = kbSettings[preset.id];
+            return (
+              <button
+                key={preset.id}
+                onClick={() => void setKbEnabled(preset.id, !active)}
+                className={`keybinding-card ${active ? "selected" : ""}`}
+              >
+                <span className="keybinding-card__keys">
+                  {preset.keys.map((k, i) => (
+                    <kbd key={i} className="keybinding-kbd">{k}</kbd>
+                  ))}
+                </span>
+                <span className="keybinding-card__action">{preset.action}</span>
+              </button>
+            );
+          })}
+        </div>
 
-      {kbIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving keybindings...</div>}
-      {kbError && <div className="mt-2 text-sm text-red-300">{kbError}</div>}
-
-      <hr className="settings-divider" />
+        {kbIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving keybindings...</div>}
+        {kbError && <div className="mt-2 text-sm text-red-300">{kbError}</div>}
+      </section>
 
       {/* ── Projects ───────────────────────────────────────── */}
-      <h2 className="section-label !p-0 mb-4">Projects</h2>
+      <section className="settings-section">
+        <h2 className="section-label !p-0 settings-section__header">Projects</h2>
 
-      <div className="settings-row">
-        <span className="settings-row__label flex items-center gap-2">
-          <span>Auto-import Worktrees</span>
-          <InfoTip text="When enabled, adding a main repo also imports its existing Git worktrees. Adding a worktree directly still adds its main repo so the relationship stays intact." />
-        </span>
-        <button
-          onClick={() => void updateProjectSettings({ autoImportWorktrees: !projectSettings.autoImportWorktrees })}
-          className={`option-card option-card--compact ${projectSettings.autoImportWorktrees ? "selected" : ""}`}
-        >
-          {projectSettings.autoImportWorktrees ? "On" : "Off"}
-        </button>
-      </div>
+        <div className="settings-row !mb-0">
+          <span className="settings-row__label flex items-center gap-2">
+            <span>Auto-import Worktrees</span>
+            <InfoTip text="When enabled, adding a main repo also imports its existing Git worktrees. Adding a worktree directly still adds its main repo so the relationship stays intact." />
+          </span>
+          <button
+            onClick={() => void updateProjectSettings({ autoImportWorktrees: !projectSettings.autoImportWorktrees })}
+            className={`option-card option-card--compact ${projectSettings.autoImportWorktrees ? "selected" : ""}`}
+          >
+            {projectSettings.autoImportWorktrees ? "On" : "Off"}
+          </button>
+        </div>
 
-      {projectIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving project settings...</div>}
-      {projectError && <div className="mt-2 text-sm text-red-300">{projectError}</div>}
-
-      <hr className="settings-divider" />
+        {projectIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving project settings...</div>}
+        {projectError && <div className="mt-2 text-sm text-red-300">{projectError}</div>}
+      </section>
 
       {/* ── Terminal ───────────────────────────────────────── */}
-      <h2 className="section-label !p-0 mb-4">Terminal</h2>
+      <section className="settings-section">
+        <h2 className="section-label !p-0 settings-section__header">Terminal</h2>
 
-      <div className="settings-row">
-        <span className="settings-row__label">Cursor</span>
-        <div className="flex flex-wrap gap-2">
-          {(["block", "underline", "bar"] as const).map((style) => (
-            <button
-              key={style}
-              onClick={() => void updateTermSettings({ cursorStyle: style as CursorStyle })}
-              className={`option-card option-card--compact ${termSettings.cursorStyle === style ? "selected" : ""}`}
-            >
-              <span className="capitalize">{style}</span>
-            </button>
-          ))}
+        <div className="settings-row">
+          <span className="settings-row__label">Cursor</span>
+          <div className="flex flex-wrap gap-2">
+            {(["block", "underline", "bar"] as const).map((style) => (
+              <button
+                key={style}
+                onClick={() => void updateTermSettings({ cursorStyle: style as CursorStyle })}
+                className={`option-card option-card--compact ${termSettings.cursorStyle === style ? "selected" : ""}`}
+              >
+                <span className="capitalize">{style}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="settings-row">
-        <span className="settings-row__label">Blink</span>
-        <button
-          onClick={() => void updateTermSettings({ cursorBlink: !termSettings.cursorBlink })}
-          className={`option-card option-card--compact ${termSettings.cursorBlink ? "selected" : ""}`}
-        >
-          {termSettings.cursorBlink ? "On" : "Off"}
-        </button>
-      </div>
-
-      <div className="settings-row">
-        <span className="settings-row__label flex items-center gap-2">
-          <span>Font</span>
-          <InfoTip text="Lists every installed monospace font on your Mac. Nerd Font variants are surfaced first — they're the best choice for powerline prompts and devicons." />
-        </span>
-        <div className="relative" ref={fontPickerRef}>
+        <div className="settings-row">
+          <span className="settings-row__label">Blink</span>
           <button
-            type="button"
-            onClick={() => {
-              setFontPickerOpen((open) => {
-                const next = !open;
-                if (next) {
-                  setFontSearch("");
-                  // Autofocus the search input once the dropdown mounts.
-                  window.setTimeout(() => fontSearchRef.current?.focus(), 0);
-                }
-                return next;
-              });
-            }}
-            className="option-card option-card--compact justify-between"
-            style={{ minWidth: 240 }}
+            onClick={() => void updateTermSettings({ cursorBlink: !termSettings.cursorBlink })}
+            className={`option-card option-card--compact ${termSettings.cursorBlink ? "selected" : ""}`}
           >
-            <span className="truncate">{termSettings.fontFamily || "Select font"}</span>
-            <ChevronDown size={14} className="shrink-0 opacity-60" />
+            {termSettings.cursorBlink ? "On" : "Off"}
           </button>
+        </div>
 
-          {fontPickerOpen && (
-            <div className="font-picker-dropdown">
-              <input
-                ref={fontSearchRef}
-                type="text"
-                value={fontSearch}
-                onChange={(event) => setFontSearch(event.target.value)}
-                placeholder="Search installed fonts..."
-                className="font-picker-search"
-              />
-              <div className="font-picker-list">
-                {filteredFontFamilies.length === 0 && (
-                  <div className="font-picker-empty">No matching fonts</div>
-                )}
-                {filteredFontFamilies.map((family) => {
-                  const active = termSettings.fontFamily === family.family;
-                  return (
-                    <button
-                      key={family.family}
-                      type="button"
-                      onClick={() => selectFont(family.family)}
-                      className={`font-picker-item ${active ? "font-picker-item--active" : ""}`}
-                    >
-                      <Check
-                        size={14}
-                        className={`shrink-0 ${active ? "opacity-100" : "opacity-0"}`}
-                      />
-                      <span className="font-picker-item__name">{family.family}</span>
-                      {family.isNerdFont && (
-                        <span className="font-picker-item__badge">Nerd Font</span>
-                      )}
-                      <span className="font-picker-item__count">
-                        {family.faceCount} {family.faceCount === 1 ? "face" : "faces"}
-                      </span>
-                    </button>
-                  );
-                })}
+        <div className="settings-row">
+          <span className="settings-row__label flex items-center gap-2">
+            <span>Font</span>
+            <InfoTip text="Lists every installed monospace font on your Mac. Nerd Font variants are surfaced first — they're the best choice for powerline prompts and devicons." />
+          </span>
+          <div className="relative" ref={fontPickerRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setFontPickerOpen((open) => {
+                  const next = !open;
+                  if (next) {
+                    setFontSearch("");
+                    // Autofocus the search input once the dropdown mounts.
+                    window.setTimeout(() => fontSearchRef.current?.focus(), 0);
+                  }
+                  return next;
+                });
+              }}
+              className="option-card option-card--compact justify-between"
+              style={{ minWidth: 240 }}
+            >
+              <span className="truncate">{termSettings.fontFamily || "Select font"}</span>
+              <ChevronDown size={14} className="shrink-0 opacity-60" />
+            </button>
+
+            {fontPickerOpen && (
+              <div className="font-picker-dropdown">
+                <input
+                  ref={fontSearchRef}
+                  type="text"
+                  value={fontSearch}
+                  onChange={(event) => setFontSearch(event.target.value)}
+                  placeholder="Search installed fonts..."
+                  className="font-picker-search"
+                />
+                <div className="font-picker-list">
+                  {filteredFontFamilies.length === 0 && (
+                    <div className="font-picker-empty">No matching fonts</div>
+                  )}
+                  {filteredFontFamilies.map((family) => {
+                    const active = termSettings.fontFamily === family.family;
+                    return (
+                      <button
+                        key={family.family}
+                        type="button"
+                        onClick={() => selectFont(family.family)}
+                        className={`font-picker-item ${active ? "font-picker-item--active" : ""}`}
+                      >
+                        <Check
+                          size={14}
+                          className={`shrink-0 ${active ? "opacity-100" : "opacity-0"}`}
+                        />
+                        <span className="font-picker-item__name">{family.family}</span>
+                        {family.isNerdFont && (
+                          <span className="font-picker-item__badge">Nerd Font</span>
+                        )}
+                        <span className="font-picker-item__count">
+                          {family.faceCount} {family.faceCount === 1 ? "face" : "faces"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+          {fontError && <div className="mt-2 text-sm text-red-300">{fontError}</div>}
         </div>
-        {fontError && <div className="mt-2 text-sm text-red-300">{fontError}</div>}
-      </div>
 
-      <div className="settings-row">
-        <span className="settings-row__label">Font Size</span>
-        <div className="flex flex-wrap gap-2">
-          {FONT_SIZE_OPTIONS.map((size) => (
-            <button
-              key={size}
-              onClick={() => void updateTermSettings({ fontSize: size })}
-              className={`option-card option-card--compact ${termSettings.fontSize === size ? "selected" : ""}`}
-            >
-              {size}px
-            </button>
-          ))}
+        <div className="settings-row">
+          <span className="settings-row__label">Font Size</span>
+          <div className="flex flex-wrap gap-2">
+            {FONT_SIZE_OPTIONS.map((size) => (
+              <button
+                key={size}
+                onClick={() => void updateTermSettings({ fontSize: size })}
+                className={`option-card option-card--compact ${termSettings.fontSize === size ? "selected" : ""}`}
+              >
+                {size}px
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="settings-row">
-        <span className="settings-row__label">
-          Scrollback
-          <InfoTip text="Number of lines kept in the terminal scroll buffer. Higher values use more memory." />
-        </span>
-        <div className="flex flex-wrap gap-2">
-          {[1000, 5000, 10000, 25000, 50000].map((value) => (
-            <button
-              key={value}
-              onClick={() => void updateTermSettings({ scrollback: value })}
-              className={`option-card option-card--compact ${termSettings.scrollback === value ? "selected" : ""}`}
-            >
-              {value >= 1000 ? `${value / 1000}k` : value}
-            </button>
-          ))}
+        <div className="settings-row !mb-0">
+          <span className="settings-row__label">
+            Scrollback
+            <InfoTip text="Number of lines kept in the terminal scroll buffer. Higher values use more memory." />
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {[1000, 5000, 10000, 25000, 50000].map((value) => (
+              <button
+                key={value}
+                onClick={() => void updateTermSettings({ scrollback: value })}
+                className={`option-card option-card--compact ${termSettings.scrollback === value ? "selected" : ""}`}
+              >
+                {value >= 1000 ? `${value / 1000}k` : value}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {termIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving terminal settings...</div>}
-      {termError && <div className="mt-2 text-sm text-red-300">{termError}</div>}
-
-      <hr className="settings-divider" />
+        {termIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving terminal settings...</div>}
+        {termError && <div className="mt-2 text-sm text-red-300">{termError}</div>}
+      </section>
 
       {/* ── Usage ──────────────────────────────────────────── */}
-      <h2 className="section-label !p-0 mb-4">Usage Providers</h2>
+      <section className="settings-section">
+        <h2 className="section-label !p-0 settings-section__header">Usage Providers</h2>
 
-      <div className="usage-provider-grid">
-        {ALL_USAGE_PROVIDERS.map((provider) => {
-          const config = usageSettings[provider];
-          const logo = assistantLogoSrc[provider];
-          const label = provider === "claude"
-            ? "Claude"
-            : provider === "codex"
-              ? "Codex"
-              : provider === "gemini"
-                ? "Gemini"
-                : provider === "opencode"
-                  ? "opencode"
-                  : "pi";
-          const budgetInput = budgetInputs[provider] ?? (config.monthlyBudget != null ? String(config.monthlyBudget) : "");
-          return (
-            <div key={provider} className="usage-provider-row">
-              <span className="usage-provider-row__name">
-                {logo && <img src={logo} alt="" width={18} height={18} className={`shrink-0 ${getAssistantLogoClass(provider) ?? ""}`} />}
-                <span>{label}</span>
-              </span>
+        <div className="usage-provider-grid">
+          {ALL_USAGE_PROVIDERS.map((provider) => {
+            const config = usageSettings[provider];
+            const logo = assistantLogoSrc[provider];
+            const label = provider === "claude"
+              ? "Claude"
+              : provider === "codex"
+                ? "Codex"
+                : provider === "gemini"
+                  ? "Gemini"
+                  : provider === "opencode"
+                    ? "opencode"
+                    : "pi";
+            const budgetInput = budgetInputs[provider] ?? (config.monthlyBudget != null ? String(config.monthlyBudget) : "");
+            return (
+              <div key={provider} className="usage-provider-row">
+                <span className="usage-provider-row__name">
+                  {logo && <img src={logo} alt="" width={18} height={18} className={`shrink-0 ${getAssistantLogoClass(provider) ?? ""}`} />}
+                  <span>{label}</span>
+                </span>
 
-              <button
-                onClick={() => void updateProvider(provider, { show: !config.show })}
-                className={`option-card option-card--compact ${config.show ? "selected" : ""}`}
-              >
-                {config.show ? "On" : "Off"}
-              </button>
+                <button
+                  onClick={() => void updateProvider(provider, { show: !config.show })}
+                  className={`option-card option-card--compact ${config.show ? "selected" : ""}`}
+                >
+                  {config.show ? "On" : "Off"}
+                </button>
 
-              {config.show && (
-                <>
-                  {(["subscription", "custom"] as BudgetMode[]).map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => void updateProvider(provider, { budgetMode: mode })}
-                      className={`option-card option-card--compact ${config.budgetMode === mode ? "selected" : ""}`}
-                    >
-                      <span className="capitalize">{mode}</span>
-                    </button>
-                  ))}
+                {config.show && (
+                  <>
+                    {(["subscription", "custom"] as BudgetMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => void updateProvider(provider, { budgetMode: mode })}
+                        className={`option-card option-card--compact ${config.budgetMode === mode ? "selected" : ""}`}
+                      >
+                        <span className="capitalize">{mode}</span>
+                      </button>
+                    ))}
 
-                  {config.budgetMode === "custom" && (
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      inputMode="decimal"
-                      placeholder="$ / month"
-                      value={budgetInput}
-                      onChange={(event) =>
-                        setBudgetInputs((prev) => ({ ...prev, [provider]: event.target.value }))
-                      }
-                      onBlur={() => {
-                        const trimmed = budgetInput.trim();
-                        const nextBudget = trimmed === "" ? null : Number(trimmed);
-                        if (nextBudget == null || Number.isFinite(nextBudget)) {
-                          void updateProvider(provider, { monthlyBudget: nextBudget });
+                    {config.budgetMode === "custom" && (
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        inputMode="decimal"
+                        placeholder="$ / month"
+                        value={budgetInput}
+                        onChange={(event) =>
+                          setBudgetInputs((prev) => ({ ...prev, [provider]: event.target.value }))
                         }
-                        setBudgetInputs((prev) => {
-                          const next = { ...prev };
-                          delete next[provider];
-                          return next;
-                        });
-                      }}
-                      className="usage-provider-row__budget-input"
-                    />
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                        onBlur={() => {
+                          const trimmed = budgetInput.trim();
+                          const nextBudget = trimmed === "" ? null : Number(trimmed);
+                          if (nextBudget == null || Number.isFinite(nextBudget)) {
+                            void updateProvider(provider, { monthlyBudget: nextBudget });
+                          }
+                          setBudgetInputs((prev) => {
+                            const next = { ...prev };
+                            delete next[provider];
+                            return next;
+                          });
+                        }}
+                        className="usage-provider-row__budget-input"
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
 
-      {usageIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving...</div>}
-      {usageError && <div className="mt-2 text-sm text-red-300">{usageError}</div>}
+        {usageIsSaving && <div className="mt-2 text-xs text-[var(--text-muted)]">Saving...</div>}
+        {usageError && <div className="mt-2 text-sm text-red-300">{usageError}</div>}
 
-      <p className="text-xs text-[var(--text-muted)] mt-6">
-        Settings are saved to ~/.shep/config.yml
-      </p>
-
-      <hr className="settings-divider" />
+        <p className="text-xs text-[var(--text-muted)] mt-4">
+          Settings are saved to ~/.shep/config.yml
+        </p>
+      </section>
 
       {/* ── Updates ─────────────────────────────────────────── */}
-      <h2 className="section-label !p-0 mb-4">Updates</h2>
+      <section className="settings-section">
+        <h2 className="section-label !p-0 settings-section__header">Updates</h2>
 
-      {updateStatus === "available" && (
-        <div className="settings-meta-grid mb-4" style={{ border: "1px solid rgba(122,162,247,0.3)", borderRadius: 8, padding: 12 }}>
-          <div className="settings-meta-row">
-            <span className="settings-meta-row__label">New version</span>
-            <span>{availableVersion}</span>
-          </div>
-          {releaseNotesUrl && (
+        {updateStatus === "available" && (
+          <div className="settings-meta-grid mb-4" style={{ border: "1px solid rgba(122,162,247,0.3)", borderRadius: 8, padding: 12 }}>
             <div className="settings-meta-row">
-              <span className="settings-meta-row__label">Release notes</span>
-              <button
-                className="text-sm underline text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-transparent border-0 cursor-pointer p-0"
-                onClick={() => import("../../lib/tauri").then((mod) => mod.openUrl(releaseNotesUrl))}
-              >
-                View on GitHub
-              </button>
+              <span className="settings-meta-row__label">New version</span>
+              <span>{availableVersion}</span>
             </div>
-          )}
+            {releaseNotesUrl && (
+              <div className="settings-meta-row">
+                <span className="settings-meta-row__label">Release notes</span>
+                <button
+                  className="text-sm underline text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-transparent border-0 cursor-pointer p-0"
+                  onClick={() => import("../../lib/tauri").then((mod) => mod.openUrl(releaseNotesUrl))}
+                >
+                  View on GitHub
+                </button>
+              </div>
+            )}
+            <button
+              className="btn-primary mt-2"
+              onClick={() => void downloadAndInstall()}
+            >
+              Download &amp; Install
+            </button>
+          </div>
+        )}
+
+        {updateStatus === "downloading" && (
+          <div className="mb-4">
+            <div className="update-progress-track mb-2">
+              <div className="update-progress-fill" style={{ width: `${downloadProgress}%` }} />
+            </div>
+            <div className="text-xs text-[var(--text-muted)]">Downloading... {downloadProgress}%</div>
+          </div>
+        )}
+
+        {updateStatus === "ready" && (
+          <div className="mb-4">
+            <div className="text-sm text-[var(--text-secondary)] mb-2">Update downloaded and ready to install.</div>
+            <button className="btn-primary" onClick={() => void restartApp()}>
+              Restart Now
+            </button>
+          </div>
+        )}
+
+        {updateStatus === "error" && updateError && (
+          <div className="text-sm text-red-300 mb-4">{updateError}</div>
+        )}
+
+        {updateStatus !== "downloading" && updateStatus !== "ready" && (
           <button
-            className="btn-primary mt-2"
-            onClick={() => void downloadAndInstall()}
+            className="btn-primary"
+            disabled={updateStatus === "checking"}
+            onClick={() => void checkForUpdate()}
           >
-            Download &amp; Install
+            {updateStatus === "checking" ? "Checking..." : "Check for Updates"}
           </button>
-        </div>
-      )}
+        )}
 
-      {updateStatus === "downloading" && (
-        <div className="mb-4">
-          <div className="update-progress-track mb-2">
-            <div className="update-progress-fill" style={{ width: `${downloadProgress}%` }} />
+        {updateStatus === "idle" && hasChecked && (
+          <div className="text-xs text-[var(--text-muted)] mt-2">You're on the latest version.</div>
+        )}
+      </section>
+
+      {/* ── About ───────────────────────────────────────────── */}
+      <section className="settings-section">
+        <h2 className="section-label !p-0 settings-section__header">About</h2>
+
+        {appMeta ? (
+          <div className="settings-meta-grid">
+            <div className="settings-meta-row">
+              <span className="settings-meta-row__label">App</span>
+              <span>{appMeta.name}</span>
+            </div>
+            <div className="settings-meta-row">
+              <span className="settings-meta-row__label">Version</span>
+              <span>{appMeta.version}</span>
+            </div>
+            <div className="settings-meta-row">
+              <span className="settings-meta-row__label">Identifier</span>
+              <span>{appMeta.identifier}</span>
+            </div>
+            <div className="settings-meta-row">
+              <span className="settings-meta-row__label">Tauri</span>
+              <span>{appMeta.tauriVersion}</span>
+            </div>
           </div>
-          <div className="text-xs text-[var(--text-muted)]">Downloading... {downloadProgress}%</div>
-        </div>
-      )}
+        ) : appMetaError ? (
+          <div className="mt-2 text-sm text-red-300">{appMetaError}</div>
+        ) : (
+          <div className="mt-2 text-xs text-[var(--text-muted)]">Loading app info...</div>
+        )}
 
-      {updateStatus === "ready" && (
-        <div className="mb-4">
-          <div className="text-sm text-[var(--text-secondary)] mb-2">Update downloaded and ready to install.</div>
-          <button className="btn-primary" onClick={() => void restartApp()}>
-            Restart Now
-          </button>
-        </div>
-      )}
-
-      {updateStatus === "error" && updateError && (
-        <div className="text-sm text-red-300 mb-4">{updateError}</div>
-      )}
-
-      {updateStatus !== "downloading" && updateStatus !== "ready" && (
-        <button
-          className="btn-primary"
-          disabled={updateStatus === "checking"}
-          onClick={() => void checkForUpdate()}
-        >
-          {updateStatus === "checking" ? "Checking..." : "Check for Updates"}
-        </button>
-      )}
-
-      {updateStatus === "idle" && hasChecked && (
-        <div className="text-xs text-[var(--text-muted)] mt-2">You're on the latest version.</div>
-      )}
-
-      <hr className="settings-divider" />
-
-      <h2 className="section-label !p-0 mb-4">About</h2>
-
-      {appMeta ? (
-        <div className="settings-meta-grid">
-          <div className="settings-meta-row">
-            <span className="settings-meta-row__label">App</span>
-            <span>{appMeta.name}</span>
-          </div>
-          <div className="settings-meta-row">
-            <span className="settings-meta-row__label">Version</span>
-            <span>{appMeta.version}</span>
-          </div>
-          <div className="settings-meta-row">
-            <span className="settings-meta-row__label">Identifier</span>
-            <span>{appMeta.identifier}</span>
-          </div>
-          <div className="settings-meta-row">
-            <span className="settings-meta-row__label">Tauri</span>
-            <span>{appMeta.tauriVersion}</span>
-          </div>
-        </div>
-      ) : appMetaError ? (
-        <div className="mt-2 text-sm text-red-300">{appMetaError}</div>
-      ) : (
-        <div className="mt-2 text-xs text-[var(--text-muted)]">Loading app info...</div>
-      )}
-
-      <p className="text-xs text-[var(--text-muted)] mt-4 max-w-lg leading-5">
-        For tester reports, include the app version, what you were doing, and whether the issue happened in a packaged build or dev mode.
-      </p>
+        <p className="text-xs text-[var(--text-muted)] mt-4 max-w-lg leading-5">
+          For tester reports, include the app version, what you were doing, and whether the issue happened in a packaged build or dev mode.
+        </p>
+      </section>
     </div>
   );
 }

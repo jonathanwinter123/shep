@@ -451,6 +451,18 @@ select {
 }
 
 /* Settings layout helpers */
+.settings-section {
+  padding: 16px;
+  background: color-mix(in srgb, var(--overlay) 1%, transparent);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 16px;
+}
+
+.settings-section__header {
+  margin-bottom: 16px;
+}
+
 .settings-divider {
   border: none;
   border-top: 1px solid var(--glass-border);
@@ -1516,6 +1528,7 @@ select {
   gap: 2px;
   margin-top: 8px;
   margin-bottom: 24px;
+  padding: 0 24px;
   padding: 3px;
   background: color-mix(in srgb, var(--overlay) 3%, transparent);
   border-radius: 8px;
@@ -1546,7 +1559,7 @@ select {
 /* ── Usage detail panel ────────────────────────────────── */
 
 .usage-panel {
-  margin-top: 22px;
+  margin-top: 0;
 }
 
 .usage-section {
