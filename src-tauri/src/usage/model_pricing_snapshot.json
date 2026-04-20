@@ -8371,6 +8371,16 @@
   },
   {
     "provider": "cloudflare-ai-gateway",
+    "modelPattern": "workers-ai/@cf/moonshotai/kimi-k2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-20"
+  },
+  {
+    "provider": "cloudflare-ai-gateway",
     "modelPattern": "workers-ai/@cf/myshell-ai/melotts",
     "inputPerM": 0,
     "outputPerM": 0,
@@ -8508,6 +8518,16 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-01-27"
+  },
+  {
+    "provider": "cloudflare-workers-ai",
+    "modelPattern": "@cf/moonshotai/kimi-k2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-20"
   },
   {
     "provider": "cloudflare-workers-ai",
@@ -11514,7 +11534,7 @@
     "modelPattern": "gemini-2.5-flash",
     "inputPerM": 0.3,
     "outputPerM": 2.5,
-    "cacheReadPerM": 0.075,
+    "cacheReadPerM": 0.03,
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2025-03-20"
@@ -18374,7 +18394,7 @@
     "modelPattern": "gemini-2.5-flash",
     "inputPerM": 0.3,
     "outputPerM": 2.5,
-    "cacheReadPerM": 0.075,
+    "cacheReadPerM": 0.03,
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2025-03-20"
@@ -36684,7 +36704,7 @@
     "modelPattern": "google/gemini-2.5-flash",
     "inputPerM": 0.3,
     "outputPerM": 2.5,
-    "cacheReadPerM": 0.075,
+    "cacheReadPerM": 0.03,
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2025-03-20"

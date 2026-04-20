@@ -26,10 +26,12 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
 
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [modelFetchStatus, setModelFetchStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState("");
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const modelSearchRef = useRef<HTMLInputElement>(null);
+  const modelRequestRef = useRef(0);
 
   // Check which assistants are installed
   useEffect(() => {
@@ -79,11 +81,27 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   }, [availableModels, modelSearch]);
 
   const handleSelectAssistant = (assistant: CodingAssistant) => {
+    const requestId = modelRequestRef.current + 1;
+    modelRequestRef.current = requestId;
     setSelectedAssistant(assistant);
     setSelectedModel(null);
     setModelPickerOpen(false);
     setAvailableModels([]);
-    getModelsForProvider(assistant.id).then(setAvailableModels).catch(() => {});
+    setModelFetchStatus("loading");
+    getModelsForProvider(assistant.id)
+      .then((models) => {
+        if (modelRequestRef.current !== requestId) return;
+        setAvailableModels(models);
+        setModelFetchStatus("loaded");
+      })
+      .catch((error) => {
+        if (modelRequestRef.current !== requestId) return;
+        if (import.meta.env.DEV) {
+          console.error(`Failed to load models for ${assistant.id}:`, error);
+        }
+        setAvailableModels([]);
+        setModelFetchStatus("error");
+      });
   };
 
   const handleStart = async () => {
@@ -226,9 +244,12 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
                 });
               }}
               className="option-card option-card--compact justify-between"
+              aria-busy={modelFetchStatus === "loading"}
               style={{ minWidth: 240 }}
             >
-              <span className="truncate">{selectedModel ?? "Default"}</span>
+              <span className="truncate">
+                {modelFetchStatus === "loading" ? "Loading..." : selectedModel ?? "Default"}
+              </span>
               <ChevronDown size={14} className="shrink-0 opacity-60" />
             </button>
 
@@ -259,10 +280,19 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
                     <span className="font-picker-item__name">Default</span>
                   </button>
 
-                  {filteredModels.length === 0 && modelSearch && (
+                  {modelFetchStatus === "loading" && (
+                    <div className="font-picker-empty">Loading models...</div>
+                  )}
+                  {modelFetchStatus === "error" && (
+                    <div className="font-picker-empty">Could not load models - using default</div>
+                  )}
+                  {modelFetchStatus === "loaded" && availableModels.length === 0 && !modelSearch && (
+                    <div className="font-picker-empty">No models found - using default</div>
+                  )}
+                  {modelFetchStatus === "loaded" && filteredModels.length === 0 && modelSearch && (
                     <div className="font-picker-empty">No matching models</div>
                   )}
-                  {filteredModels.map((model) => {
+                  {modelFetchStatus === "loaded" && filteredModels.map((model) => {
                     const active = selectedModel === model;
                     return (
                       <button

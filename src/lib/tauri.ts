@@ -134,6 +134,7 @@ export function openUrl(url: string): Promise<void> {
 
 export function spawnPty(
   command: string,
+  args: string[] | null,
   cwd: string,
   env: Record<string, string>,
   cols: number,
@@ -145,6 +146,7 @@ export function spawnPty(
   channel.onmessage = onMessage;
   return invoke("spawn_pty", {
     command,
+    args,
     cwd,
     env,
     cols,

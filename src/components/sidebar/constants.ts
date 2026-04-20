@@ -9,7 +9,7 @@ export const CODING_ASSISTANTS: CodingAssistant[] = [
 ];
 
 export const ASSISTANT_INSTALL_URLS: Record<string, string> = {
-  claude: "https://code.claude.com/docs/en/overview",
+  claude: "https://code.claude.com/docs/en",
   codex: "https://github.com/openai/codex",
   gemini: "https://github.com/google-gemini/gemini-cli",
   opencode: "https://opencode.ai/",

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import json
+import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -52,12 +54,19 @@ def snapshot_rows(catalog):
 
 
 def main():
-    catalog = fetch_catalog()
+    try:
+        catalog = fetch_catalog()
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        print(f"Failed to fetch models.dev pricing catalog: {exc}", file=sys.stderr)
+        print("Existing pricing snapshot was left unchanged.", file=sys.stderr)
+        return 1
+
     rows = snapshot_rows(catalog)
     OUTPUT.write_text(json.dumps(rows, indent=2) + "\n")
     providers = set(r["provider"] for r in rows)
     print(f"Wrote {len(rows)} pricing rows ({len(providers)} providers) to {OUTPUT}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
