@@ -138,6 +138,9 @@ fi
 
 # ── Step 8: install deps + build + post-build + updater metadata ────
 
+step "Updating model pricing snapshot from models.dev"
+python3 scripts/update_model_pricing.py
+
 step "pnpm install"
 pnpm install
 

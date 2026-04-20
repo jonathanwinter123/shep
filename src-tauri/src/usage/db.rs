@@ -190,6 +190,37 @@ fn migrate(conn: &Connection) -> Result<(), String> {
         ).map_err(|e| format!("Failed to run migration v5: {e}"))?;
     }
 
+    if version < 6 {
+        conn.execute_batch(
+            "UPDATE usage_messages SET pricing_provider = 'anthropic' WHERE pricing_provider = 'claude';
+             UPDATE usage_messages SET pricing_provider = 'openai'    WHERE pricing_provider = 'codex';
+             UPDATE usage_messages SET pricing_provider = 'google'    WHERE pricing_provider = 'gemini';
+             UPDATE usage_daily   SET pricing_provider = 'anthropic' WHERE pricing_provider = 'claude';
+             UPDATE usage_daily   SET pricing_provider = 'openai'    WHERE pricing_provider = 'codex';
+             UPDATE usage_daily   SET pricing_provider = 'google'    WHERE pricing_provider = 'gemini';
+             INSERT INTO schema_version (version) VALUES (6);"
+        ).map_err(|e| format!("Failed to run migration v6: {e}"))?;
+    }
+
+    if version < 7 {
+        conn.execute_batch(
+            "DROP TABLE IF EXISTS model_pricing;
+             CREATE TABLE model_pricing (
+                provider TEXT NOT NULL,
+                model_pattern TEXT NOT NULL,
+                input_per_m REAL NOT NULL DEFAULT 0,
+                output_per_m REAL NOT NULL DEFAULT 0,
+                cache_read_per_m REAL NOT NULL DEFAULT 0,
+                cache_write_per_m REAL NOT NULL DEFAULT 0,
+                thoughts_per_m REAL NOT NULL DEFAULT 0,
+                release_date TEXT,
+                updated_at TEXT NOT NULL DEFAULT '2026-04-20',
+                PRIMARY KEY (provider, model_pattern)
+             );
+             INSERT INTO schema_version (version) VALUES (7);"
+        ).map_err(|e| format!("Failed to run migration v7: {e}"))?;
+    }
+
     Ok(())
 }
 
@@ -231,6 +262,7 @@ fn seed_pricing(conn: &Connection) -> Result<(), String> {
         cache_read_per_m: f64,
         cache_write_per_m: f64,
         thoughts_per_m: f64,
+        release_date: Option<String>,
     }
 
     let rows: Vec<PricingSeedRow> = serde_json::from_str(include_str!("model_pricing_snapshot.json"))
@@ -241,16 +273,17 @@ fn seed_pricing(conn: &Connection) -> Result<(), String> {
 
     for row in rows {
         conn.execute(
-            "INSERT OR REPLACE INTO model_pricing (model_pattern, provider, input_per_m, output_per_m, cache_read_per_m, cache_write_per_m, thoughts_per_m)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT OR REPLACE INTO model_pricing (provider, model_pattern, input_per_m, output_per_m, cache_read_per_m, cache_write_per_m, thoughts_per_m, release_date)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             rusqlite::params![
-                row.model_pattern,
                 row.provider,
+                row.model_pattern,
                 row.input_per_m,
                 row.output_per_m,
                 row.cache_read_per_m,
                 row.cache_write_per_m,
-                row.thoughts_per_m
+                row.thoughts_per_m,
+                row.release_date,
             ],
         ).map_err(|e| format!("Failed to seed pricing: {e}"))?;
     }

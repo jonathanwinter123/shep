@@ -516,6 +516,78 @@ pub async fn get_project_alias_review_queue(
 }
 
 #[tauri::command]
+pub async fn get_models_for_provider(
+    db: State<'_, UsageDb>,
+    provider: String,
+) -> Result<Vec<String>, String> {
+    match provider.as_str() {
+        "pi" => Ok(sort_cli_models(&db, query_cli_models("pi", &["--list-models"], parse_pi_models))),
+        "opencode" => Ok(sort_cli_models(&db, query_cli_models("opencode", &["models"], parse_opencode_models))),
+        _ => Ok(crate::usage::get_models_for_provider(&db, &provider)),
+    }
+}
+
+fn query_cli_models(
+    cmd: &str,
+    args: &[&str],
+    parser: fn(&str) -> Vec<String>,
+) -> Vec<String> {
+    let output = Command::new(cmd)
+        .args(args)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| String::from_utf8(o.stdout).ok());
+
+    match output {
+        Some(text) => parser(&text),
+        None => Vec::new(),
+    }
+}
+
+fn sort_cli_models(db: &UsageDb, models: Vec<String>) -> Vec<String> {
+    let conn = db.conn.lock().unwrap();
+    let mut dated: Vec<(String, String)> = models
+        .into_iter()
+        .map(|name| {
+            let date = name.split_once('/')
+                .and_then(|(provider, model)| {
+                    conn.query_row(
+                        "SELECT COALESCE(release_date, '2000-01-01') FROM model_pricing WHERE provider = ?1 AND model_pattern = ?2",
+                        rusqlite::params![provider, model],
+                        |row| row.get::<_, String>(0),
+                    ).ok()
+                })
+                .unwrap_or_else(|| "2000-01-01".to_string());
+            (name, date)
+        })
+        .collect();
+    dated.sort_by(|a, b| b.1.cmp(&a.1));
+    dated.into_iter().map(|(name, _)| name).collect()
+}
+
+/// Parse `pi --list-models` table: "provider  model  context  ..."
+fn parse_pi_models(text: &str) -> Vec<String> {
+    text.lines()
+        .skip(1) // header row
+        .filter_map(|line| {
+            let mut cols = line.split_whitespace();
+            let provider = cols.next()?;
+            let model = cols.next()?;
+            Some(format!("{provider}/{model}"))
+        })
+        .collect()
+}
+
+/// Parse `opencode models` output: "provider/model" per line
+fn parse_opencode_models(text: &str) -> Vec<String> {
+    text.lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect()
+}
+
+#[tauri::command]
 pub fn refresh_usage_data(db: State<'_, UsageDb>, app: tauri::AppHandle) {
     let db = db.inner().clone();
     std::thread::spawn(move || {

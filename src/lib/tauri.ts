@@ -303,6 +303,10 @@ export function getProjectAliasReviewQueue(): Promise<UsageProjectAliasReviewIte
   return invoke("get_project_alias_review_queue");
 }
 
+export function getModelsForProvider(provider: string): Promise<string[]> {
+  return invoke("get_models_for_provider", { provider });
+}
+
 export function refreshUsageData(): Promise<void> {
   return invoke("refresh_usage_data");
 }

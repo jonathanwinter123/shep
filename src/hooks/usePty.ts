@@ -353,12 +353,16 @@ export function usePty() {
       cols: number,
       rows: number,
       mode: SessionMode = "standard",
+      model?: string,
     ) => {
       if (!activeRepoPath) return;
       const assistant = CODING_ASSISTANTS.find((a) => a.id === assistantId);
       if (!assistant) return;
 
       let command = assistant.command;
+      if (model) {
+        command = `${command} ${assistant.modelFlag} ${model}`;
+      }
       if (mode === "yolo" && assistant.yoloFlag) {
         command = `${command} ${assistant.yoloFlag}`;
       }
