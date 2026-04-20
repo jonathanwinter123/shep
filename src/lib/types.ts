@@ -143,6 +143,7 @@ export interface CodingAssistant {
   name: string;
   command: string;
   yoloFlag: string | null;
+  modelFlag: string;
   description?: string;
   docsUrl?: string;
 }

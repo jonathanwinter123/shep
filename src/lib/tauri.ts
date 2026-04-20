@@ -134,6 +134,7 @@ export function openUrl(url: string): Promise<void> {
 
 export function spawnPty(
   command: string,
+  args: string[] | null,
   cwd: string,
   env: Record<string, string>,
   cols: number,
@@ -145,6 +146,7 @@ export function spawnPty(
   channel.onmessage = onMessage;
   return invoke("spawn_pty", {
     command,
+    args,
     cwd,
     env,
     cols,
@@ -301,6 +303,10 @@ export function getUsageOverview(window: string): Promise<UsageOverview> {
 
 export function getProjectAliasReviewQueue(): Promise<UsageProjectAliasReviewItem[]> {
   return invoke("get_project_alias_review_queue");
+}
+
+export function getModelsForProvider(provider: string): Promise<string[]> {
+  return invoke("get_models_for_provider", { provider });
 }
 
 export function refreshUsageData(): Promise<void> {

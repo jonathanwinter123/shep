@@ -16,6 +16,7 @@ impl UsageDb {
             .expect("Failed to open in-memory SQLite — this should never fail");
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;").ok();
         let _ = migrate(&conn);
+        let _ = seed_pricing(&conn);
         Self { conn: Arc::new(Mutex::new(conn)) }
     }
 
@@ -111,11 +112,9 @@ fn migrate(conn: &Connection) -> Result<(), String> {
                 cache_read_per_m REAL NOT NULL DEFAULT 0,
                 cache_write_per_m REAL NOT NULL DEFAULT 0,
                 thoughts_per_m REAL NOT NULL DEFAULT 0,
-                updated_at TEXT NOT NULL DEFAULT '2026-03-20'
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );"
         ).map_err(|e| format!("Failed to create model_pricing table: {e}"))?;
-
-        seed_pricing(conn)?;
 
         // Clear old codex data so it re-ingests from JSONL with full token breakdown
         conn.execute_batch(
@@ -190,6 +189,49 @@ fn migrate(conn: &Connection) -> Result<(), String> {
         ).map_err(|e| format!("Failed to run migration v5: {e}"))?;
     }
 
+    if version < 6 {
+        conn.execute_batch(
+            "UPDATE usage_messages SET pricing_provider = 'anthropic' WHERE pricing_provider = 'claude';
+             UPDATE usage_messages SET pricing_provider = 'openai'    WHERE pricing_provider = 'codex';
+             UPDATE usage_messages SET pricing_provider = 'google'    WHERE pricing_provider = 'gemini';
+             UPDATE usage_daily   SET pricing_provider = 'anthropic' WHERE pricing_provider = 'claude';
+             UPDATE usage_daily   SET pricing_provider = 'openai'    WHERE pricing_provider = 'codex';
+             UPDATE usage_daily   SET pricing_provider = 'google'    WHERE pricing_provider = 'gemini';
+             INSERT INTO schema_version (version) VALUES (6);"
+        ).map_err(|e| format!("Failed to run migration v6: {e}"))?;
+    }
+
+    if version < 7 {
+        conn.execute_batch(
+            "DROP TABLE IF EXISTS model_pricing;
+             CREATE TABLE model_pricing (
+                provider TEXT NOT NULL,
+                model_pattern TEXT NOT NULL,
+                input_per_m REAL NOT NULL DEFAULT 0,
+                output_per_m REAL NOT NULL DEFAULT 0,
+                cache_read_per_m REAL NOT NULL DEFAULT 0,
+                cache_write_per_m REAL NOT NULL DEFAULT 0,
+                thoughts_per_m REAL NOT NULL DEFAULT 0,
+                release_date TEXT,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (provider, model_pattern)
+             );
+             INSERT INTO schema_version (version) VALUES (7);"
+        ).map_err(|e| format!("Failed to run migration v7: {e}"))?;
+    }
+
+    if version < 8 {
+        conn.execute_batch(
+            "UPDATE usage_messages SET pricing_provider = 'anthropic' WHERE pricing_provider = 'claude';
+             UPDATE usage_messages SET pricing_provider = 'openai'    WHERE pricing_provider = 'codex';
+             UPDATE usage_messages SET pricing_provider = 'google'    WHERE pricing_provider = 'gemini';
+             UPDATE usage_daily   SET pricing_provider = 'anthropic' WHERE pricing_provider = 'claude';
+             UPDATE usage_daily   SET pricing_provider = 'openai'    WHERE pricing_provider = 'codex';
+             UPDATE usage_daily   SET pricing_provider = 'google'    WHERE pricing_provider = 'gemini';
+             INSERT INTO schema_version (version) VALUES (8);"
+        ).map_err(|e| format!("Failed to run migration v8: {e}"))?;
+    }
+
     Ok(())
 }
 
@@ -231,29 +273,93 @@ fn seed_pricing(conn: &Connection) -> Result<(), String> {
         cache_read_per_m: f64,
         cache_write_per_m: f64,
         thoughts_per_m: f64,
+        release_date: Option<String>,
     }
 
     let rows: Vec<PricingSeedRow> = serde_json::from_str(include_str!("model_pricing_snapshot.json"))
         .map_err(|e| format!("Failed to parse bundled pricing snapshot: {e}"))?;
 
-    conn.execute("DELETE FROM model_pricing", [])
+    let tx = conn.unchecked_transaction()
+        .map_err(|e| format!("Failed to start pricing seed transaction: {e}"))?;
+
+    tx.execute("DELETE FROM model_pricing", [])
         .map_err(|e| format!("Failed to clear pricing snapshot: {e}"))?;
 
     for row in rows {
-        conn.execute(
-            "INSERT OR REPLACE INTO model_pricing (model_pattern, provider, input_per_m, output_per_m, cache_read_per_m, cache_write_per_m, thoughts_per_m)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        tx.execute(
+            "INSERT OR REPLACE INTO model_pricing (provider, model_pattern, input_per_m, output_per_m, cache_read_per_m, cache_write_per_m, thoughts_per_m, release_date)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             rusqlite::params![
-                row.model_pattern,
                 row.provider,
+                row.model_pattern,
                 row.input_per_m,
                 row.output_per_m,
                 row.cache_read_per_m,
                 row.cache_write_per_m,
-                row.thoughts_per_m
+                row.thoughts_per_m,
+                row.release_date,
             ],
         ).map_err(|e| format!("Failed to seed pricing: {e}"))?;
     }
 
+    tx.commit()
+        .map_err(|e| format!("Failed to commit pricing seed: {e}"))?;
+
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fresh_database_migrates_and_seeds_pricing() {
+        let conn = Connection::open_in_memory().unwrap();
+
+        migrate(&conn).unwrap();
+        seed_pricing(&conn).unwrap();
+
+        let version: i64 = conn
+            .query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |row| row.get(0))
+            .unwrap();
+        let pricing_rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM model_pricing", [], |row| row.get(0))
+            .unwrap();
+
+        assert_eq!(version, 8);
+        assert!(pricing_rows > 0);
+    }
+
+    #[test]
+    fn v8_normalizes_stale_pricing_provider_keys() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE schema_version (version INTEGER NOT NULL);
+             INSERT INTO schema_version (version) VALUES (7);
+             CREATE TABLE usage_messages (provider TEXT, pricing_provider TEXT, recorded_cost REAL);
+             CREATE TABLE usage_daily (provider TEXT, pricing_provider TEXT, recorded_cost REAL);
+             INSERT INTO usage_messages (provider, pricing_provider) VALUES ('claude', 'claude'), ('codex', 'codex'), ('gemini', 'gemini'), ('claude', 'anthropic');
+             INSERT INTO usage_daily (provider, pricing_provider) VALUES ('claude', 'claude'), ('codex', 'codex'), ('gemini', 'gemini'), ('gemini', 'google');"
+        ).unwrap();
+
+        migrate(&conn).unwrap();
+
+        let stale_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM (
+                    SELECT pricing_provider FROM usage_messages
+                    UNION ALL
+                    SELECT pricing_provider FROM usage_daily
+                 ) WHERE pricing_provider IN ('claude', 'codex', 'gemini')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let version: i64 = conn
+            .query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |row| row.get(0))
+            .unwrap();
+
+        assert_eq!(stale_count, 0);
+        assert_eq!(version, 8);
+    }
 }

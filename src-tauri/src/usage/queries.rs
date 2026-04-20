@@ -9,6 +9,8 @@ use super::types::{
 };
 use super::helpers::now_epoch_seconds;
 
+const OVERVIEW_BREAKDOWN_LIMIT: i64 = 25;
+
 /// Pricing rates per million tokens for a model.
 struct ModelPricing {
     input_per_m: f64,
@@ -991,13 +993,13 @@ fn query_top_models_all(
              WHERE timestamp >= ?1
              GROUP BY provider, COALESCE(pricing_provider, provider), model
              ORDER BY 4 DESC
-             LIMIT 6",
+             LIMIT ?2",
         ) {
         Ok(s) => s,
         Err(_) => return Vec::new(),
     };
 
-    let rows = match stmt.query_map(params![since], |row| {
+    let rows = match stmt.query_map(params![since, OVERVIEW_BREAKDOWN_LIMIT], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,
@@ -1063,13 +1065,13 @@ fn query_top_projects_all(
              WHERE timestamp >= ?1
              GROUP BY provider, project
              ORDER BY 3 DESC
-             LIMIT 6",
+             LIMIT ?2",
         ) {
         Ok(s) => s,
         Err(_) => return Vec::new(),
     };
 
-    let rows = match stmt.query_map(params![since], |row| {
+    let rows = match stmt.query_map(params![since, OVERVIEW_BREAKDOWN_LIMIT], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,
@@ -1568,4 +1570,30 @@ fn align_to_local_hour(conn: &Connection, since: i64) -> i64 {
         params![since],
         |row| row.get::<_, i64>(0),
     ).unwrap_or(since)
+}
+
+pub fn models_for_provider(conn: &Connection, provider: &str) -> Vec<String> {
+    let pricing_provider = match provider {
+        "claude" => "anthropic",
+        "codex" => "openai",
+        "gemini" => "google",
+        other => other,
+    };
+
+    let mut stmt = match conn.prepare(
+        "SELECT model_pattern
+         FROM model_pricing
+         WHERE provider = ?1 AND release_date >= date('now', '-2 years')
+         ORDER BY release_date DESC",
+    ) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+
+    let rows = match stmt.query_map(params![pricing_provider], |row| row.get::<_, String>(0)) {
+        Ok(r) => r,
+        Err(_) => return Vec::new(),
+    };
+
+    rows.filter_map(|r| r.ok()).collect()
 }

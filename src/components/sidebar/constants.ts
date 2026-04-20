@@ -1,15 +1,15 @@
 import type { CodingAssistant } from "../../lib/types";
 
 export const CODING_ASSISTANTS: CodingAssistant[] = [
-  { id: "claude", name: "Claude Code", command: "claude", yoloFlag: "--dangerously-skip-permissions" },
-  { id: "codex", name: "Codex", command: "codex", yoloFlag: "--full-auto" },
-  { id: "gemini", name: "Gemini", command: "gemini", yoloFlag: null },
-  { id: "opencode", name: "Open Code", command: "opencode", yoloFlag: null },
-  { id: "pi", name: "pi", command: "pi", yoloFlag: null },
+  { id: "claude", name: "Claude Code", command: "claude", yoloFlag: "--dangerously-skip-permissions", modelFlag: "--model" },
+  { id: "codex", name: "Codex", command: "codex", yoloFlag: "--full-auto", modelFlag: "--model" },
+  { id: "gemini", name: "Gemini", command: "gemini", yoloFlag: null, modelFlag: "--model" },
+  { id: "opencode", name: "Open Code", command: "opencode", yoloFlag: null, modelFlag: "--model" },
+  { id: "pi", name: "pi", command: "pi", yoloFlag: null, modelFlag: "--model" },
 ];
 
 export const ASSISTANT_INSTALL_URLS: Record<string, string> = {
-  claude: "https://code.claude.com/docs/en/overview",
+  claude: "https://code.claude.com/docs/en",
   codex: "https://github.com/openai/codex",
   gemini: "https://github.com/google-gemini/gemini-cli",
   opencode: "https://opencode.ai/",

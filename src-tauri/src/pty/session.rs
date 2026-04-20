@@ -325,6 +325,7 @@ fn get_all_descendants(root_pid: i32) -> Vec<i32> {
 impl PtySession {
     pub fn spawn(
         command: &str,
+        args: Option<Vec<String>>,
         cwd: &str,
         env: HashMap<String, String>,
         cols: u16,
@@ -347,7 +348,16 @@ impl PtySession {
         cmd.arg("-l");
         cmd.arg("-i");
         cmd.arg("-c");
-        cmd.arg(command);
+        if let Some(args) = args {
+            cmd.arg("exec \"$@\"");
+            cmd.arg("shep");
+            cmd.arg(command);
+            for arg in args {
+                cmd.arg(arg);
+            }
+        } else {
+            cmd.arg(command);
+        }
         cmd.cwd(cwd);
 
         for (key, val) in &env {

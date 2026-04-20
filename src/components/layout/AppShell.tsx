@@ -401,9 +401,9 @@ export default function AppShell() {
   }, []);
 
   const handleStartSession = useCallback(
-    async (assistantId: string, mode: SessionMode) => {
+    async (assistantId: string, mode: SessionMode, model?: string) => {
       const { cols, rows } = getTerminalDimensions();
-      const ptyId = await launchAssistant(assistantId, cols, rows, mode);
+      const ptyId = await launchAssistant(assistantId, cols, rows, mode, model);
       if (ptyId) {
         // Remove the launcher panel tab — the new terminal tab is now active
         useTerminalStore.getState().removePanelTab("launcher");

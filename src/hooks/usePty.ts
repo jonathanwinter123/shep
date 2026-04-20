@@ -161,6 +161,7 @@ export function usePty() {
   const spawnSession = useCallback(
     async (
       command: string,
+      commandArgs: string[] | null,
       env: Record<string, string>,
       cols: number,
       rows: number,
@@ -179,6 +180,7 @@ export function usePty() {
 
       const ptyId = await spawnPty(
         command,
+        commandArgs,
         repoPath,
         fullEnv,
         cols,
@@ -216,6 +218,7 @@ export function usePty() {
       try {
         const ptyId = await spawnSession(
           command.command,
+          null,
           command.env,
           cols,
           rows,
@@ -311,6 +314,7 @@ export function usePty() {
         const shell = await getDefaultShell();
         const ptyId = await spawnSession(
           `${shell} -l`,
+          null,
           {},
           cols,
           rows,
@@ -353,19 +357,24 @@ export function usePty() {
       cols: number,
       rows: number,
       mode: SessionMode = "standard",
+      model?: string,
     ) => {
       if (!activeRepoPath) return;
       const assistant = CODING_ASSISTANTS.find((a) => a.id === assistantId);
       if (!assistant) return;
 
-      let command = assistant.command;
+      const commandArgs: string[] = [];
+      if (model) {
+        commandArgs.push(assistant.modelFlag, model);
+      }
       if (mode === "yolo" && assistant.yoloFlag) {
-        command = `${command} ${assistant.yoloFlag}`;
+        commandArgs.push(assistant.yoloFlag);
       }
 
       try {
         const ptyId = await spawnSession(
-          command,
+          assistant.command,
+          commandArgs,
           {},
           cols,
           rows,

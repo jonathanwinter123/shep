@@ -1,6 +1,9 @@
 use std::collections::HashMap;
+use std::io::Read;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 use tauri::ipc::Channel;
 use tauri::{Emitter, State};
 use url::Url;
@@ -247,6 +250,7 @@ pub fn move_repo_to_group(
 #[allow(clippy::too_many_arguments)]
 pub fn spawn_pty(
     command: &str,
+    args: Option<Vec<String>>,
     cwd: &str,
     env: HashMap<String, String>,
     cols: u16,
@@ -255,7 +259,7 @@ pub fn spawn_pty(
     on_data: Channel<PtyOutput>,
     pty_manager: State<'_, PtyManager>,
 ) -> Result<u32, String> {
-    pty_manager.spawn(command, cwd, env, cols, rows, color_theme, on_data)
+    pty_manager.spawn(command, args, cwd, env, cols, rows, color_theme, on_data)
 }
 
 #[tauri::command]
@@ -513,6 +517,113 @@ pub async fn get_project_alias_review_queue(
     db: State<'_, UsageDb>,
 ) -> Result<Vec<UsageProjectAliasReviewItem>, String> {
     Ok(crate::usage::get_project_alias_review_queue(&db))
+}
+
+#[tauri::command]
+pub async fn get_models_for_provider(
+    db: State<'_, UsageDb>,
+    provider: String,
+) -> Result<Vec<String>, String> {
+    match provider.as_str() {
+        "pi" => Ok(sort_cli_models(&db, query_cli_models("pi", &["--list-models"], parse_pi_models))),
+        "opencode" => Ok(sort_cli_models(&db, query_cli_models("opencode", &["models"], parse_opencode_models))),
+        _ => Ok(crate::usage::get_models_for_provider(&db, &provider)),
+    }
+}
+
+fn query_cli_models(
+    cmd: &str,
+    args: &[&str],
+    parser: fn(&str) -> Vec<String>,
+) -> Vec<String> {
+    let mut child = match Command::new(cmd)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(_) => return Vec::new(),
+    };
+
+    let Some(mut stdout) = child.stdout.take() else {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Vec::new();
+    };
+
+    let reader = thread::spawn(move || {
+        let mut text = String::new();
+        stdout.read_to_string(&mut text).map(|_| text).ok()
+    });
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let output = reader.join().ok().flatten();
+                if !status.success() {
+                    return Vec::new();
+                }
+                return output.map(|text| parser(&text)).unwrap_or_default();
+            }
+            Ok(None) if Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = reader.join();
+                return Vec::new();
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(50)),
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = reader.join();
+                return Vec::new();
+            }
+        }
+    }
+}
+
+fn sort_cli_models(db: &UsageDb, models: Vec<String>) -> Vec<String> {
+    let conn = db.conn.lock().unwrap();
+    let mut dated: Vec<(String, String)> = models
+        .into_iter()
+        .map(|name| {
+            let date = name.split_once('/')
+                .and_then(|(provider, model)| {
+                    conn.query_row(
+                        "SELECT COALESCE(release_date, '2000-01-01') FROM model_pricing WHERE provider = ?1 AND model_pattern = ?2",
+                        rusqlite::params![provider, model],
+                        |row| row.get::<_, String>(0),
+                    ).ok()
+                })
+                .unwrap_or_else(|| "2000-01-01".to_string());
+            (name, date)
+        })
+        .collect();
+    dated.sort_by(|a, b| b.1.cmp(&a.1));
+    dated.into_iter().map(|(name, _)| name).collect()
+}
+
+/// Parse `pi --list-models` table: "provider  model  context  ..."
+fn parse_pi_models(text: &str) -> Vec<String> {
+    text.lines()
+        .skip(1) // header row
+        .filter_map(|line| {
+            let mut cols = line.split_whitespace();
+            let provider = cols.next()?;
+            let model = cols.next()?;
+            Some(format!("{provider}/{model}"))
+        })
+        .collect()
+}
+
+/// Parse `opencode models` output: "provider/model" per line
+fn parse_opencode_models(text: &str) -> Vec<String> {
+    text.lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect()
 }
 
 #[tauri::command]

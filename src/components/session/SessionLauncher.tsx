@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import type { CodingAssistant, SessionMode } from "../../lib/types";
 import { CODING_ASSISTANTS } from "../sidebar/constants";
-import { checkCommandExists } from "../../lib/tauri";
+import { checkCommandExists, getModelsForProvider } from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
-import { HandMetal } from "lucide-react";
+import { HandMetal, ChevronDown, Check } from "lucide-react";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { ASSISTANT_INSTALL_URLS } from "../sidebar/constants";
 
@@ -11,6 +11,7 @@ interface SessionLauncherProps {
   onStartSession: (
     assistantId: string,
     mode: SessionMode,
+    model?: string,
   ) => Promise<boolean>;
 }
 
@@ -22,6 +23,15 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   const [installPopover, setInstallPopover] = useState<string | null>(null);
   const [mode, setMode] = useState<SessionMode>("standard");
   const [launching, setLaunching] = useState(false);
+
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [modelFetchStatus, setModelFetchStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle");
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [modelSearch, setModelSearch] = useState("");
+  const modelPickerRef = useRef<HTMLDivElement>(null);
+  const modelSearchRef = useRef<HTMLInputElement>(null);
+  const modelRequestRef = useRef(0);
 
   // Check which assistants are installed
   useEffect(() => {
@@ -49,11 +59,60 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
     };
   }, [installPopover]);
 
+  // Close model picker on outside click
+  useEffect(() => {
+    if (!modelPickerOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (modelPickerRef.current && !modelPickerRef.current.contains(e.target as Node)) {
+        setModelPickerOpen(false);
+      }
+    };
+    const timer = setTimeout(() => document.addEventListener("mousedown", handleClick), 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [modelPickerOpen]);
+
+  const filteredModels = useMemo(() => {
+    if (!modelSearch) return availableModels;
+    const q = modelSearch.toLowerCase();
+    return availableModels.filter((m) => m.toLowerCase().includes(q));
+  }, [availableModels, modelSearch]);
+
+  const handleSelectAssistant = (assistant: CodingAssistant) => {
+    const requestId = modelRequestRef.current + 1;
+    modelRequestRef.current = requestId;
+    setSelectedAssistant(assistant);
+    setSelectedModel(null);
+    setModelPickerOpen(false);
+    setAvailableModels([]);
+    setModelFetchStatus("loading");
+    getModelsForProvider(assistant.id)
+      .then((models) => {
+        if (modelRequestRef.current !== requestId) return;
+        setAvailableModels(models);
+        setModelFetchStatus("loaded");
+      })
+      .catch((error) => {
+        if (modelRequestRef.current !== requestId) return;
+        if (import.meta.env.DEV) {
+          console.error(`Failed to load models for ${assistant.id}:`, error);
+        }
+        setAvailableModels([]);
+        setModelFetchStatus("error");
+      });
+  };
+
   const handleStart = async () => {
     if (!selectedAssistant || !activeRepoPath || launching) return;
     setLaunching(true);
 
-    const started = await onStartSession(selectedAssistant.id, mode);
+    const started = await onStartSession(
+      selectedAssistant.id,
+      mode,
+      selectedModel ?? undefined,
+    );
     if (!started) {
       setLaunching(false);
     }
@@ -84,7 +143,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
                   className={`option-card ${isSelected ? "selected" : ""} ${!isAvailable ? "opacity-40" : ""}`}
                   onClick={() => {
                     if (isAvailable) {
-                      setSelectedAssistant(assistant);
+                      handleSelectAssistant(assistant);
                       setInstallPopover(null);
                     } else {
                       setInstallPopover(showPopover ? null : assistant.id);
@@ -163,6 +222,96 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
               <HandMetal size={14} />
               YOLO
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Model selector */}
+      {selectedAssistant && (
+        <div className="mb-6">
+          <label className="section-label !p-0 mb-3 block text-xs opacity-50">Model</label>
+          <div className="relative" ref={modelPickerRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setModelPickerOpen((open) => {
+                  const next = !open;
+                  if (next) {
+                    setModelSearch("");
+                    window.setTimeout(() => modelSearchRef.current?.focus(), 0);
+                  }
+                  return next;
+                });
+              }}
+              className="option-card option-card--compact justify-between"
+              aria-busy={modelFetchStatus === "loading"}
+              style={{ minWidth: 240 }}
+            >
+              <span className="truncate">
+                {modelFetchStatus === "loading" ? "Loading..." : selectedModel ?? "Default"}
+              </span>
+              <ChevronDown size={14} className="shrink-0 opacity-60" />
+            </button>
+
+            {modelPickerOpen && (
+              <div className="font-picker-dropdown">
+                <input
+                  ref={modelSearchRef}
+                  type="text"
+                  value={modelSearch}
+                  onChange={(e) => setModelSearch(e.target.value)}
+                  placeholder="Search models..."
+                  className="font-picker-search"
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setModelPickerOpen(false);
+                  }}
+                />
+                <div className="font-picker-list">
+                  {/* Default option — always first */}
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedModel(null); setModelPickerOpen(false); }}
+                    className={`font-picker-item ${selectedModel === null ? "font-picker-item--active" : ""}`}
+                  >
+                    <Check
+                      size={14}
+                      className={`shrink-0 ${selectedModel === null ? "opacity-100" : "opacity-0"}`}
+                    />
+                    <span className="font-picker-item__name">Default</span>
+                  </button>
+
+                  {modelFetchStatus === "loading" && (
+                    <div className="font-picker-empty">Loading models...</div>
+                  )}
+                  {modelFetchStatus === "error" && (
+                    <div className="font-picker-empty">Could not load models - using default</div>
+                  )}
+                  {modelFetchStatus === "loaded" && availableModels.length === 0 && !modelSearch && (
+                    <div className="font-picker-empty">No models found - using default</div>
+                  )}
+                  {modelFetchStatus === "loaded" && filteredModels.length === 0 && modelSearch && (
+                    <div className="font-picker-empty">No matching models</div>
+                  )}
+                  {modelFetchStatus === "loaded" && filteredModels.map((model) => {
+                    const active = selectedModel === model;
+                    return (
+                      <button
+                        key={model}
+                        type="button"
+                        onClick={() => { setSelectedModel(model); setModelPickerOpen(false); }}
+                        className={`font-picker-item ${active ? "font-picker-item--active" : ""}`}
+                      >
+                        <Check
+                          size={14}
+                          className={`shrink-0 ${active ? "opacity-100" : "opacity-0"}`}
+                        />
+                        <span className="font-picker-item__name">{model}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

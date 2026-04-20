@@ -175,9 +175,9 @@ fn ingest_claude_file(conn: &Connection, path: &Path) -> Result<(), String> {
 
         conn.execute(
             "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total, pricing_provider)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10, ?1)",
+             VALUES ('claude', ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0, ?9, 'anthropic')",
             params![
-                "claude", session_id, project_name, model, ts as i64,
+                session_id, project_name, model, ts as i64,
                 input as i64, output as i64, cache_write as i64, cache_read as i64, total as i64
             ],
         ).map_err(|e| e.to_string())?;
@@ -308,7 +308,7 @@ fn ingest_gemini_file(conn: &Connection, path: &Path) -> Result<(), String> {
 
             conn.execute(
                 "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total, pricing_provider)
-                 VALUES ('gemini', ?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9, 'gemini')",
+                 VALUES ('gemini', ?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9, 'google')",
         params![
             session_id, project, model, session_ts as i64,
             input as i64, output as i64, cached as i64, thoughts as i64, total as i64
@@ -475,7 +475,7 @@ fn ingest_codex_file(conn: &Connection, path: &Path) -> Result<(), String> {
 
     conn.execute(
         "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total, pricing_provider)
-         VALUES ('codex', ?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9, 'codex')",
+         VALUES ('codex', ?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9, 'openai')",
         params![
             session_id, project, model, timestamp as i64,
             non_cached_input as i64, output as i64, cached_input as i64, reasoning as i64, total as i64
@@ -790,14 +790,12 @@ fn ingest_pi_file(conn: &Connection, path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Map pi's provider name (from message.provider) to the pricing_provider
-/// key used in the model_pricing table. Unknown providers pass through, which
-/// means tokens are tracked but no cost is computed.
+/// Map pi's provider name to the pricing_provider key used in model_pricing.
+/// Uses models.dev native names so pricing lookups are consistent.
 fn map_pi_provider(pi_provider: &str) -> String {
     match pi_provider {
-        "anthropic" => "claude".to_string(),
-        "openai" | "azure" => "codex".to_string(),
-        p if p.starts_with("google") => "gemini".to_string(),
+        "azure" => "openai".to_string(),
+        p if p.starts_with("google") => "google".to_string(),
         other => other.to_string(),
     }
 }
