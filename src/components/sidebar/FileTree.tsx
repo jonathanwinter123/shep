@@ -92,7 +92,9 @@ export default function FileTree({ repoPath }: FileTreeProps) {
             if (entry.is_dir) {
               toggleDir(repoPath, entry.path);
             } else {
-              useUIStore.getState().openFilePreview();
+              if (!useUIStore.getState().filePreviewActive) {
+                useUIStore.getState().toggleFilePreview();
+              }
               openPreview(entry.path);
             }
           }}

@@ -1,18 +1,28 @@
 use std::collections::HashMap;
+use std::io::Read;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 use tauri::ipc::Channel;
 use tauri::{Emitter, State};
+use url::Url;
 
+use crate::fonts::{self, FontFaceData, FontFamily};
 use crate::git;
 use crate::git::{ChangedFile, CreatedWorktree, GitStatus, WorktreeEntry};
 use crate::tab_state::{self, PersistedTab};
 use crate::session_history::{SessionMessage, SessionSummary};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::{PtyColorTheme, PtyOutput};
-use crate::usage::{LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview};
+use crate::usage::{
+    LocalUsageDetails, ProviderUsageSnapshot, UsageDb, UsageOverview, UsageProjectAliasReviewItem,
+};
 use crate::watcher::GitWatcher;
-use crate::workspace::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig};
+use crate::workspace::config::{
+    normalize_terminal_settings, EditorSettings, GroupEntry, KeybindingSettings, ProjectSettings,
+    RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig,
+};
 use crate::workspace::manager::WorkspaceManager;
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -68,11 +78,26 @@ pub fn get_editor_settings(
 }
 
 #[tauri::command]
+pub fn get_project_settings(
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<ProjectSettings, String> {
+    workspace.load_project_settings()
+}
+
+#[tauri::command]
 pub fn save_editor_settings(
     settings: EditorSettings,
     workspace: State<'_, WorkspaceManager>,
 ) -> Result<(), String> {
     workspace.save_editor_settings(&settings)
+}
+
+#[tauri::command]
+pub fn save_project_settings(
+    settings: ProjectSettings,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<(), String> {
+    workspace.save_project_settings(&settings)
 }
 
 #[tauri::command]
@@ -94,15 +119,32 @@ pub fn save_keybinding_settings(
 pub fn get_terminal_settings(
     workspace: State<'_, WorkspaceManager>,
 ) -> Result<TerminalSettings, String> {
-    workspace.load_terminal_settings()
+    let mut settings = workspace.load_terminal_settings()?;
+    normalize_terminal_settings(&mut settings);
+    Ok(settings)
 }
 
 #[tauri::command]
 pub fn save_terminal_settings(
-    settings: TerminalSettings,
+    mut settings: TerminalSettings,
     workspace: State<'_, WorkspaceManager>,
 ) -> Result<(), String> {
+    normalize_terminal_settings(&mut settings);
     workspace.save_terminal_settings(&settings)
+}
+
+#[tauri::command]
+pub fn list_monospace_families() -> Vec<FontFamily> {
+    fonts::list_monospace_families()
+}
+
+#[tauri::command]
+pub async fn load_font_family(family: String) -> Vec<FontFaceData> {
+    // Font file reads can total 10+ MB for a large family. Run on the blocking
+    // thread pool so the Tauri runtime isn't stalled.
+    tauri::async_runtime::spawn_blocking(move || fonts::load_font_family(&family))
+        .await
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -145,9 +187,15 @@ pub fn reveal_in_finder(path: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn open_url(url: &str) -> Result<(), String> {
-    if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err("Only http/https URLs are allowed".to_string());
+pub fn open_url(url: &str, workspace: State<'_, WorkspaceManager>) -> Result<(), String> {
+    let parsed = Url::parse(url).map_err(|_| "Invalid URL".to_string())?;
+    let scheme = parsed.scheme().to_ascii_lowercase();
+
+    let mut settings = workspace.load_terminal_settings()?;
+    normalize_terminal_settings(&mut settings);
+
+    if !settings.url_allowlist.iter().any(|allowed| allowed == &scheme) {
+        return Err(format!("URL scheme '{scheme}' is not allowed"));
     }
 
     let status = Command::new("open")
@@ -281,12 +329,54 @@ pub async fn read_file_contents(path: String, max_bytes: u64) -> Result<FileCont
     })
 }
 
+// ── Group commands ─────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn list_groups(workspace: State<'_, WorkspaceManager>) -> Result<Vec<GroupEntry>, String> {
+    workspace.list_groups()
+}
+
+#[tauri::command]
+pub fn create_group(
+    name: &str,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<GroupEntry, String> {
+    workspace.create_group(name)
+}
+
+#[tauri::command]
+pub fn rename_group(
+    group_id: &str,
+    new_name: &str,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<(), String> {
+    workspace.rename_group(group_id, new_name)
+}
+
+#[tauri::command]
+pub fn delete_group(
+    group_id: &str,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<(), String> {
+    workspace.delete_group(group_id)
+}
+
+#[tauri::command]
+pub fn move_repo_to_group(
+    repo_path: &str,
+    group_id: Option<&str>,
+    workspace: State<'_, WorkspaceManager>,
+) -> Result<(), String> {
+    workspace.move_repo_to_group(repo_path, group_id)
+}
+
 // ── PTY commands ────────────────────────────────────────────────────
 
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub fn spawn_pty(
     command: &str,
+    args: Option<Vec<String>>,
     cwd: &str,
     env: HashMap<String, String>,
     cols: u16,
@@ -295,7 +385,7 @@ pub fn spawn_pty(
     on_data: Channel<PtyOutput>,
     pty_manager: State<'_, PtyManager>,
 ) -> Result<u32, String> {
-    pty_manager.spawn(command, cwd, env, cols, rows, color_theme, on_data)
+    pty_manager.spawn(command, args, cwd, env, cols, rows, color_theme, on_data)
 }
 
 #[tauri::command]
@@ -412,6 +502,16 @@ pub async fn git_file_diff(path: String, file_path: String, staged: bool) -> Res
 }
 
 #[tauri::command]
+pub async fn git_file_contents(path: String, file_path: String, source: String) -> Result<String, String> {
+    git::file_contents(&path, &file_path, &source)
+}
+
+#[tauri::command]
+pub async fn git_list_files(path: String) -> Result<Vec<String>, String> {
+    git::list_files(&path)
+}
+
+#[tauri::command]
 pub async fn git_stage_file(path: String, file_path: String) -> Result<(), String> {
     git::stage_file(&path, &file_path)
 }
@@ -432,6 +532,11 @@ pub async fn git_unstage_file(path: String, file_path: String) -> Result<(), Str
 }
 
 #[tauri::command]
+pub async fn git_unstage_all(path: String) -> Result<(), String> {
+    git::unstage_all(&path)
+}
+
+#[tauri::command]
 pub async fn git_switch_branch(path: String, branch_name: String) -> Result<(), String> {
     git::switch_branch(&path, &branch_name)
 }
@@ -446,6 +551,13 @@ pub async fn git_create_branch(path: String, branch_name: String) -> Result<(), 
 #[tauri::command]
 pub fn get_username() -> String {
     std::env::var("USER").unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn get_home_directory() -> Result<String, String> {
+    dirs::home_dir()
+        .map(|path| path.to_string_lossy().to_string())
+        .ok_or_else(|| "Could not find home directory".to_string())
 }
 
 #[tauri::command]
@@ -495,8 +607,9 @@ pub async fn get_usage_snapshot(
 fn enabled_providers(workspace: &State<'_, WorkspaceManager>) -> crate::usage::EnabledProviders {
     let settings = workspace.load_usage_settings().unwrap_or_default();
     crate::usage::EnabledProviders {
-        claude: settings.show_claude,
-        codex: settings.show_codex,
+        claude: settings.claude.show,
+        codex: settings.codex.show,
+        gemini: settings.gemini.show,
     }
 }
 
@@ -523,6 +636,120 @@ pub async fn get_usage_details(db: State<'_, UsageDb>, provider: String, window:
 #[tauri::command]
 pub async fn get_usage_overview(db: State<'_, UsageDb>, window: String) -> Result<UsageOverview, String> {
     crate::usage::get_usage_overview(&db, &window)
+}
+
+#[tauri::command]
+pub async fn get_project_alias_review_queue(
+    db: State<'_, UsageDb>,
+) -> Result<Vec<UsageProjectAliasReviewItem>, String> {
+    Ok(crate::usage::get_project_alias_review_queue(&db))
+}
+
+#[tauri::command]
+pub async fn get_models_for_provider(
+    db: State<'_, UsageDb>,
+    provider: String,
+) -> Result<Vec<String>, String> {
+    match provider.as_str() {
+        "pi" => Ok(sort_cli_models(&db, query_cli_models("pi", &["--list-models"], parse_pi_models))),
+        "opencode" => Ok(sort_cli_models(&db, query_cli_models("opencode", &["models"], parse_opencode_models))),
+        _ => Ok(crate::usage::get_models_for_provider(&db, &provider)),
+    }
+}
+
+fn query_cli_models(
+    cmd: &str,
+    args: &[&str],
+    parser: fn(&str) -> Vec<String>,
+) -> Vec<String> {
+    let mut child = match Command::new(cmd)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(_) => return Vec::new(),
+    };
+
+    let Some(mut stdout) = child.stdout.take() else {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Vec::new();
+    };
+
+    let reader = thread::spawn(move || {
+        let mut text = String::new();
+        stdout.read_to_string(&mut text).map(|_| text).ok()
+    });
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let output = reader.join().ok().flatten();
+                if !status.success() {
+                    return Vec::new();
+                }
+                return output.map(|text| parser(&text)).unwrap_or_default();
+            }
+            Ok(None) if Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = reader.join();
+                return Vec::new();
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(50)),
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = reader.join();
+                return Vec::new();
+            }
+        }
+    }
+}
+
+fn sort_cli_models(db: &UsageDb, models: Vec<String>) -> Vec<String> {
+    let conn = db.conn.lock().unwrap();
+    let mut dated: Vec<(String, String)> = models
+        .into_iter()
+        .map(|name| {
+            let date = name.split_once('/')
+                .and_then(|(provider, model)| {
+                    conn.query_row(
+                        "SELECT COALESCE(release_date, '2000-01-01') FROM model_pricing WHERE provider = ?1 AND model_pattern = ?2",
+                        rusqlite::params![provider, model],
+                        |row| row.get::<_, String>(0),
+                    ).ok()
+                })
+                .unwrap_or_else(|| "2000-01-01".to_string());
+            (name, date)
+        })
+        .collect();
+    dated.sort_by(|a, b| b.1.cmp(&a.1));
+    dated.into_iter().map(|(name, _)| name).collect()
+}
+
+/// Parse `pi --list-models` table: "provider  model  context  ..."
+fn parse_pi_models(text: &str) -> Vec<String> {
+    text.lines()
+        .skip(1) // header row
+        .filter_map(|line| {
+            let mut cols = line.split_whitespace();
+            let provider = cols.next()?;
+            let model = cols.next()?;
+            Some(format!("{provider}/{model}"))
+        })
+        .collect()
+}
+
+/// Parse `opencode models` output: "provider/model" per line
+fn parse_opencode_models(text: &str) -> Vec<String> {
+    text.lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect()
 }
 
 #[tauri::command]

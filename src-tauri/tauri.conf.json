@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "shep",
-  "version": "0.1.4",
+  "version": "0.2.3",
   "identifier": "com.shep.terminal",
   "build": {
     "frontendDist": "../dist",
@@ -30,6 +30,7 @@
     "security": {
       "csp": {
         "default-src": "'self' customprotocol: asset:",
+        "script-src": "'self' 'wasm-unsafe-eval'",
         "connect-src": "ipc: http://ipc.localhost https://github.com https://objects.githubusercontent.com",
         "img-src": "'self' asset: http://asset.localhost data: blob:",
         "style-src": "'unsafe-inline' 'self'",

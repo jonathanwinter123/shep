@@ -1,16 +1,16 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { RepoInfo, WorktreeEntry } from "../../lib/types";
+import type { RepoInfo, RepoGroup } from "../../lib/types";
 import { getEditorLabel } from "../../lib/editors";
 import { useEditorStore } from "../../stores/useEditorStore";
 import {
   Folder,
   FolderOpen,
+  FolderInput,
   GitFork,
   Plus,
   Copy,
   Trash2,
   SquareArrowOutUpRight,
-  Search,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import ContextMenu from "../shared/ContextMenu";
@@ -18,7 +18,7 @@ import type { ContextMenuItem } from "../shared/ContextMenu";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
 import { handleActionKey } from "../../lib/a11y";
-import { gitCreateWorktree, gitListWorktrees, revealInFinder } from "../../lib/tauri";
+import { gitCreateWorktree, revealInFinder } from "../../lib/tauri";
 
 interface ProjectItemProps {
   repo: RepoInfo;
@@ -26,11 +26,13 @@ interface ProjectItemProps {
   isExpanded: boolean;
   activity?: { terminalCount: number; runningCount: number; hasAttention: boolean; hasCrash: boolean };
   worktreeParent?: string | null;
-  existingPaths: Set<string>;
+  groups: RepoGroup[];
   onClick: () => void;
   onRemove: () => void;
   onOpenInEditor: () => void;
-  onAddProject: (repoPath: string) => void;
+  onAddProject: (repoPath: string) => Promise<void>;
+  onMoveToGroup: (repoPath: string, groupId: string | null) => Promise<void>;
+  onNewGroupForRepo: (repoPath: string) => void;
 }
 
 export default function ProjectItem({
@@ -39,11 +41,13 @@ export default function ProjectItem({
   isExpanded,
   activity,
   worktreeParent,
-  existingPaths,
+  groups,
   onClick,
   onRemove,
   onOpenInEditor,
   onAddProject,
+  onMoveToGroup,
+  onNewGroupForRepo,
 }: ProjectItemProps) {
   const hasActivity = activity && (activity.terminalCount > 0 || activity.runningCount > 0);
   const dotColor = activity?.hasCrash
@@ -59,34 +63,10 @@ export default function ProjectItem({
     ? `Open in ${preferredEditorLabel}`
     : "Set Editor Preference";
 
-  // Worktree picker state
-  const [wtPicker, setWtPicker] = useState<{ x: number; y: number } | null>(null);
-  const [wtEntries, setWtEntries] = useState<WorktreeEntry[]>([]);
-  const [wtSelected, setWtSelected] = useState<Set<string>>(new Set());
-  const wtRef = useRef<HTMLDivElement>(null);
   const [wtCreate, setWtCreate] = useState<{ x: number; y: number } | null>(null);
   const [wtBranchName, setWtBranchName] = useState("");
   const [creatingWorktree, setCreatingWorktree] = useState(false);
   const wtCreateRef = useRef<HTMLDivElement>(null);
-
-  // Close picker on outside click
-  useEffect(() => {
-    if (!wtPicker) return;
-    const handle = (e: MouseEvent) => {
-      if (wtRef.current && !wtRef.current.contains(e.target as Node)) {
-        setWtPicker(null);
-      }
-    };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setWtPicker(null);
-    };
-    document.addEventListener("mousedown", handle, true);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handle, true);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [wtPicker]);
 
   useEffect(() => {
     if (!wtCreate) return;
@@ -119,32 +99,6 @@ export default function ProjectItem({
     setMenu(null);
   }, []);
 
-  const handleDiscoverWorktrees = async () => {
-    try {
-      const worktrees = await gitListWorktrees(repo.path);
-      const available = worktrees.filter(
-        (wt) => !wt.is_main && wt.path && !existingPaths.has(wt.path),
-      );
-      if (available.length === 0) {
-        pushNotice({ tone: "success", title: "No new worktrees found", message: repo.name });
-        return;
-      }
-      setWtEntries(available);
-      setWtSelected(new Set(available.map((wt) => wt.path)));
-      // Position near the context menu
-      setWtPicker(menu ?? { x: 200, y: 200 });
-    } catch (error) {
-      pushNotice({ tone: "error", title: "Couldn't discover worktrees", message: getErrorMessage(error) });
-    }
-  };
-
-  const handleAddSelected = () => {
-    for (const path of wtSelected) {
-      onAddProject(path);
-    }
-    setWtPicker(null);
-  };
-
   const handleOpenCreateWorktree = () => {
     setWtCreate(menu ?? { x: 200, y: 200 });
     setWtBranchName("");
@@ -156,7 +110,10 @@ export default function ProjectItem({
     setCreatingWorktree(true);
     try {
       const created = await gitCreateWorktree(repo.path, branchName);
-      onAddProject(created.path);
+      await onAddProject(created.path);
+      if (repo.group) {
+        await onMoveToGroup(created.path, repo.group);
+      }
       setWtCreate(null);
       setWtBranchName("");
     } catch (error) {
@@ -180,6 +137,29 @@ export default function ProjectItem({
   const createPathPreview = branchSlugPreview
     ? `.shep-worktrees/${repo.name}/${branchSlugPreview}`
     : null;
+
+  // Build "Move to" submenu children
+  const otherGroups = groups.filter((g) => g.id !== repo.group);
+  const moveToChildren: ContextMenuItem[] = [
+    ...otherGroups.map((g) => ({
+      label: g.name,
+      onClick: () => onMoveToGroup(repo.path, g.id),
+    })),
+    ...(otherGroups.length > 0 || repo.group ? [{ separator: true, label: "_sep_new" }] : []),
+    {
+      label: "New Group",
+      onClick: () => onNewGroupForRepo(repo.path),
+    },
+    ...(repo.group
+      ? [
+          { separator: true, label: "_sep_remove" },
+          {
+            label: "Remove from group",
+            onClick: () => onMoveToGroup(repo.path, null),
+          },
+        ]
+      : []),
+  ];
 
   const menuItems: ContextMenuItem[] = [
     {
@@ -222,15 +202,15 @@ export default function ProjectItem({
           });
       },
     },
+    {
+      label: "Move to",
+      icon: <FolderInput size={14} />,
+      children: moveToChildren,
+    },
     ...(!worktreeParent ? [{
       label: "Create Worktree",
       icon: <Plus size={14} />,
       onClick: handleOpenCreateWorktree,
-    }] : []),
-    ...(!worktreeParent ? [{
-      label: "Discover Worktrees",
-      icon: <Search size={14} />,
-      onClick: handleDiscoverWorktrees,
     }] : []),
     {
       label: "Remove Project",
@@ -266,60 +246,13 @@ export default function ProjectItem({
           <span className="sidebar-status-dot" style={{ background: dotColor }} />
         )}
       </div>
-      {menu && (
+      {menu && createPortal(
         <ContextMenu
           x={menu.x}
           y={menu.y}
           items={menuItems}
           onClose={handleClose}
-        />
-      )}
-      {wtPicker && createPortal(
-        <div
-          ref={wtRef}
-          className="context-menu"
-          style={{ left: wtPicker.x, top: wtPicker.y, minWidth: 220 }}
-        >
-          <div style={{ padding: "6px 10px", fontSize: 11, opacity: 0.5 }}>
-            Select worktrees to add
-          </div>
-          {wtEntries.map((wt) => {
-            const checked = wtSelected.has(wt.path);
-            return (
-              <button
-                key={wt.path}
-                className="context-menu__item"
-                onClick={() => {
-                  setWtSelected((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(wt.path)) next.delete(wt.path);
-                    else next.add(wt.path);
-                    return next;
-                  });
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  readOnly
-                  style={{ accentColor: "var(--text-muted)", pointerEvents: "none" }}
-                />
-                <GitFork size={12} style={{ opacity: 0.5 }} />
-                <span>{wt.branch ?? wt.path}</span>
-              </button>
-            );
-          })}
-          <div style={{ padding: "6px 8px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-            <button
-              className="btn-primary"
-              style={{ width: "100%", fontSize: 12, padding: "4px 0" }}
-              disabled={wtSelected.size === 0}
-              onClick={handleAddSelected}
-            >
-              Add{wtSelected.size > 0 ? ` (${wtSelected.size})` : ""}
-            </button>
-          </div>
-        </div>,
+        />,
         document.body,
       )}
       {wtCreate && createPortal(

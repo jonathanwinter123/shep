@@ -4,6 +4,7 @@ import type { ShepTheme } from "../../lib/themes";
 import type { TerminalSettings } from "../../lib/types";
 import { resizePty } from "../../lib/tauri";
 import { terminalCache } from "./TerminalView";
+import { buildCSSFontFamily } from "../../lib/terminalConfig";
 
 // Utility to make hex colors partially transparent
 function withAlpha(hex: string, alpha: number): string {
@@ -62,20 +63,26 @@ export function applyThemeToTerminals(theme: ShepTheme): void {
 }
 
 export function applyTerminalSettings(settings: TerminalSettings): void {
+  const cssFont = buildCSSFontFamily(settings.fontFamily);
+
   for (const [ptyId, entry] of terminalCache) {
     const fontMetricsChanged =
-      entry.term.options.fontFamily !== settings.fontFamily ||
+      entry.term.options.fontFamily !== cssFont ||
       entry.term.options.fontSize !== settings.fontSize;
 
     entry.term.options.cursorStyle = settings.cursorStyle;
     entry.term.options.cursorBlink = settings.cursorBlink;
     entry.term.options.scrollback = settings.scrollback;
-    entry.term.options.fontFamily = settings.fontFamily;
+    entry.term.options.fontFamily = cssFont;
     entry.term.options.fontSize = settings.fontSize;
 
     const el = entry.term.element;
     if (!fontMetricsChanged || !el || el.offsetParent === null) continue;
 
+    // Clear the renderer's glyph texture atlas so the new font is measured
+    // and cached from scratch. Without this, xterm keeps rendering glyphs
+    // with the *old* font's metrics, causing clipping and misalignment.
+    entry.rendererAddon?.clearTextureAtlas?.();
     entry.fitAddon.fit();
     entry.term.refresh(0, entry.term.rows - 1);
     resizePty(ptyId, entry.term.cols, entry.term.rows).catch((error) => {

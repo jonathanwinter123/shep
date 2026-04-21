@@ -1,10 +1,12 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
 import type {
   RepoInfo,
+  RepoGroup,
   RegisteredRepo,
   WorkspaceConfig,
   PtyColorTheme,
   PtyOutput,
+  ProjectSettings,
   GitStatus,
   ChangedFile,
   WorktreeEntry,
@@ -12,11 +14,14 @@ import type {
   EditorSettings,
   KeybindingSettings,
   TerminalSettings,
+  FontFamily,
+  FontFaceData,
   PreferredEditor,
   ProviderUsageSnapshot,
   LocalUsageDetails,
   UsageSettings,
   UsageOverview,
+  UsageProjectAliasReviewItem,
   PortInfo,
   SessionSummary,
   SessionMessage,
@@ -39,6 +44,28 @@ export function unregisterRepo(repoPath: string): Promise<void> {
   return invoke("unregister_repo", { repoPath });
 }
 
+// ── Group commands ────────────────────────────────────────────────
+
+export function listGroups(): Promise<RepoGroup[]> {
+  return invoke("list_groups");
+}
+
+export function createGroup(name: string): Promise<RepoGroup> {
+  return invoke("create_group", { name });
+}
+
+export function renameGroup(groupId: string, newName: string): Promise<void> {
+  return invoke("rename_group", { groupId, newName });
+}
+
+export function deleteGroup(groupId: string): Promise<void> {
+  return invoke("delete_group", { groupId });
+}
+
+export function moveRepoToGroup(repoPath: string, groupId: string | null): Promise<void> {
+  return invoke("move_repo_to_group", { repoPath, groupId });
+}
+
 export function loadWorkspace(repoPath: string): Promise<WorkspaceConfig> {
   return invoke("load_workspace", { repoPath });
 }
@@ -54,8 +81,16 @@ export function getEditorSettings(): Promise<EditorSettings> {
   return invoke("get_editor_settings");
 }
 
+export function getProjectSettings(): Promise<ProjectSettings> {
+  return invoke("get_project_settings");
+}
+
 export function saveEditorSettings(settings: EditorSettings): Promise<void> {
   return invoke("save_editor_settings", { settings });
+}
+
+export function saveProjectSettings(settings: ProjectSettings): Promise<void> {
+  return invoke("save_project_settings", { settings });
 }
 
 export function getKeybindingSettings(): Promise<KeybindingSettings> {
@@ -72,6 +107,14 @@ export function getTerminalSettings(): Promise<TerminalSettings> {
 
 export function saveTerminalSettings(settings: TerminalSettings): Promise<void> {
   return invoke("save_terminal_settings", { settings });
+}
+
+export function listMonospaceFamilies(): Promise<FontFamily[]> {
+  return invoke("list_monospace_families");
+}
+
+export function loadFontFamily(family: string): Promise<FontFaceData[]> {
+  return invoke("load_font_family", { family });
 }
 
 export function openInEditor(
@@ -96,6 +139,7 @@ export function openUrl(url: string): Promise<void> {
 
 export function spawnPty(
   command: string,
+  args: string[] | null,
   cwd: string,
   env: Record<string, string>,
   cols: number,
@@ -107,6 +151,7 @@ export function spawnPty(
   channel.onmessage = onMessage;
   return invoke("spawn_pty", {
     command,
+    args,
     cwd,
     env,
     cols,
@@ -170,10 +215,6 @@ export function gitListBranches(path: string): Promise<string[]> {
   return invoke("git_list_branches", { path });
 }
 
-export function gitPushBranch(path: string, branch: string): Promise<void> {
-  return invoke("git_push_branch", { path, branch });
-}
-
 export function gitListWorktrees(path: string): Promise<WorktreeEntry[]> {
   return invoke("git_list_worktrees", { path });
 }
@@ -194,20 +235,21 @@ export function gitFileDiff(path: string, filePath: string, staged: boolean): Pr
   return invoke("git_file_diff", { path, filePath, staged });
 }
 
-export function gitStageFile(path: string, filePath: string): Promise<void> {
-  return invoke("git_stage_file", { path, filePath });
+/** Read a file's contents for preview in file-viewer mode. `source` is one
+ *  of: "working" (from disk), "staged" (from git index), "head" (from HEAD). */
+export function gitFileContents(
+  path: string,
+  filePath: string,
+  source: "working" | "staged" | "head",
+): Promise<string> {
+  return invoke("git_file_contents", { path, filePath, source });
 }
 
-export function gitStageAll(path: string): Promise<void> {
-  return invoke("git_stage_all", { path });
-}
-
-export function gitCommit(path: string, message: string): Promise<void> {
-  return invoke("git_commit", { path, message });
-}
-
-export function gitUnstageFile(path: string, filePath: string): Promise<void> {
-  return invoke("git_unstage_file", { path, filePath });
+/** List all files known to git — tracked + untracked-but-not-ignored.
+ *  Returns repo-relative paths, same set a user would consider "files in
+ *  this project" (build artifacts and node_modules are excluded). */
+export function gitListFiles(path: string): Promise<string[]> {
+  return invoke("git_list_files", { path });
 }
 
 export function gitSwitchBranch(path: string, branchName: string): Promise<void> {
@@ -222,6 +264,10 @@ export function gitCreateBranch(path: string, branchName: string): Promise<void>
 
 export function getUsername(): Promise<string> {
   return invoke("get_username");
+}
+
+export function getHomeDirectory(): Promise<string> {
+  return invoke("get_home_directory");
 }
 
 export function getDefaultShell(): Promise<string> {
@@ -258,6 +304,14 @@ export function getUsageDetails(provider: string, window: string): Promise<Local
 
 export function getUsageOverview(window: string): Promise<UsageOverview> {
   return invoke("get_usage_overview", { window });
+}
+
+export function getProjectAliasReviewQueue(): Promise<UsageProjectAliasReviewItem[]> {
+  return invoke("get_project_alias_review_queue");
+}
+
+export function getModelsForProvider(provider: string): Promise<string[]> {
+  return invoke("get_models_for_provider", { provider });
 }
 
 export function refreshUsageData(): Promise<void> {

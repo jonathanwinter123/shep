@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CircleHelp, Play, Plus, Save, Square, Terminal, Trash2, X } from "lucide-react";
+import { CircleHelp, Play, Plus, Save, Square, Trash2, X } from "lucide-react";
+import tabKindMeta from "../../lib/tabKindMeta";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import type { CommandConfig, CommandState } from "../../lib/types";
 
@@ -270,7 +271,7 @@ export default function CommandsPanel({
     <div className="commands-panel">
       <div className="commands-panel__header">
         <div className="commands-panel__title-wrap">
-          <Terminal size={15} className="shrink-0" />
+          <span className="shrink-0">{tabKindMeta.commands.icon(15)}</span>
           <div className="commands-panel__title-block">
             <div className="commands-panel__title">Commands</div>
             <div className="commands-panel__subtitle">

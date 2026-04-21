@@ -31,14 +31,32 @@ Before tagging a release:
 
 ## Build
 
-All signing env vars are stored in `.env` (not committed). Source them with
-`set -a` so they're exported to child processes:
+### The easy path: `scripts/release-build.sh`
+
+After bumping versions, run:
 
 ```bash
-set -a && source .env && set +a
+./scripts/release-build.sh
 ```
 
-The `.env` file should contain:
+This single command:
+
+1. Loads `.env` and verifies every required signing variable is set
+2. Verifies the Developer ID certificate is actually installed in Keychain
+3. Verifies the updater signing key file exists and exports its contents
+4. Verifies `package.json` / `tauri.conf.json` / `Cargo.toml` versions agree
+5. Verifies `pnpm`, `jq`, `hdiutil`, `codesign` are on PATH
+6. Runs `pnpm install`, `pnpm tauri build`, `post-build-dmg.sh`, `generate-update-json.sh`
+7. Prints a summary of the artifact locations
+
+If any pre-flight check fails, the script stops before running the build, so
+you find out about env problems in seconds instead of waiting 5+ minutes for
+the Rust build to fail partway through.
+
+### `.env` contents
+
+All signing env vars are stored in `.env` (not committed). The `.env` file
+should contain:
 
 ```bash
 APPLE_SIGNING_IDENTITY="Developer ID Application: Doug Dement (Y49DF9C9JJ)"
@@ -49,29 +67,21 @@ TAURI_SIGNING_PRIVATE_KEY_PATH=/Users/dougdement/.tauri/shep.key
 TAURI_SIGNING_PRIVATE_KEY_PASSWORD="<updater-key-password>"
 ```
 
-Then export the updater private key contents (the build reads the key value,
-not the path):
+### The manual path (fallback)
+
+If you ever need to run the steps by hand, source `.env` first:
 
 ```bash
+set -a && source .env && set +a
 export TAURI_SIGNING_PRIVATE_KEY="$(cat "$TAURI_SIGNING_PRIVATE_KEY_PATH")"
 ```
 
-Build, sign, and notarize:
+Then build, sign, and notarize:
 
 ```bash
 pnpm install
 pnpm tauri build
-```
-
-Patch the DMG to hide `.VolumeIcon.icns` from Finder:
-
-```bash
 ./scripts/post-build-dmg.sh
-```
-
-Generate the updater metadata:
-
-```bash
 bash scripts/generate-update-json.sh
 ```
 

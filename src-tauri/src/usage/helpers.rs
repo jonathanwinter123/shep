@@ -36,7 +36,7 @@ pub fn run_command(program: &str, args: &[&str]) -> Result<String, String> {
                     let _ = child.kill();
                     return Err(format!("{program} timed out after {}s", COMMAND_TIMEOUT.as_secs()));
                 }
-                std::thread::sleep(Duration::from_millis(50));
+                std::thread::sleep(Duration::from_millis(100));
             }
             Err(e) => return Err(format!("Error waiting for {program}: {e}")),
         }

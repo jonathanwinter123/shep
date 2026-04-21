@@ -10,6 +10,8 @@ interface UsageStore {
   error: string | null;
   window: TimeWindow;
   setWindow: (window: TimeWindow) => void;
+  sidebarWindow: "5h" | "7d";
+  setSidebarWindow: (window: "5h" | "7d") => void;
   fetchSnapshots: () => Promise<void>;
   getSnapshot: (provider: UsageProvider) => ProviderUsageSnapshot | null;
 }
@@ -20,6 +22,8 @@ export const useUsageStore = create<UsageStore>((set, get) => ({
   error: null,
   window: "5h",
   setWindow: (window) => set({ window }),
+  sidebarWindow: "5h",
+  setSidebarWindow: (sidebarWindow) => set({ sidebarWindow }),
   fetchSnapshots: async () => {
     set({ loading: true, error: null });
     try {

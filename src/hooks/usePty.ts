@@ -161,6 +161,7 @@ export function usePty() {
   const spawnSession = useCallback(
     async (
       command: string,
+      commandArgs: string[] | null,
       env: Record<string, string>,
       cols: number,
       rows: number,
@@ -179,6 +180,7 @@ export function usePty() {
 
       const ptyId = await spawnPty(
         command,
+        commandArgs,
         repoPath,
         fullEnv,
         cols,
@@ -216,6 +218,7 @@ export function usePty() {
       try {
         const ptyId = await spawnSession(
           command.command,
+          null,
           command.env,
           cols,
           rows,
@@ -234,6 +237,7 @@ export function usePty() {
           const id = opts?.restoreId ?? nextTabId();
           addTab({
             id,
+            kind: "terminal",
             label: opts?.restoreLabel ?? commandName,
             ptyId,
             repoPath: activeRepoPath,
@@ -276,7 +280,7 @@ export function usePty() {
       const state = useTerminalStore.getState();
       const commands = useCommandStore.getState().projectCommands[path] ?? [];
       const command = commands.find((c) => c.name === commandName);
-      const tab = state.getAllProjectTabs(path).find((t) => t.commandName === commandName);
+      const tab = state.getAllProjectTabs(path).find((t) => (t.kind === "terminal" || t.kind === "assistant") && t.commandName === commandName);
       if (command?.ptyId) {
         cleanupActivityState(command.ptyId);
         stoppingPtys.add(command.ptyId);
@@ -311,6 +315,7 @@ export function usePty() {
         const shell = await getDefaultShell();
         const ptyId = await spawnSession(
           `${shell} -l`,
+          null,
           {},
           cols,
           rows,
@@ -322,6 +327,7 @@ export function usePty() {
         const id = opts?.restoreId ?? nextTabId();
         addTab({
           id,
+          kind: "terminal",
           label: opts?.restoreLabel ?? "Terminal",
           ptyId,
           repoPath: activeRepoPath,
@@ -353,6 +359,7 @@ export function usePty() {
       cols: number,
       rows: number,
       mode: SessionMode = "standard",
+      model?: string,
       resumeSessionId?: string,
       opts?: { restoreId?: string; restoreLabel?: string },
     ) => {
@@ -360,34 +367,30 @@ export function usePty() {
       const assistant = CODING_ASSISTANTS.find((a) => a.id === assistantId);
       if (!assistant) return;
 
-      let command = assistant.command;
-      // Track the session ID we'll store on the tab. Filled below.
+      const commandArgs: string[] = [];
       let tabSessionId: string | null = null;
 
-      if (resumeSessionId) {
-        // Resuming a specific session (user picked from history).
-        command = `${command} --resume ${resumeSessionId}`;
-        tabSessionId = resumeSessionId;
-        if (mode === "yolo" && assistant.yoloFlag) {
-          command = `${command} ${assistant.yoloFlag}`;
-        }
-      } else if (assistant.sessionIdFlag) {
-        // Fresh launch; pre-generate a UUID so we can resume later.
-        const uuid = crypto.randomUUID();
-        command = `${command} ${assistant.sessionIdFlag} ${uuid}`;
-        tabSessionId = uuid;
+      if (model) {
+        commandArgs.push(assistant.modelFlag, model);
+      }
 
-        if (mode === "yolo" && assistant.yoloFlag) {
-          command = `${command} ${assistant.yoloFlag}`;
-        }
-      } else if (mode === "yolo" && assistant.yoloFlag) {
-        // Assistant doesn't support session ID preallocation.
-        command = `${command} ${assistant.yoloFlag}`;
+      if (resumeSessionId) {
+        commandArgs.push("--resume", resumeSessionId);
+        tabSessionId = resumeSessionId;
+      } else if (assistant.sessionIdFlag) {
+        const uuid = crypto.randomUUID();
+        commandArgs.push(assistant.sessionIdFlag, uuid);
+        tabSessionId = uuid;
+      }
+
+      if (mode === "yolo" && assistant.yoloFlag) {
+        commandArgs.push(assistant.yoloFlag);
       }
 
       try {
         const ptyId = await spawnSession(
-          command,
+          assistant.command,
+          commandArgs,
           {},
           cols,
           rows,
@@ -399,6 +402,7 @@ export function usePty() {
         const id = opts?.restoreId ?? nextTabId();
         addTab({
           id,
+          kind: "assistant",
           label: opts?.restoreLabel ?? assistant.name,
           ptyId,
           repoPath: activeRepoPath,
@@ -431,7 +435,7 @@ export function usePty() {
       if (!path) return;
       const tabs = state.projectState[path]?.tabs ?? [];
       const tab = tabs.find((t) => t.id === tabId);
-      if (!tab) return;
+      if (!tab || (tab.kind !== "terminal" && tab.kind !== "assistant")) return;
 
       cleanupActivityState(tab.ptyId);
       stoppingPtys.add(tab.ptyId);
@@ -456,6 +460,7 @@ export function usePty() {
     const tabs = state.getAllProjectTabs(repoPath);
 
     for (const tab of tabs) {
+      if (tab.kind !== "terminal" && tab.kind !== "assistant") continue;
       cleanupActivityState(tab.ptyId);
       stoppingPtys.add(tab.ptyId);
       await killPty(tab.ptyId).catch(() => {

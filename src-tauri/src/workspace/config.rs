@@ -1,6 +1,6 @@
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 // ── Global config (~/.shep/config.yml) ──────────────────────────────
@@ -11,6 +11,10 @@ pub struct GlobalConfig {
     pub version: u32,
     #[serde(default)]
     pub repos: Vec<RepoEntry>,
+    #[serde(default)]
+    pub groups: Vec<GroupEntry>,
+    #[serde(default)]
+    pub projects: ProjectSettings,
     #[serde(default)]
     pub editor: EditorSettings,
     #[serde(default)]
@@ -30,6 +34,8 @@ impl Default for GlobalConfig {
         GlobalConfig {
             version: 1,
             repos: Vec::new(),
+            groups: Vec::new(),
+            projects: ProjectSettings::default(),
             editor: EditorSettings::default(),
             keybindings: KeybindingSettings::default(),
             terminal: TerminalSettings::default(),
@@ -42,6 +48,20 @@ impl Default for GlobalConfig {
 pub struct EditorSettings {
     #[serde(default, rename = "preferredEditor")]
     pub preferred_editor: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectSettings {
+    #[serde(default = "default_true", rename = "autoImportWorktrees")]
+    pub auto_import_worktrees: bool,
+}
+
+impl Default for ProjectSettings {
+    fn default() -> Self {
+        ProjectSettings {
+            auto_import_worktrees: true,
+        }
+    }
 }
 
 /// Flat map of `actionId → keyCombo` keybindings.
@@ -134,6 +154,12 @@ pub struct TerminalSettings {
     pub font_family: String,
     #[serde(default = "default_font_size", rename = "fontSize")]
     pub font_size: u32,
+    #[serde(
+        default = "default_url_allowlist",
+        rename = "urlAllowlist",
+        alias = "allowedUrlSchemes"
+    )]
+    pub url_allowlist: Vec<String>,
 }
 
 fn default_cursor_style() -> String {
@@ -145,11 +171,15 @@ fn default_scrollback() -> u32 {
 }
 
 fn default_font_family() -> String {
-    "'MesloLGS NF', 'Menlo', 'Monaco', 'Courier New', monospace".to_string()
+    "MesloLGS NF".to_string()
 }
 
 fn default_font_size() -> u32 {
     14
+}
+
+fn default_url_allowlist() -> Vec<String> {
+    vec!["http".to_string(), "https".to_string()]
 }
 
 impl Default for TerminalSettings {
@@ -160,26 +190,119 @@ impl Default for TerminalSettings {
             scrollback: default_scrollback(),
             font_family: default_font_family(),
             font_size: default_font_size(),
+            url_allowlist: default_url_allowlist(),
         }
+    }
+}
+
+pub fn normalize_terminal_settings(settings: &mut TerminalSettings) {
+    settings.url_allowlist = normalize_url_allowlist(&settings.url_allowlist);
+}
+
+fn normalize_url_allowlist(schemes: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut normalized = Vec::new();
+
+    for scheme in ["http", "https"] {
+        seen.insert(scheme.to_string());
+        normalized.push(scheme.to_string());
+    }
+
+    for scheme in schemes {
+        let candidate = scheme.trim().trim_end_matches(':').to_ascii_lowercase();
+        if !is_valid_url_scheme_token(&candidate) {
+            continue;
+        }
+        if seen.insert(candidate.clone()) {
+            normalized.push(candidate);
+        }
+    }
+
+    normalized
+}
+
+fn is_valid_url_scheme_token(scheme: &str) -> bool {
+    let mut chars = scheme.chars();
+    match chars.next() {
+        Some(ch) if ch.is_ascii_alphabetic() => {}
+        _ => return false,
+    }
+
+    chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '+' | '-' | '.'))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderBudgetConfig {
+    #[serde(default = "default_true")]
+    pub show: bool,
+    #[serde(default = "default_budget_mode_subscription", rename = "budgetMode")]
+    pub budget_mode: String,
+    #[serde(default, rename = "monthlyBudget")]
+    pub monthly_budget: Option<f64>,
+}
+
+fn default_budget_mode_subscription() -> String {
+    "subscription".to_string()
+}
+
+impl ProviderBudgetConfig {
+    fn default_subscription() -> Self {
+        ProviderBudgetConfig {
+            show: true,
+            budget_mode: "subscription".to_string(),
+            monthly_budget: None,
+        }
+    }
+
+    fn default_custom() -> Self {
+        ProviderBudgetConfig {
+            show: true,
+            budget_mode: "custom".to_string(),
+            monthly_budget: None,
+        }
+    }
+}
+
+fn default_provider_subscription() -> ProviderBudgetConfig {
+    ProviderBudgetConfig::default_subscription()
+}
+
+fn default_provider_custom() -> ProviderBudgetConfig {
+    ProviderBudgetConfig::default_custom()
+}
+
+fn default_provider_custom_hidden() -> ProviderBudgetConfig {
+    ProviderBudgetConfig {
+        show: false,
+        ..ProviderBudgetConfig::default_custom()
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageSettings {
-    #[serde(default = "default_true", rename = "showClaude")]
-    pub show_claude: bool,
-    #[serde(default = "default_true", rename = "showCodex")]
-    pub show_codex: bool,
-    #[serde(default = "default_true", rename = "showGemini")]
-    pub show_gemini: bool,
+    #[serde(default = "default_provider_subscription")]
+    pub claude: ProviderBudgetConfig,
+    #[serde(default = "default_provider_subscription")]
+    pub codex: ProviderBudgetConfig,
+    #[serde(default = "default_provider_subscription")]
+    pub gemini: ProviderBudgetConfig,
+    #[serde(default = "default_provider_custom")]
+    pub opencode: ProviderBudgetConfig,
+    #[serde(default = "default_provider_custom_hidden")]
+    pub pi: ProviderBudgetConfig,
 }
 
 impl Default for UsageSettings {
     fn default() -> Self {
         UsageSettings {
-            show_claude: true,
-            show_codex: true,
-            show_gemini: true,
+            claude: ProviderBudgetConfig::default_subscription(),
+            codex: ProviderBudgetConfig::default_subscription(),
+            gemini: ProviderBudgetConfig { show: false, ..ProviderBudgetConfig::default_subscription() },
+            opencode: ProviderBudgetConfig {
+                monthly_budget: Some(100.0),
+                ..ProviderBudgetConfig::default_custom()
+            },
+            pi: ProviderBudgetConfig::default_custom(),
         }
     }
 }
@@ -187,6 +310,16 @@ impl Default for UsageSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepoEntry {
     pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupEntry {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub order: u32,
 }
 
 // ── Repo info returned to frontend ──────────────────────────────────
@@ -195,6 +328,7 @@ pub struct RepoEntry {
 pub struct RepoInfo {
     pub path: String,
     pub name: String,
+    pub group: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

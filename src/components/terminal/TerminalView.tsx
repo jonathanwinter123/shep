@@ -6,13 +6,13 @@ import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
-import { writePty, resizePty } from "../../lib/tauri";
+import { writePty, resizePty, openUrl } from "../../lib/tauri";
 import {
   flushPendingOutput,
   registerTerminal,
   unregisterTerminal,
 } from "../../hooks/usePty";
-import { TERMINAL_LINE_HEIGHT } from "../../lib/terminalConfig";
+import { TERMINAL_LINE_HEIGHT, buildCSSFontFamily } from "../../lib/terminalConfig";
 import { createTerminalTheme } from "./terminalTheme";
 import { useThemeStore } from "../../stores/useThemeStore";
 import { notifyAgent } from "../../lib/notifications";
@@ -47,12 +47,17 @@ export default function TerminalView({
       cursorBlink: termSettings.cursorBlink,
       cursorStyle: termSettings.cursorStyle,
       fontSize: termSettings.fontSize,
-      fontFamily: termSettings.fontFamily,
+      fontFamily: buildCSSFontFamily(termSettings.fontFamily),
       lineHeight: TERMINAL_LINE_HEIGHT,
       theme: createTerminalTheme(useThemeStore.getState().theme),
       scrollback: termSettings.scrollback,
       allowTransparency: true,
       allowProposedApi: true,
+      linkHandler: {
+        activate: (_ev, url) => {
+          void openUrl(url);
+        },
+      },
     });
 
     const fitAddon = new FitAddon();
@@ -60,7 +65,9 @@ export default function TerminalView({
     const unicodeAddon = new Unicode11Addon();
     term.loadAddon(unicodeAddon);
     term.unicode.activeVersion = "11";
-    term.loadAddon(new WebLinksAddon());
+    term.loadAddon(new WebLinksAddon((_ev, url) => {
+      void openUrl(url);
+    }));
 
     // Send input to PTY
     term.onData((data) => {
@@ -159,6 +166,28 @@ export default function TerminalView({
       // corrupting xterm's scroll state.
       term.options.theme = createTerminalTheme(useThemeStore.getState().theme);
 
+      // Re-apply terminal settings (font, cursor, scrollback) that may have
+      // changed while this terminal was hidden. `applyTerminalSettings` skips
+      // hidden terminals to avoid corrupting xterm state, so we catch up here
+      // once the container is visible again. If the font changed, the
+      // renderer's texture atlas is cleared so glyphs are re-measured.
+      const currentTermSettings = useTerminalSettingsStore.getState().settings;
+      const nextCssFont = buildCSSFontFamily(currentTermSettings.fontFamily);
+      const fontMetricsChanged =
+        term.options.fontFamily !== nextCssFont ||
+        term.options.fontSize !== currentTermSettings.fontSize;
+
+      term.options.cursorStyle = currentTermSettings.cursorStyle;
+      term.options.cursorBlink = currentTermSettings.cursorBlink;
+      term.options.scrollback = currentTermSettings.scrollback;
+      term.options.fontFamily = nextCssFont;
+      term.options.fontSize = currentTermSettings.fontSize;
+
+      const cachedEntry = terminalCache.get(ptyId);
+      if (fontMetricsChanged) {
+        cachedEntry?.rendererAddon?.clearTextureAtlas?.();
+      }
+
       // Refresh the viewport so rendering is restored after visibility
       // changes (e.g. closing settings overlay).
       term.refresh(0, term.rows - 1);
@@ -182,6 +211,24 @@ export default function TerminalView({
         void document.fonts.ready.then(() => {
           if (disposed) return;
           void fitAndResize();
+          if (import.meta.env.DEV) {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              const cssFont = term.options.fontFamily ?? "";
+              const fonts = cssFont.split(",").map(f => f.trim().replace(/^["']|["']$/g, ""));
+              ctx.font = `${term.options.fontSize}px serif`;
+              const serifW = ctx.measureText("mmmm").width;
+              for (const font of fonts) {
+                ctx.font = `${term.options.fontSize}px "${font}", serif`;
+                const w = ctx.measureText("mmmm").width;
+                if (w !== serifW) {
+                  console.log(`Terminal font: "${font}" (active)`);
+                  break;
+                }
+              }
+            }
+          }
         });
       }
     };

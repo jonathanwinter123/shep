@@ -25,9 +25,12 @@ export function registerActions(callbacks: {
         if (!path) return;
         const tabs = store.projectState[path]?.tabs ?? [];
         if (index < tabs.length) {
+          const tab = tabs[index];
           deactivateAllOverlays();
-          store.setActiveTab(tabs[index].id);
-          store.clearTabBell(tabs[index].ptyId);
+          store.setActiveTab(tab.id);
+          if ((tab.kind === "terminal" || tab.kind === "assistant") && "ptyId" in tab) {
+            store.clearTabBell(tab.ptyId);
+          }
         }
       },
     });
@@ -49,7 +52,9 @@ export function registerActions(callbacks: {
       const next = ps.tabs[(idx + 1) % ps.tabs.length];
       deactivateAllOverlays();
       store.setActiveTab(next.id);
-      store.clearTabBell(next.ptyId);
+      if ((next.kind === "terminal" || next.kind === "assistant") && "ptyId" in next) {
+        store.clearTabBell(next.ptyId);
+      }
     },
   });
 
@@ -69,7 +74,9 @@ export function registerActions(callbacks: {
       const prev = ps.tabs[(idx - 1 + ps.tabs.length) % ps.tabs.length];
       deactivateAllOverlays();
       store.setActiveTab(prev.id);
-      store.clearTabBell(prev.ptyId);
+      if ((prev.kind === "terminal" || prev.kind === "assistant") && "ptyId" in prev) {
+        store.clearTabBell(prev.ptyId);
+      }
     },
   });
 
@@ -107,7 +114,7 @@ export function registerActions(callbacks: {
 
       for (let offset = 1; offset <= len; offset++) {
         const tab = ps.tabs[(currentIdx + offset) % len];
-        if (tab.assistantId && store.tabActivity[tab.ptyId]?.bell) {
+        if (tab.kind === "assistant" && "ptyId" in tab && store.tabActivity[tab.ptyId]?.bell) {
           deactivateAllOverlays();
           store.setActiveTab(tab.id);
           store.clearTabBell(tab.ptyId);
@@ -157,7 +164,7 @@ export function registerActions(callbacks: {
     label: "Toggle Git Panel",
     category: "Panels",
     defaultShortcut: "Cmd+Shift+G",
-    execute: () => useUIStore.getState().toggleGitPanel(),
+    execute: () => useTerminalStore.getState().togglePanelTab("git"),
   });
 
   registerAction({
@@ -165,7 +172,7 @@ export function registerActions(callbacks: {
     label: "Toggle Commands Panel",
     category: "Panels",
     defaultShortcut: "Cmd+Shift+C",
-    execute: () => useUIStore.getState().toggleCommandsPanel(),
+    execute: () => useTerminalStore.getState().togglePanelTab("commands"),
   });
 
   registerAction({
@@ -231,14 +238,7 @@ export function registerActions(callbacks: {
 }
 
 function deactivateAllOverlays() {
-  const ui = useUIStore.getState();
-  ui.deactivateSettings();
-  ui.deactivateGitPanel();
-  ui.deactivateCommandsPanel();
-  ui.deactivateLauncher();
-  ui.deactivateUsagePanel();
-  ui.deactivatePortsPanel();
-  ui.deactivateSessionHistory();
+  useUIStore.getState().deactivateAllOverlays();
 }
 
 function writeToActivePty(sequence: string) {
@@ -248,6 +248,6 @@ function writeToActivePty(sequence: string) {
   const ps = store.projectState[path];
   if (!ps || !ps.activeTabId) return;
   const tab = ps.tabs.find((t) => t.id === ps.activeTabId);
-  if (!tab) return;
+  if (!tab || (tab.kind !== "terminal" && tab.kind !== "assistant")) return;
   void writePty(tab.ptyId, sequence);
 }

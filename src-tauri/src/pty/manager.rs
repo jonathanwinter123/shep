@@ -36,6 +36,7 @@ impl PtyManager {
     pub fn spawn(
         &self,
         command: &str,
+        args: Option<Vec<String>>,
         cwd: &str,
         env: HashMap<String, String>,
         cols: u16,
@@ -43,7 +44,7 @@ impl PtyManager {
         color_theme: PtyColorTheme,
         channel: Channel<PtyOutput>,
     ) -> Result<u32, String> {
-        let session = PtySession::spawn(command, cwd, env, cols, rows, color_theme, channel)?;
+        let session = PtySession::spawn(command, args, cwd, env, cols, rows, color_theme, channel)?;
 
         let mut next_id = self.next_id.lock().unwrap();
         let id = *next_id;

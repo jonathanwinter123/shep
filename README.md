@@ -14,7 +14,7 @@ Shep gives each repo a dedicated workspace for terminals, AI coding agents, comm
 - Launch AI coding agents from the app with standard and auto-accept modes.
 - Start common tasks quickly with saved commands and autostart behavior.
 - See which sessions are running, stopped, or need attention without hunting for them.
-- Discover existing git worktrees and work in them from the same UI.
+- Automatically import existing git worktrees when you add a repo, and work in them from the same UI.
 
 ## What It Does
 
@@ -101,7 +101,7 @@ Shep supports two session modes for supported coding agents:
 | `Standard` | Runs the agent in the current repo directory |
 | `YOLO` | Runs the agent in the current repo directory with auto-accept when supported |
 
-Worktrees are managed outside Shep. If you create one with git, you can add or discover it in Shep and use the same terminals, assistants, commands, and git UI there.
+Worktrees are managed outside Shep. If you create one with git, adding the main repo or a worktree in Shep will automatically import the related entries Git already knows about, and you can use the same terminals, assistants, commands, and git UI there.
 
 Supported today:
 

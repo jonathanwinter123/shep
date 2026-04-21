@@ -1,4 +1,7 @@
-use super::config::{EditorSettings, KeybindingSettings, RegisteredRepo, RepoInfo, TerminalSettings, UsageSettings, WorkspaceConfig};
+use super::config::{
+    EditorSettings, GroupEntry, KeybindingSettings, ProjectSettings, RegisteredRepo, RepoInfo,
+    TerminalSettings, UsageSettings, WorkspaceConfig,
+};
 use super::loader;
 
 pub struct WorkspaceManager;
@@ -10,6 +13,10 @@ impl WorkspaceManager {
 
     pub fn migrate(&self) -> Result<(), String> {
         loader::migrate_old_projects()
+    }
+
+    pub fn backfill_global_config_defaults(&self) -> Result<(), String> {
+        loader::backfill_global_config_defaults()
     }
 
     pub fn list_repos(&self) -> Result<Vec<RepoInfo>, String> {
@@ -40,8 +47,16 @@ impl WorkspaceManager {
         loader::load_editor_settings()
     }
 
+    pub fn load_project_settings(&self) -> Result<ProjectSettings, String> {
+        loader::load_project_settings()
+    }
+
     pub fn save_editor_settings(&self, settings: &EditorSettings) -> Result<(), String> {
         loader::save_editor_settings(settings)
+    }
+
+    pub fn save_project_settings(&self, settings: &ProjectSettings) -> Result<(), String> {
+        loader::save_project_settings(settings)
     }
 
     pub fn load_keybinding_settings(&self) -> Result<KeybindingSettings, String> {
@@ -66,5 +81,29 @@ impl WorkspaceManager {
 
     pub fn save_usage_settings(&self, settings: &UsageSettings) -> Result<(), String> {
         loader::save_usage_settings(settings)
+    }
+
+    pub fn list_groups(&self) -> Result<Vec<GroupEntry>, String> {
+        loader::list_groups()
+    }
+
+    pub fn create_group(&self, name: &str) -> Result<GroupEntry, String> {
+        loader::create_group(name)
+    }
+
+    pub fn rename_group(&self, group_id: &str, new_name: &str) -> Result<(), String> {
+        loader::rename_group(group_id, new_name)
+    }
+
+    pub fn delete_group(&self, group_id: &str) -> Result<(), String> {
+        loader::delete_group(group_id)
+    }
+
+    pub fn move_repo_to_group(
+        &self,
+        repo_path: &str,
+        group_id: Option<&str>,
+    ) -> Result<(), String> {
+        loader::move_repo_to_group(repo_path, group_id)
     }
 }

@@ -7,9 +7,10 @@ Git worktrees let you have multiple branches checked out simultaneously in separ
 Shep does not create worktrees for you right now. Instead:
 
 1. You create a worktree with normal git commands
-2. You add that worktree to Shep, or discover it from the parent repo
-3. Shep treats the worktree as its own project entry
-4. AI assistants, terminals, commands, and git actions run in the worktree directory
+2. You add either the main repo or a specific worktree to Shep
+3. Shep automatically imports the related repo/worktree entries Git already knows about
+4. Shep treats each worktree as its own project entry
+5. AI assistants, terminals, commands, and git actions run in the selected directory
 
 The worktree is completely isolated from your main checkout. Commits in the worktree go to the worktree's branch, not your current branch.
 
@@ -25,10 +26,10 @@ You can use any naming and storage convention you want. Shep does not require a 
 
 ## Adding a worktree to Shep
 
-You have two options:
+Use **Add Project** and select either:
 
-1. Use **Add Project** and select the worktree directory directly.
-2. Right-click the main repo in the sidebar and choose **Discover Worktrees** to import worktrees that git already knows about.
+1. The main repo directory to add the repo and its existing worktrees
+2. A specific worktree directory to add that worktree and its associated main repo
 
 ## Working with worktrees
 
@@ -55,7 +56,7 @@ The git panel provides:
 ### Typical worktree workflow
 
 1. Create a worktree with git
-2. Add or discover it in Shep
+2. Add the repo or worktree in Shep
 3. Launch an assistant or terminal in the worktree
 4. Stage and commit
 5. Push the branch
@@ -65,7 +66,7 @@ The git panel provides:
 
 ## Notes
 
-- Shep does not currently create, configure, or remove worktrees.
+- Shep does not currently create, configure, or remove existing worktrees for you outside Git.
 - Shep does not require special `workspace.yml` settings for worktrees.
 - If a repo is a worktree, Shep detects that automatically and prevents branch switching in the Git panel.
 

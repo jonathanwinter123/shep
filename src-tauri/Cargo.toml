@@ -1,6 +1,6 @@
 [package]
 name = "shep"
-version = "0.1.4"
+version = "0.2.3"
 description = "Terminal workspace manager"
 authors = []
 license = ""
@@ -32,5 +32,8 @@ tauri-plugin-notification = "2"
 libc = "0.2"
 rusqlite = { version = "0.33", features = ["bundled"] }
 notify = { version = "7", features = ["macos_fsevent"] }
+core-text = "21"
+core-foundation = "0.10"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+url = "2"

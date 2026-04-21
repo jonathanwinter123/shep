@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { RepoInfo, CommandState } from "../../lib/types";
+import type { RepoInfo, RepoGroup, CommandState } from "../../lib/types";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import SectionHeader from "./SectionHeader";
@@ -9,21 +9,26 @@ import SidebarUsage from "./SidebarUsage";
 
 interface SidebarProps {
   repos: RepoInfo[];
+  groups: RepoGroup[];
   activeRepoPath: string | null;
   activeTabId: string | null;
   commands: CommandState[];
   onSelectRepo: (repoPath: string) => void;
-  onAddProject: (repoPath: string) => void;
+  onAddProject: (repoPath: string) => Promise<void>;
   onRemoveProject: (repoPath: string) => void;
   onNewAssistant: () => void;
   onOpenInEditor: (repoPath: string) => void;
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onNewShell: () => void;
+  onRenameGroup: (groupId: string, newName: string) => void;
+  onDeleteGroup: (groupId: string) => void;
+  onMoveToGroup: (repoPath: string, groupId: string | null) => Promise<void>;
 }
 
 export default function Sidebar({
   repos,
+  groups,
   activeRepoPath,
   activeTabId,
   commands,
@@ -35,6 +40,9 @@ export default function Sidebar({
   onSelectTab,
   onCloseTab,
   onNewShell,
+  onRenameGroup,
+  onDeleteGroup,
+  onMoveToGroup,
 }: SidebarProps) {
   const projectState = useTerminalStore((s) => s.projectState);
   const projectCommands = useCommandStore((s) => s.projectCommands);
@@ -62,6 +70,7 @@ export default function Sidebar({
       let hasAttention = false;
       let hasCrash = false;
       for (const tab of repoTabs) {
+        if (tab.kind !== "terminal" && tab.kind !== "assistant") continue;
         const a = tabActivity[tab.ptyId];
         if (a) {
           if (a.bell) hasAttention = true;
@@ -69,7 +78,7 @@ export default function Sidebar({
         }
       }
       activity[repo.path] = {
-        terminalCount: repoTabs.length,
+        terminalCount: repoTabs.filter((t) => t.kind === "terminal" || t.kind === "assistant").length,
         runningCount: cmds.filter((c) => c.status === "running").length,
         hasAttention,
         hasCrash,
@@ -84,6 +93,7 @@ export default function Sidebar({
         <SectionHeader label="Projects" />
         <ProjectList
           repos={repos}
+          groups={groups}
           activeRepoPath={activeRepoPath}
           activeTabId={activeTabId}
           commands={commands}
@@ -96,6 +106,9 @@ export default function Sidebar({
           onSelectTab={onSelectTab}
           onCloseTab={onCloseTab}
           onNewShell={onNewShell}
+          onRenameGroup={onRenameGroup}
+          onDeleteGroup={onDeleteGroup}
+          onMoveToGroup={onMoveToGroup}
         />
       </div>
       <SidebarUsage />

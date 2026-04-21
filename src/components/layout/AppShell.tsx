@@ -1,16 +1,10 @@
-import { useEffect, useCallback, useRef, useMemo } from "react";
+import { Suspense, lazy, useEffect, useCallback, useRef, useMemo } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import Sidebar from "../sidebar/Sidebar";
 import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
 import TerminalErrorBoundary from "../terminal/TerminalErrorBoundary";
-import SettingsPanel from "../settings/SettingsPanel";
-import GitPanel from "../git/GitPanel";
-import CommandsPanel from "../commands/CommandsPanel";
-import SessionLauncher from "../session/SessionLauncher";
 import NoticeCenter from "../shared/NoticeCenter";
-import UsagePanel from "../usage/UsagePanel";
-import PortsPanel from "../ports/PortsPanel";
 import SessionHistoryPanel from "../session/SessionHistoryPanel";
 import FilePreviewPanel from "../files/FilePreviewPanel";
 import { PanelLeft, PanelLeftOpen } from "lucide-react";
@@ -41,13 +35,19 @@ import { getAction } from "../../lib/actionRegistry";
 import { useShortcutStore } from "../../stores/useShortcutStore";
 
 import { seedTabCounter } from "../../stores/useTerminalStore";
-import type { CommandConfig, CommandState, TerminalTab, SessionMode, WorkspaceConfig, PersistedTab } from "../../lib/types";
+import type { CommandConfig, CommandState, TerminalTabData, UnifiedTab, SessionMode, WorkspaceConfig, PersistedTab } from "../../lib/types";
 const LAST_REPO_STORAGE_KEY = "shep:last-repo-path";
 
 // Stable empty arrays to avoid infinite re-render loops with zustand v5's
 // useSyncExternalStore — selectors must return the same reference for the same state.
-const EMPTY_TABS: TerminalTab[] = [];
+const EMPTY_TABS: UnifiedTab[] = [];
 const EMPTY_COMMANDS: CommandState[] = [];
+const SettingsPanel = lazy(() => import("../settings/SettingsPanel"));
+const GitPanel = lazy(() => import("../git/GitPanel"));
+const CommandsPanel = lazy(() => import("../commands/CommandsPanel"));
+const SessionLauncher = lazy(() => import("../session/SessionLauncher"));
+const UsagePanel = lazy(() => import("../usage/UsagePanel"));
+const PortsPanel = lazy(() => import("../ports/PortsPanel"));
 
 function toCommandConfig(command: CommandState): CommandConfig {
   return {
@@ -63,10 +63,14 @@ function fallbackWorkspaceName(repoPath: string) {
   return repoPath.split("/").filter(Boolean).pop() ?? "Project";
 }
 
+function PanelLoader() {
+  return <div className="terminal-empty">Loading panel…</div>;
+}
+
 export default function AppShell() {
   useThemeApplicator();
 
-  const { repos, activeRepoPath, fetchRepos, openRepo, addRepo, removeRepo } =
+  const { repos, groups, activeRepoPath, fetchRepos, fetchGroups, openRepo, addRepo, removeRepo, renameGroup, deleteGroup, moveRepoToGroup } =
     useRepoStore();
   const activeConfig = useRepoStore((s) => s.activeConfig);
   const setActiveConfig = useRepoStore((s) => s.setActiveConfig);
@@ -102,10 +106,15 @@ export default function AppShell() {
     [repos],
   );
   useGitWatcher(gitRepoPaths);
-  const allTabs = useMemo(() => {
-    const all: TerminalTab[] = [];
+  // Collect only PTY-backed tabs for TerminalView rendering (panel tabs have no terminal)
+  const allTerminalTabs = useMemo(() => {
+    const all: TerminalTabData[] = [];
     for (const ps of Object.values(projectState)) {
-      all.push(...ps.tabs);
+      for (const tab of ps.tabs) {
+        if (tab.kind === "terminal" || tab.kind === "assistant") {
+          all.push(tab);
+        }
+      }
     }
 
     // Keep terminal DOM order stable even when the visible tab order changes.
@@ -150,18 +159,18 @@ export default function AppShell() {
   );
 
   const {
-    settingsActive, gitPanelActive, commandsPanelActive, launcherActive, usagePanelActive, portsPanelActive, sessionHistoryActive, filePreviewActive, sidebarVisible,
+    settingsActive, usagePanelActive, portsPanelActive, sessionHistoryActive, filePreviewActive, sidebarVisible,
   } = useUIStore(useShallow((s) => ({
     settingsActive: s.settingsActive,
-    gitPanelActive: s.gitPanelActive,
-    commandsPanelActive: s.commandsPanelActive,
-    launcherActive: s.launcherActive,
     usagePanelActive: s.usagePanelActive,
     portsPanelActive: s.portsPanelActive,
     sessionHistoryActive: s.sessionHistoryActive,
     filePreviewActive: s.filePreviewActive,
     sidebarVisible: s.sidebarVisible,
   })));
+
+  // Derive which kind of local tab is active (for panel content rendering)
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
   const { loadSettings: loadEditorSettings } = useEditorStore.getState();
   const { loadSettings: loadTerminalSettings } = useTerminalSettingsStore.getState();
   const { fetchSnapshots: fetchUsageSnapshots } = useUsageStore.getState();
@@ -169,11 +178,16 @@ export default function AppShell() {
 
   useEffect(() => {
     fetchRepos();
+    fetchGroups();
     void loadEditorSettings();
     void loadTerminalSettings();
     void loadUsageSettings();
     void fetchUsageSnapshots();
     void useShortcutStore.getState().loadSettings();
+    const usageRefreshTimer = window.setTimeout(() => {
+      void fetchUsageSnapshots();
+    }, 3000);
+    void refreshUsageData();
     void initNotifications();
     getUsername().then((name) => useUIStore.getState().setUsername(name));
     getComputerName().then((name) => useUIStore.getState().setComputerName(name));
@@ -189,8 +203,11 @@ export default function AppShell() {
         );
       }
     }, 3000);
-    return () => window.clearTimeout(updateTimer);
-  }, [fetchRepos, loadEditorSettings, loadTerminalSettings, loadUsageSettings, fetchUsageSnapshots, pushNotice]);
+    return () => {
+      window.clearTimeout(updateTimer);
+      window.clearTimeout(usageRefreshTimer);
+    };
+  }, [fetchRepos, fetchGroups, loadEditorSettings, loadTerminalSettings, loadUsageSettings, fetchUsageSnapshots, pushNotice]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -254,6 +271,7 @@ export default function AppShell() {
                     cols,
                     rows,
                     p.sessionMode ?? "standard",
+                    undefined, // model
                     p.sessionId ?? undefined,
                     { restoreId: p.id, restoreLabel: p.label },
                   );
@@ -316,6 +334,12 @@ export default function AppShell() {
 
   const handleRemoveProject = useCallback(
     async (repoPath: string) => {
+      const repoName = repoPath.split("/").filter(Boolean).pop() ?? "this project";
+      const confirmed = await ask(
+        `Remove "${repoName}" from Shep? The files on disk will not be deleted.`,
+        { title: "Remove project", kind: "warning", okLabel: "Remove", cancelLabel: "Cancel" },
+      );
+      if (!confirmed) return;
       try {
         await killProjectPtys(repoPath);
         await removeRepo(repoPath);
@@ -331,6 +355,58 @@ export default function AppShell() {
       }
     },
     [killProjectPtys, pushNotice, removeRepo],
+  );
+
+  const handleRenameGroup = useCallback(
+    async (groupId: string, newName: string) => {
+      try {
+        await renameGroup(groupId, newName);
+      } catch (error) {
+        pushNotice({
+          tone: "error",
+          title: "Couldn’t rename group",
+          message: getErrorMessage(error),
+        });
+      }
+    },
+    [renameGroup, pushNotice],
+  );
+
+  const handleDeleteGroup = useCallback(
+    async (groupId: string) => {
+      const group = groups.find((g) => g.id === groupId);
+      const groupName = group?.name ?? "this group";
+      const confirmed = await ask(
+        `Remove group "${groupName}"? Projects in this group will become ungrouped.`,
+        { title: "Remove group", kind: "warning", okLabel: "Remove", cancelLabel: "Cancel" },
+      );
+      if (!confirmed) return;
+      try {
+        await deleteGroup(groupId);
+      } catch (error) {
+        pushNotice({
+          tone: "error",
+          title: "Couldn’t delete group",
+          message: getErrorMessage(error),
+        });
+      }
+    },
+    [groups, deleteGroup, pushNotice],
+  );
+
+  const handleMoveToGroup = useCallback(
+    async (repoPath: string, groupId: string | null) => {
+      try {
+        await moveRepoToGroup(repoPath, groupId);
+      } catch (error) {
+        pushNotice({
+          tone: "error",
+          title: "Couldn’t move project",
+          message: getErrorMessage(error),
+        });
+      }
+    },
+    [moveRepoToGroup, pushNotice],
   );
 
   const handleStartCommand = useCallback(
@@ -358,43 +434,40 @@ export default function AppShell() {
   );
 
   const handleSelectSidebarTab = useCallback((tabId: string) => {
-    useUIStore.getState().deactivateSettings();
-    useUIStore.getState().deactivateGitPanel();
-    useUIStore.getState().deactivateCommandsPanel();
-    useUIStore.getState().deactivateLauncher();
-    useUIStore.getState().deactivateUsagePanel();
-    useUIStore.getState().deactivatePortsPanel();
-    useUIStore.getState().deactivateSessionHistory();
-    useUIStore.getState().deactivateFilePreview();
-    setActiveTab(tabId); // auto-switches workspace if tab is in a different one
+    useUIStore.getState().deactivateAllOverlays();
+    setActiveTab(tabId);
     const store = useTerminalStore.getState();
     const allTabs = activeRepoPath ? store.getAllProjectTabs(activeRepoPath) : [];
     const tab = allTabs.find((t) => t.id === tabId);
-    if (tab) store.clearTabBell(tab.ptyId);
+    if (tab && (tab.kind === "terminal" || tab.kind === "assistant")) {
+      store.clearTabBell(tab.ptyId);
+    }
   }, [setActiveTab, activeRepoPath]);
 
+  const handleCloseTab = useCallback((tabId: string) => {
+    const store = useTerminalStore.getState();
+    const path = store.activeProjectPath;
+    if (!path) return;
+    const tab = store.projectState[path]?.tabs.find((t) => t.id === tabId);
+    if (!tab) return;
+    if (tab.kind === "terminal" || tab.kind === "assistant") {
+      closeTab(tabId);
+    } else {
+      store.removeTab(tabId);
+    }
+  }, [closeTab]);
+
   const handleNewAssistant = useCallback(() => {
-    useUIStore.getState().openLauncher();
+    useTerminalStore.getState().addPanelTab("launcher");
   }, []);
 
   const handleStartSession = useCallback(
-    async (assistantId: string, mode: SessionMode) => {
+    async (assistantId: string, mode: SessionMode, model?: string) => {
       const { cols, rows } = getTerminalDimensions();
-      const ptyId = await launchAssistant(assistantId, cols, rows, mode);
+      const ptyId = await launchAssistant(assistantId, cols, rows, mode, model);
       if (ptyId) {
-        // Close the launcher tab and deactivate all overlays so the new
-        // terminal tab is immediately visible. closeLauncher() alone would
-        // call activateNextOpen() which can re-activate another panel
-        // (e.g. commands), hiding the tab we just created.
-        const ui = useUIStore.getState();
-        ui.deactivateSettings();
-        ui.deactivateLauncher();
-        ui.deactivateGitPanel();
-        ui.deactivateCommandsPanel();
-        ui.deactivateUsagePanel();
-        ui.deactivatePortsPanel();
-        ui.deactivateSessionHistory();
-        useUIStore.setState({ launcherOpen: false });
+        useTerminalStore.getState().removePanelTab("launcher");
+        useUIStore.getState().deactivateAllOverlays();
         return true;
       }
       return false;
@@ -405,17 +478,10 @@ export default function AppShell() {
   const handleResumeSession = useCallback(
     async (sessionId: string) => {
       const { cols, rows } = getTerminalDimensions();
-      const ptyId = await launchAssistant("claude", cols, rows, "standard", sessionId);
+      const ptyId = await launchAssistant("claude", cols, rows, "standard", undefined, sessionId);
       if (ptyId) {
-        const ui = useUIStore.getState();
-        ui.deactivateSettings();
-        ui.deactivateLauncher();
-        ui.deactivateGitPanel();
-        ui.deactivateCommandsPanel();
-        ui.deactivateUsagePanel();
-        ui.deactivatePortsPanel();
-        ui.deactivateSessionHistory();
-        useUIStore.setState({ launcherOpen: false });
+        useTerminalStore.getState().removePanelTab("launcher");
+        useUIStore.getState().deactivateAllOverlays();
         return true;
       }
       return false;
@@ -424,14 +490,7 @@ export default function AppShell() {
   );
 
   const handleNewShell = useCallback(() => {
-    useUIStore.getState().deactivateSettings();
-    useUIStore.getState().deactivateLauncher();
-    useUIStore.getState().deactivateGitPanel();
-    useUIStore.getState().deactivateCommandsPanel();
-    useUIStore.getState().deactivateUsagePanel();
-    useUIStore.getState().deactivatePortsPanel();
-    useUIStore.getState().deactivateSessionHistory();
-    useUIStore.getState().deactivateFilePreview();
+    useUIStore.getState().deactivateAllOverlays();
     const { cols, rows } = getTerminalDimensions();
     spawnBlankShell(cols, rows);
   }, [spawnBlankShell, getTerminalDimensions]);
@@ -500,7 +559,7 @@ export default function AppShell() {
   const handleOpenInEditor = useCallback(async (repoPath: string) => {
     const preferredEditor = useEditorStore.getState().settings.preferredEditor;
     if (!preferredEditor) {
-      useUIStore.getState().openSettings();
+      useUIStore.getState().toggleSettings();
       return;
     }
 
@@ -566,26 +625,34 @@ export default function AppShell() {
     };
 
     const unlisten = listen<string>("menu-event", (event) => {
+      // Try action registry first (for shortcuttable actions)
       const actionId = menuActionMap[event.payload];
       if (actionId) {
         const action = getAction(actionId);
-        if (action) action.execute();
-        return;
+        if (action) { action.execute(); return; }
       }
 
-      // Non-shortcut menu items (check_updates)
-      if (event.payload === "check_updates") {
-        void useUpdateStore.getState().checkForUpdate().then(() => {
-          const { status, availableVersion } = useUpdateStore.getState();
-          if (status === "available" && availableVersion) {
-            pushNotice(
-              { tone: "info", title: "Update available", message: `Version ${availableVersion} is ready to download` },
-              { durationMs: 8000 },
-            );
-          } else if (status === "idle") {
-            pushNotice({ tone: "success", title: "You're up to date", message: "No updates available" });
-          }
-        });
+      // Fallback: handle actions not in the shortcut registry
+      switch (event.payload) {
+        case "new_commands":
+          useTerminalStore.getState().addPanelTab("commands");
+          break;
+        case "new_git":
+          useTerminalStore.getState().addPanelTab("git");
+          break;
+        case "check_updates":
+          void useUpdateStore.getState().checkForUpdate().then(() => {
+            const { status, availableVersion } = useUpdateStore.getState();
+            if (status === "available" && availableVersion) {
+              pushNotice(
+                { tone: "info", title: "Update available", message: `Version ${availableVersion} is ready to download` },
+                { durationMs: 8000 },
+              );
+            } else if (status === "idle") {
+              pushNotice({ tone: "success", title: "You're up to date", message: "No updates available" });
+            }
+          });
+          break;
       }
     });
     return () => { unlisten.then((f) => f()); };
@@ -631,7 +698,7 @@ export default function AppShell() {
     return () => window.removeEventListener("keydown", handler, { capture: true });
   }, []);
 
-  const showOverlay = settingsActive || gitPanelActive || commandsPanelActive || launcherActive || usagePanelActive || portsPanelActive || sessionHistoryActive || filePreviewActive;
+  const showOverlay = settingsActive || usagePanelActive || portsPanelActive || sessionHistoryActive || filePreviewActive;
 
   return (
     <div className="app-shell">
@@ -668,6 +735,7 @@ export default function AppShell() {
         {sidebarVisible && (
           <Sidebar
             repos={repos}
+            groups={groups}
             activeRepoPath={activeRepoPath}
             activeTabId={showOverlay ? null : activeTabId}
             commands={commands}
@@ -677,47 +745,78 @@ export default function AppShell() {
             onNewAssistant={handleNewAssistant}
             onOpenInEditor={handleOpenInEditor}
             onSelectTab={handleSelectSidebarTab}
-            onCloseTab={closeTab}
+            onCloseTab={handleCloseTab}
             onNewShell={handleNewShell}
+            onRenameGroup={handleRenameGroup}
+            onDeleteGroup={handleDeleteGroup}
+            onMoveToGroup={handleMoveToGroup}
           />
         )}
 
         <div className="workspace-panel">
           <TabBar
-            onClose={closeTab}
+            onClose={handleCloseTab}
             onNewShell={handleNewShell}
             onNewAssistant={handleNewAssistant}
+            onNewCommands={() => useTerminalStore.getState().addPanelTab("commands")}
+            onNewGit={() => useTerminalStore.getState().addPanelTab("git")}
+            onOpenInEditor={() => { const p = useTerminalStore.getState().activeProjectPath; if (p) handleOpenInEditor(p); }}
           />
 
           <div ref={terminalContainerRef} className="terminal-stage">
-            {settingsActive && <SettingsPanel />}
-            {gitPanelActive && <GitPanel />}
-            {commandsPanelActive && (
-              <CommandsPanel
-                commands={commands}
-                onStartCommand={handleStartCommand}
-                onStopCommand={stopCommand}
-                onCreateCommand={handleCreateCommand}
-                onUpdateCommand={handleUpdateCommand}
-                onDeleteCommand={handleDeleteCommand}
-                onStartAllCommands={handleStartAllCommands}
-                onStopAllCommands={handleStopAllCommands}
-              />
+            {/* Global overlays (Settings, Usage, Ports) */}
+            {settingsActive && (
+              <Suspense fallback={<PanelLoader />}>
+                <SettingsPanel />
+              </Suspense>
             )}
-            {launcherActive && <SessionLauncher onStartSession={handleStartSession} onResumeSession={handleResumeSession} />}
-            {usagePanelActive && <UsagePanel />}
-            {portsPanelActive && <PortsPanel />}
+            {usagePanelActive && (
+              <Suspense fallback={<PanelLoader />}>
+                <UsagePanel />
+              </Suspense>
+            )}
+            {portsPanelActive && (
+              <Suspense fallback={<PanelLoader />}>
+                <PortsPanel />
+              </Suspense>
+            )}
             {sessionHistoryActive && <SessionHistoryPanel onResumeSession={handleResumeSession} />}
             {filePreviewActive && <FilePreviewPanel />}
 
-            {!showOverlay && tabs.length === 0 && (
+            {/* Local panel tabs (Git, Commands, Launcher) */}
+            {!showOverlay && activeTab?.kind === "git" && (
+              <Suspense fallback={<PanelLoader />}>
+                <GitPanel />
+              </Suspense>
+            )}
+            {!showOverlay && activeTab?.kind === "commands" && (
+              <Suspense fallback={<PanelLoader />}>
+                <CommandsPanel
+                  commands={commands}
+                  onStartCommand={handleStartCommand}
+                  onStopCommand={stopCommand}
+                  onCreateCommand={handleCreateCommand}
+                  onUpdateCommand={handleUpdateCommand}
+                  onDeleteCommand={handleDeleteCommand}
+                  onStartAllCommands={handleStartAllCommands}
+                  onStopAllCommands={handleStopAllCommands}
+                />
+              </Suspense>
+            )}
+            {!showOverlay && activeTab?.kind === "launcher" && (
+              <Suspense fallback={<PanelLoader />}>
+                <SessionLauncher onStartSession={handleStartSession} onResumeSession={handleResumeSession} />
+              </Suspense>
+            )}
+
+            {!showOverlay && !activeTab && tabs.length === 0 && (
               <div className="terminal-empty">
                 {activeRepoPath
                   ? "Launch an assistant or open a terminal"
                   : "Select or add a project to begin"}
               </div>
             )}
-            {allTabs.map((tab) => (
+            {allTerminalTabs.map((tab) => (
               <div
                 key={tab.id}
                 className="absolute inset-0"

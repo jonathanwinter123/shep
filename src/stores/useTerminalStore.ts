@@ -1,9 +1,11 @@
 import { create } from "zustand";
-import type { TerminalTab, TabActivity, PersistedTab, PersistedTabType } from "../lib/types";
+import type { TerminalTabData, TabActivity, UnifiedTab, PanelTabKind, PanelTabData, PersistedTab, PersistedTabType } from "../lib/types";
+import { panelTabId, panelTabDefaults } from "../lib/types";
+import { useUIStore } from "./useUIStore";
 import { saveTabState } from "../lib/tauri";
 
 interface ProjectTerminalState {
-  tabs: TerminalTab[];
+  tabs: UnifiedTab[];
   activeTabId: string | null;
 }
 
@@ -13,20 +15,23 @@ interface TerminalStore {
   tabActivity: Record<number, TabActivity>;
   switchProject: (repoPath: string) => void;
   removeProject: (repoPath: string) => void;
-  addTab: (tab: TerminalTab) => void;
+  addTab: (tab: UnifiedTab) => void;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
-  updateTab: (id: string, patch: Partial<TerminalTab>) => void;
+  updateTab: (id: string, patch: Partial<Pick<UnifiedTab, "label">>) => void;
   reorderTab: (tabId: string, toIndex: number) => void;
-  findTabByCommand: (commandName: string) => TerminalTab | undefined;
-  findTabByPtyId: (ptyId: number) => TerminalTab | undefined;
+  addPanelTab: (kind: PanelTabKind) => void;
+  removePanelTab: (kind: PanelTabKind) => void;
+  togglePanelTab: (kind: PanelTabKind) => void;
+  findTabByCommand: (commandName: string) => TerminalTabData | undefined;
+  findTabByPtyId: (ptyId: number) => TerminalTabData | undefined;
   initActivity: (ptyId: number) => void;
   setTabActive: (ptyId: number, active: boolean) => void;
   setTabExited: (ptyId: number, exitCode: number) => void;
   setTabBell: (ptyId: number) => void;
   clearTabBell: (ptyId: number) => void;
   removeActivity: (ptyId: number) => void;
-  getAllProjectTabs: (repoPath: string) => TerminalTab[];
+  getAllProjectTabs: (repoPath: string) => UnifiedTab[];
 }
 
 function emptyState(): ProjectTerminalState {
@@ -74,7 +79,9 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
       const tabActivity = { ...state.tabActivity };
       if (project) {
         for (const tab of project.tabs) {
-          delete tabActivity[tab.ptyId];
+          if (tab.kind === "terminal" || tab.kind === "assistant") {
+            delete tabActivity[tab.ptyId];
+          }
         }
       }
 
@@ -88,7 +95,7 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     });
   },
 
-  addTab: (tab: TerminalTab) => {
+  addTab: (tab: UnifiedTab) => {
     set((state) => {
       const path = state.activeProjectPath;
       if (!path) return state;
@@ -111,11 +118,17 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
       if (!path) return state;
       const ps = state.projectState[path];
       if (!ps) return state;
+      const closedIndex = ps.tabs.findIndex((t) => t.id === id);
+      if (closedIndex === -1) return state;
       const tabs = ps.tabs.filter((t) => t.id !== id);
-      const activeTabId =
-        ps.activeTabId === id
-          ? tabs.length > 0 ? tabs[tabs.length - 1].id : null
-          : ps.activeTabId;
+      let activeTabId = ps.activeTabId;
+      if (ps.activeTabId === id) {
+        if (tabs.length === 0) {
+          activeTabId = null;
+        } else {
+          activeTabId = tabs[Math.min(closedIndex, tabs.length - 1)].id;
+        }
+      }
       return {
         projectState: {
           ...state.projectState,
@@ -140,7 +153,7 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     });
   },
 
-  updateTab: (id: string, patch: Partial<TerminalTab>) => {
+  updateTab: (id: string, patch: Partial<Pick<UnifiedTab, "label">>) => {
     set((state) => {
       const path = state.activeProjectPath;
       if (!path) return state;
@@ -183,18 +196,75 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     });
   },
 
+  addPanelTab: (kind: PanelTabKind) => {
+    useUIStore.getState().deactivateAllOverlays();
+    set((state) => {
+      const path = state.activeProjectPath;
+      if (!path) return state;
+      const ps = state.projectState[path] ?? emptyState();
+      const id = panelTabId(kind);
+      const existing = ps.tabs.find((t) => t.id === id);
+      if (existing) {
+        return {
+          projectState: {
+            ...state.projectState,
+            [path]: { ...ps, activeTabId: id },
+          },
+        };
+      }
+      const tab: PanelTabData = { id, kind, label: panelTabDefaults[kind].label };
+      return {
+        projectState: {
+          ...state.projectState,
+          [path]: { tabs: [...ps.tabs, tab], activeTabId: id },
+        },
+      };
+    });
+  },
+
+  removePanelTab: (kind: PanelTabKind) => {
+    get().removeTab(panelTabId(kind));
+  },
+
+  togglePanelTab: (kind: PanelTabKind) => {
+    const state = get();
+    const path = state.activeProjectPath;
+    if (!path) return;
+    const ps = state.projectState[path];
+    const id = panelTabId(kind);
+    const existing = ps?.tabs.find((t) => t.id === id);
+    if (existing && ps?.activeTabId === id) {
+      get().removeTab(id);
+    } else if (existing) {
+      useUIStore.getState().deactivateAllOverlays();
+      set((s) => {
+        const p = s.projectState[path];
+        if (!p) return s;
+        return {
+          projectState: { ...s.projectState, [path]: { ...p, activeTabId: id } },
+        };
+      });
+    } else {
+      get().addPanelTab(kind);
+    }
+  },
+
   findTabByCommand: (commandName: string) => {
     const state = get();
     if (!state.activeProjectPath) return undefined;
     const ps = state.projectState[state.activeProjectPath];
-    return ps?.tabs.find((t) => t.commandName === commandName);
+    return ps?.tabs.find(
+      (t): t is TerminalTabData => (t.kind === "terminal" || t.kind === "assistant") && t.commandName === commandName,
+    );
   },
 
   findTabByPtyId: (ptyId: number) => {
     const state = get();
     if (!state.activeProjectPath) return undefined;
     const ps = state.projectState[state.activeProjectPath];
-    return ps?.tabs.find((t) => t.ptyId === ptyId);
+    return ps?.tabs.find(
+      (t): t is TerminalTabData => (t.kind === "terminal" || t.kind === "assistant") && t.ptyId === ptyId,
+    );
   },
 
   initActivity: (ptyId: number) => {
@@ -253,7 +323,7 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
 
 // ── Persistence: serialize projectState to the backend on change ────────
 
-function toPersistedTab(tab: TerminalTab, position: number, isActive: boolean): PersistedTab {
+function toPersistedTab(tab: TerminalTabData, position: number, isActive: boolean): PersistedTab {
   let tabType: PersistedTabType = "shell";
   if (tab.assistantId) tabType = "assistant";
   else if (tab.commandName) tabType = "command";
@@ -282,7 +352,10 @@ function scheduleSave(repoPath: string) {
     pendingTimers.delete(repoPath);
     const ps = useTerminalStore.getState().projectState[repoPath];
     if (!ps) return;
-    const tabs = ps.tabs.map((tab, i) =>
+    const terminalTabs = ps.tabs.filter(
+      (t): t is TerminalTabData => t.kind === "terminal" || t.kind === "assistant",
+    );
+    const tabs = terminalTabs.map((tab, i) =>
       toPersistedTab(tab, i, tab.id === ps.activeTabId),
     );
     void saveTabState(repoPath, tabs).catch((err) => {

@@ -1,4 +1,5 @@
 mod commands;
+mod fonts;
 mod git;
 mod menu;
 mod pty;
@@ -34,6 +35,9 @@ pub fn run() {
             let workspace = app.state::<WorkspaceManager>();
             if let Err(e) = workspace.migrate() {
                 eprintln!("Migration warning: {e}");
+            }
+            if let Err(e) = workspace.backfill_global_config_defaults() {
+                eprintln!("Config backfill warning: {e}");
             }
 
             // Start file system watcher for git status updates
@@ -79,12 +83,21 @@ pub fn run() {
             commands::unregister_repo,
             commands::load_workspace,
             commands::save_workspace,
+            commands::list_groups,
+            commands::create_group,
+            commands::rename_group,
+            commands::delete_group,
+            commands::move_repo_to_group,
             commands::get_editor_settings,
+            commands::get_project_settings,
             commands::save_editor_settings,
+            commands::save_project_settings,
             commands::get_keybinding_settings,
             commands::save_keybinding_settings,
             commands::get_terminal_settings,
             commands::save_terminal_settings,
+            commands::list_monospace_families,
+            commands::load_font_family,
             commands::open_in_editor,
             commands::reveal_in_finder,
             commands::spawn_pty,
@@ -95,6 +108,7 @@ pub fn run() {
             commands::get_pty_session_count,
             commands::shutdown_and_quit,
             commands::get_username,
+            commands::get_home_directory,
             commands::get_default_shell,
             commands::get_computer_name,
             commands::is_git_repo,
@@ -107,10 +121,13 @@ pub fn run() {
             commands::git_status,
             commands::git_changed_files,
             commands::git_file_diff,
+            commands::git_file_contents,
+            commands::git_list_files,
             commands::git_stage_file,
             commands::git_stage_all,
             commands::git_commit,
             commands::git_unstage_file,
+            commands::git_unstage_all,
             commands::git_switch_branch,
             commands::git_create_branch,
             commands::check_command_exists,
@@ -123,6 +140,8 @@ pub fn run() {
             commands::get_usage_snapshot,
             commands::get_usage_details,
             commands::get_usage_overview,
+            commands::get_project_alias_review_queue,
+            commands::get_models_for_provider,
             commands::refresh_usage_data,
             commands::get_memory_stats,
             commands::watch_repo,

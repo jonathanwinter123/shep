@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OpenFlags};
 use serde_json::Value;
 use std::fs;
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
@@ -27,6 +27,14 @@ pub fn ingest_all(conn: &Connection) -> bool {
     match ingest_codex(conn, MAX_FILES_PER_CYCLE) {
         Ok(done) => { if !done { all_done = false; } }
         Err(e) => eprintln!("Codex ingest error: {e}"),
+    }
+    match ingest_opencode(conn) {
+        Ok(done) => { if !done { all_done = false; } }
+        Err(e) => eprintln!("OpenCode ingest error: {e}"),
+    }
+    match ingest_pi(conn, MAX_FILES_PER_CYCLE) {
+        Ok(done) => { if !done { all_done = false; } }
+        Err(e) => eprintln!("pi ingest error: {e}"),
     }
     if let Err(e) = prune_old_messages(conn) {
         eprintln!("Prune error: {e}");
@@ -166,10 +174,10 @@ fn ingest_claude_file(conn: &Connection, path: &Path) -> Result<(), String> {
             .unwrap_or(0);
 
         conn.execute(
-            "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10)",
+            "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total, pricing_provider)
+             VALUES ('claude', ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0, ?9, 'anthropic')",
             params![
-                "claude", session_id, project_name, model, ts as i64,
+                session_id, project_name, model, ts as i64,
                 input as i64, output as i64, cache_write as i64, cache_read as i64, total as i64
             ],
         ).map_err(|e| e.to_string())?;
@@ -299,12 +307,12 @@ fn ingest_gemini_file(conn: &Connection, path: &Path) -> Result<(), String> {
                 .unwrap_or("unknown");
 
             conn.execute(
-                "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total)
-                 VALUES ('gemini', ?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9)",
-                params![
-                    session_id, project, model, session_ts as i64,
-                    input as i64, output as i64, cached as i64, thoughts as i64, total as i64
-                ],
+                "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total, pricing_provider)
+                 VALUES ('gemini', ?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9, 'google')",
+        params![
+            session_id, project, model, session_ts as i64,
+            input as i64, output as i64, cached as i64, thoughts as i64, total as i64
+        ],
             ).map_err(|e| e.to_string())?;
         }
     }
@@ -466,8 +474,8 @@ fn ingest_codex_file(conn: &Connection, path: &Path) -> Result<(), String> {
     ).map_err(|e| e.to_string())?;
 
     conn.execute(
-        "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total)
-         VALUES ('codex', ?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9)",
+        "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total, pricing_provider)
+         VALUES ('codex', ?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9, 'openai')",
         params![
             session_id, project, model, timestamp as i64,
             non_cached_input as i64, output as i64, cached_input as i64, reasoning as i64, total as i64
@@ -478,6 +486,332 @@ fn ingest_codex_file(conn: &Connection, path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+// ── OpenCode ──────────────────────────────────────────────
+
+fn ingest_opencode(conn: &Connection) -> Result<bool, String> {
+    let db_path = home_join(".local/share/opencode/opencode.db")?;
+    if !db_path.exists() {
+        return Ok(true);
+    }
+
+    let cursor_key = "opencode:message-db";
+    let meta = fs::metadata(&db_path).map_err(|e| e.to_string())?;
+    let file_size = meta.len() as i64;
+    let mtime = file_mtime(&meta);
+    let cursor = get_cursor(conn, cursor_key);
+
+    if let Some((size, _, last_mtime)) = cursor {
+        if size == file_size && last_mtime == mtime {
+            return Ok(true);
+        }
+    }
+
+    let source = Connection::open_with_flags(
+        &db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ).map_err(|e| format!("Failed to open OpenCode DB: {e}"))?;
+
+    conn.execute_batch("BEGIN").map_err(|e| e.to_string())?;
+    let (last_size, last_rowid, _) = cursor.unwrap_or((0, 0, 0));
+    let should_rebuild = last_rowid > 0 && file_size < last_size;
+
+    if should_rebuild {
+        conn.execute("DELETE FROM usage_messages WHERE provider = 'opencode'", [])
+            .map_err(|e| e.to_string())?;
+    }
+
+    let mut stmt = source.prepare(
+        "SELECT
+            m.rowid,
+            m.session_id,
+            s.directory,
+            m.time_created,
+            m.data
+         FROM message m
+         JOIN session s ON s.id = m.session_id
+         WHERE json_extract(m.data, '$.role') = 'assistant'
+           AND m.rowid > ?1
+         ORDER BY m.rowid ASC"
+    ).map_err(|e| format!("Failed to query OpenCode DB: {e}"))?;
+
+    let start_rowid = if should_rebuild { 0 } else { last_rowid };
+    let rows = stmt.query_map(params![start_rowid], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, i64>(3)?,
+            row.get::<_, String>(4)?,
+        ))
+    }).map_err(|e| e.to_string())?;
+
+    let mut max_rowid = start_rowid;
+    for row in rows {
+        let (rowid, session_id, directory, time_created, data) = match row {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        max_rowid = rowid;
+        let payload: Value = match serde_json::from_str(&data) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+
+        let model = payload
+            .get("modelID")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+        let pricing_provider = payload
+            .get("providerID")
+            .and_then(Value::as_str)
+            .unwrap_or("opencode");
+        let tokens = payload.get("tokens");
+        let input = tokens.and_then(|t| t.get("input")).and_then(Value::as_u64).unwrap_or(0);
+        let output = tokens.and_then(|t| t.get("output")).and_then(Value::as_u64).unwrap_or(0);
+        let thoughts = tokens.and_then(|t| t.get("reasoning")).and_then(Value::as_u64).unwrap_or(0);
+        let cache_read = tokens
+            .and_then(|t| t.get("cache"))
+            .and_then(|c| c.get("read"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let cache_write = tokens
+            .and_then(|t| t.get("cache"))
+            .and_then(|c| c.get("write"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let total = tokens
+            .and_then(|t| t.get("total"))
+            .and_then(Value::as_u64)
+            .unwrap_or(input + output + thoughts + cache_read + cache_write);
+        let recorded_cost = payload.get("cost").and_then(Value::as_f64);
+        let project = directory
+            .split('/')
+            .rfind(|segment| !segment.is_empty())
+            .unwrap_or("unknown")
+            .to_string();
+        let timestamp = payload
+            .get("time")
+            .and_then(|t| t.get("completed").or_else(|| t.get("created")))
+            .and_then(Value::as_i64)
+            .map(|ms| ms / 1000)
+            .unwrap_or(time_created / 1000);
+
+        conn.execute(
+            "INSERT INTO usage_messages (
+                provider, session_id, project, model, timestamp,
+                tokens_input, tokens_output, tokens_cache_write, tokens_cache_read,
+                tokens_thoughts, tokens_total, pricing_provider, recorded_cost
+             ) VALUES (
+                'opencode', ?1, ?2, ?3, ?4,
+                ?5, ?6, ?7, ?8,
+                ?9, ?10, ?11, ?12
+             )",
+            params![
+                session_id,
+                project,
+                model,
+                timestamp,
+                input as i64,
+                output as i64,
+                cache_write as i64,
+                cache_read as i64,
+                thoughts as i64,
+                total as i64,
+                pricing_provider,
+                recorded_cost,
+            ],
+        ).map_err(|e| e.to_string())?;
+    }
+
+    upsert_cursor(conn, cursor_key, "opencode", file_size, max_rowid, mtime)?;
+    conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+// ── pi ────────────────────────────────────────────────────
+
+fn ingest_pi(conn: &Connection, budget: usize) -> Result<bool, String> {
+    let sessions_dir = home_join(".pi/agent/sessions")?;
+    if !sessions_dir.exists() {
+        return Ok(true);
+    }
+
+    let files = walk_files(&sessions_dir);
+    let jsonl_files: Vec<_> = files
+        .into_iter()
+        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl"))
+        .collect();
+
+    conn.execute_batch("BEGIN").map_err(|e| e.to_string())?;
+
+    let mut processed = 0;
+    let mut skipped_remaining = false;
+
+    for path in &jsonl_files {
+        if processed >= budget {
+            skipped_remaining = true;
+            break;
+        }
+        let path_str = path.to_string_lossy().to_string();
+        let meta = match fs::metadata(path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let file_size = meta.len() as i64;
+        let mtime = file_mtime(&meta);
+        let cursor = get_cursor(conn, &path_str);
+        let needs_work = match &cursor {
+            Some((size, _, mt)) => *size != file_size || *mt != mtime,
+            None => true,
+        };
+        if !needs_work {
+            continue;
+        }
+
+        processed += 1;
+        if let Err(e) = ingest_pi_file(conn, path) {
+            eprintln!("pi ingest error for {}: {e}", path.display());
+        }
+    }
+
+    if !skipped_remaining {
+        clean_cursors(conn, "pi", &jsonl_files);
+    }
+
+    conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+    Ok(!skipped_remaining)
+}
+
+fn ingest_pi_file(conn: &Connection, path: &Path) -> Result<(), String> {
+    let path_str = path.to_string_lossy().to_string();
+    let meta = fs::metadata(path).map_err(|e| e.to_string())?;
+    let file_size = meta.len() as i64;
+    let mtime = file_mtime(&meta);
+
+    let cursor = get_cursor(conn, &path_str);
+    let offset = match &cursor {
+        Some((size, off, mt)) => {
+            if *size == file_size && *mt == mtime {
+                return Ok(());
+            }
+            *off
+        }
+        None => 0,
+    };
+
+    // Filename format: <iso-timestamp>_<uuid>.jsonl — session id is the uuid.
+    let file_stem = path.file_stem().and_then(|n| n.to_str()).unwrap_or_default();
+    let session_id = file_stem.rsplit_once('_')
+        .map(|(_, uuid)| uuid.to_string())
+        .unwrap_or_else(|| file_stem.to_string());
+
+    let project = read_pi_project(path).unwrap_or_else(|| "unknown".to_string());
+
+    let file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut reader = BufReader::new(file);
+    reader.seek(SeekFrom::Start(offset as u64)).map_err(|e| e.to_string())?;
+
+    let mut new_offset = offset;
+    let mut line = String::new();
+
+    loop {
+        line.clear();
+        let bytes_read = reader.read_line(&mut line).map_err(|e| e.to_string())?;
+        if bytes_read == 0 {
+            break;
+        }
+        new_offset += bytes_read as i64;
+
+        let row: Value = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        if row.get("type").and_then(Value::as_str) != Some("message") {
+            continue;
+        }
+        let message = match row.get("message") {
+            Some(m) if m.is_object() => m,
+            _ => continue,
+        };
+        if message.get("role").and_then(Value::as_str) != Some("assistant") {
+            continue;
+        }
+        let usage = match message.get("usage") {
+            Some(u) if u.is_object() => u,
+            _ => continue,
+        };
+
+        let input = as_u64(usage.get("input"));
+        let output = as_u64(usage.get("output"));
+        let cache_read = as_u64(usage.get("cacheRead"));
+        let cache_write = as_u64(usage.get("cacheWrite"));
+        let mut total = as_u64(usage.get("totalTokens"));
+        if total == 0 {
+            total = input + output + cache_read + cache_write;
+        }
+
+        let model = message.get("model").and_then(Value::as_str).unwrap_or("unknown");
+        let pi_provider = message.get("provider").and_then(Value::as_str).unwrap_or("pi");
+        let pricing_provider = map_pi_provider(pi_provider);
+
+        let ts = row.get("timestamp").and_then(Value::as_str)
+            .and_then(parse_iso_timestamp)
+            .unwrap_or(0);
+
+        // PI records $0 for OAuth/subscription sessions, which would understate
+        // token value when list-rate pricing is available. Preserve only
+        // positive recorded costs; otherwise let the pricing table estimate.
+        let recorded_cost = usage
+            .get("cost")
+            .and_then(|cost| cost.get("total"))
+            .and_then(Value::as_f64)
+            .filter(|cost| *cost > 0.0);
+
+        conn.execute(
+            "INSERT INTO usage_messages (
+                provider, session_id, project, model, timestamp,
+                tokens_input, tokens_output, tokens_cache_write, tokens_cache_read,
+                tokens_thoughts, tokens_total, pricing_provider, recorded_cost
+             ) VALUES (
+                'pi', ?1, ?2, ?3, ?4,
+                ?5, ?6, ?7, ?8,
+                0, ?9, ?10, ?11
+             )",
+            params![
+                session_id, project, model, ts as i64,
+                input as i64, output as i64, cache_write as i64, cache_read as i64,
+                total as i64, pricing_provider, recorded_cost
+            ],
+        ).map_err(|e| e.to_string())?;
+    }
+
+    upsert_cursor(conn, &path_str, "pi", file_size, new_offset, mtime)?;
+    Ok(())
+}
+
+/// Map pi's provider name to the pricing_provider key used in model_pricing.
+/// Uses models.dev native names so pricing lookups are consistent.
+fn map_pi_provider(pi_provider: &str) -> String {
+    match pi_provider {
+        "azure" => "openai".to_string(),
+        p if p.starts_with("google") => "google".to_string(),
+        other => other.to_string(),
+    }
+}
+
+/// Read the first-line session event to extract the cwd, then return the
+/// last path segment as project name. Falls back to None on any error.
+fn read_pi_project(path: &Path) -> Option<String> {
+    let file = fs::File::open(path).ok()?;
+    let mut reader = BufReader::new(file);
+    let mut line = String::new();
+    reader.read_line(&mut line).ok()?;
+    let row: Value = serde_json::from_str(&line).ok()?;
+    let cwd = row.get("cwd").and_then(Value::as_str)?;
+    Some(cwd.rsplit('/').find(|s| !s.is_empty()).unwrap_or("unknown").to_string())
+}
+
 // ── Maintenance ───────────────────────────────────────────
 
 fn prune_old_messages(conn: &Connection) -> Result<(), String> {
@@ -485,17 +819,17 @@ fn prune_old_messages(conn: &Connection) -> Result<(), String> {
 
     // Roll up old messages into daily aggregates
     conn.execute(
-        "INSERT OR REPLACE INTO usage_daily (provider, date, model, project, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total, message_count)
-         SELECT provider, date(timestamp, 'unixepoch') as d, model, project,
-                SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_write), SUM(tokens_cache_read), SUM(tokens_thoughts), SUM(tokens_total), COUNT(*)
+        "INSERT OR REPLACE INTO usage_daily (provider, date, pricing_provider, model, project, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total, message_count, recorded_cost)
+         SELECT provider, date(timestamp, 'unixepoch') as d, COALESCE(pricing_provider, provider), model, project,
+                SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_write), SUM(tokens_cache_read), SUM(tokens_thoughts), SUM(tokens_total), COUNT(*), SUM(recorded_cost)
          FROM usage_messages
-         WHERE timestamp < ?1
-         GROUP BY provider, d, model, project",
+         WHERE timestamp < ?1 AND provider != 'opencode'
+         GROUP BY provider, d, COALESCE(pricing_provider, provider), model, project",
         params![cutoff],
     ).map_err(|e| e.to_string())?;
 
     conn.execute(
-        "DELETE FROM usage_messages WHERE timestamp < ?1",
+        "DELETE FROM usage_messages WHERE timestamp < ?1 AND provider != 'opencode'",
         params![cutoff],
     ).map_err(|e| e.to_string())?;
 

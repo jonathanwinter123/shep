@@ -3,6 +3,13 @@
 export interface RepoInfo {
   path: string;
   name: string;
+  group: string | null;
+}
+
+export interface RepoGroup {
+  id: string;
+  name: string;
+  order: number;
 }
 
 export interface CommandConfig {
@@ -30,6 +37,10 @@ export interface EditorSettings {
   preferredEditor: PreferredEditor | null;
 }
 
+export interface ProjectSettings {
+  autoImportWorktrees: boolean;
+}
+
 /** Flat map of action ID → key combo string. */
 export type KeybindingSettings = Record<string, string>;
 
@@ -41,6 +52,23 @@ export interface TerminalSettings {
   scrollback: number;
   fontFamily: string;
   fontSize: number;
+  urlAllowlist: string[];
+}
+
+export interface FontFamily {
+  family: string;
+  faceCount: number;
+  isNerdFont: boolean;
+}
+
+export interface FontFaceData {
+  /// Raw TTF/OTF bytes, sent from Rust over IPC as a number array.
+  data: number[];
+  /// CSS font-weight (100..900).
+  weight: number;
+  italic: boolean;
+  /// CSS font-stretch keyword index (1..9).
+  stretch: number;
 }
 
 // ── Runtime state types ─────────────────────────────────────────────
@@ -59,16 +87,43 @@ export interface CommandState {
 
 export type SessionMode = "standard" | "yolo";
 
-export interface TerminalTab {
+// ── Unified tab model ──────────────────────────────────────────────
+
+export type PanelTabKind = "git" | "commands" | "launcher";
+export type TabKind = "terminal" | "assistant" | PanelTabKind;
+
+interface TabBase {
   id: string;
+  kind: TabKind;
   label: string;
+}
+
+export interface TerminalTabData extends TabBase {
+  kind: "terminal" | "assistant";
   ptyId: number;
   repoPath: string;
-  commandName: string | null; // null = blank shell or assistant
-  assistantId: string | null; // null = not an assistant tab
-  sessionMode: SessionMode | null; // null = not an assistant tab
-  sessionId: string | null; // pre-generated UUID for assistant resume; null otherwise
+  commandName: string | null;
+  assistantId: string | null;
+  sessionMode: SessionMode | null;
+  sessionId: string | null;
 }
+
+export interface PanelTabData extends TabBase {
+  kind: PanelTabKind;
+}
+
+export type UnifiedTab = TerminalTabData | PanelTabData;
+
+export function panelTabId(kind: PanelTabKind): string {
+  return `panel-${kind}`;
+}
+
+export const panelTabDefaults: Record<PanelTabKind, { label: string }> = {
+  git: { label: "Files" },
+  commands: { label: "Commands" },
+  launcher: { label: "New Agent" },
+};
+
 
 // ── Tab activity tracking ────────────────────────────────────────────
 
@@ -86,15 +141,13 @@ export interface CodingAssistant {
   name: string;
   command: string;
   yoloFlag: string | null;
-  sessionIdFlag: string | null; // e.g., "--session-id"; null if unsupported
+  sessionIdFlag: string | null;
+  modelFlag: string;
+  description?: string;
+  docsUrl?: string;
 }
 
-export interface AssistantConfig {
-  id: string;
-  name: string;
-  command: string;
-  yoloFlag: string | null;
-}
+export type AssistantConfig = CodingAssistant;
 
 // ── Git status ──────────────────────────────────────────────────────
 
@@ -175,22 +228,46 @@ export interface PtyColorTheme {
 
 // ── Usage ──────────────────────────────────────────────────────────
 
-export type UsageProvider = "codex" | "claude" | "gemini";
+export type UsageProvider = "codex" | "claude" | "gemini" | "opencode" | "pi";
+
+export type BudgetMode = "subscription" | "custom";
+
+export interface ProviderBudgetConfig {
+  show: boolean;
+  budgetMode: BudgetMode;
+  monthlyBudget: number | null;
+}
 
 export interface UsageSettings {
-  showClaude: boolean;
-  showCodex: boolean;
-  showGemini: boolean;
+  claude: ProviderBudgetConfig;
+  codex: ProviderBudgetConfig;
+  gemini: ProviderBudgetConfig;
+  opencode: ProviderBudgetConfig;
+  pi: ProviderBudgetConfig;
 }
 export type UsageSourceType = "provider" | "local";
 export type UsageConfidence = "official" | "observed" | "estimated";
+export type UsageCostKind = "recorded" | "estimated" | "included" | "free" | "unknown" | "mixed";
+export type UsageCostBasis = "provider" | "local-pricing" | "subscription" | "gateway" | "none";
+
+export interface UsageCost {
+  amount: number | null;
+  kind: UsageCostKind;
+  basis: UsageCostBasis;
+  confidence: UsageConfidence;
+}
 
 export interface UsageWindowSnapshot {
   provider: UsageProvider;
+  windowId: string;
   window: string;
   label: string;
+  scope: "session" | "plan" | "billing" | "reporting";
+  limit: number | null;
+  used: number | null;
   sourceType: UsageSourceType;
   confidence: UsageConfidence;
+  costKind: UsageCostKind;
   usedPercent: number | null;
   remainingPercent: number | null;
   resetAt: string | null;
@@ -202,6 +279,7 @@ export interface UsageNamedTokens {
   name: string;
   tokens: number;
   cost: number | null;
+  costDetail: UsageCost;
 }
 
 export interface UsageTask {
@@ -209,6 +287,7 @@ export interface UsageTask {
   label: string;
   tokens: number;
   cost: number | null;
+  costDetail: UsageCost;
   model: string | null;
   project: string | null;
   updatedAt: string | null;
@@ -218,13 +297,26 @@ export interface UsageProject {
   name: string;
   tokens: number;
   cost: number | null;
+  costDetail: UsageCost;
   sessions: number | null;
+}
+
+export interface UsageProjectAliasReviewItem {
+  rawLabel: string;
+  provider: UsageProvider;
+  canonicalId: string;
+  displayName: string;
+  confidence: number;
+  reason: string;
+  sessions: number;
+  tokens: number;
 }
 
 export interface UsageTrendProviderValue {
   provider: UsageProvider;
   tokens: number;
   cost: number | null;
+  costDetail: UsageCost;
 }
 
 export interface UsageTrendBucket {
@@ -233,13 +325,20 @@ export interface UsageTrendBucket {
   label: string;
   tokens: number;
   cost: number | null;
+  costDetail: UsageCost;
   providers: UsageTrendProviderValue[];
 }
 
 export interface UsageOverviewProvider {
   provider: UsageProvider;
   tokens: number;
+  tokensInput: number;
+  tokensOutput: number;
+  tokensCacheRead: number;
+  tokensCacheWrite: number;
+  tokensThoughts: number;
   cost: number | null;
+  costDetail: UsageCost;
   sharePercent: number;
   trend: number[];
 }
@@ -248,7 +347,13 @@ export interface UsageBreakdownItem {
   provider: UsageProvider;
   label: string;
   tokens: number;
+  tokensInput: number;
+  tokensOutput: number;
+  tokensCacheRead: number;
+  tokensCacheWrite: number;
+  tokensThoughts: number;
   cost: number | null;
+  costDetail: UsageCost;
   sessions: number | null;
   trend: number[];
 }
@@ -257,6 +362,7 @@ export interface UsageOverview {
   window: string;
   totalTokens: number;
   totalCost: number | null;
+  totalCostDetail: UsageCost;
   activeProjects: number;
   activeSessions: number;
   providers: UsageOverviewProvider[];
@@ -277,9 +383,15 @@ export interface LocalUsageDetails {
   tokens7d: number;
   tokens30d: number;
   costTotal: number | null;
+  costTotalDetail: UsageCost;
+  costMonth: number | null;
+  costMonthDetail: UsageCost;
   cost5h: number | null;
+  cost5hDetail: UsageCost;
   cost7d: number | null;
+  cost7dDetail: UsageCost;
   cost30d: number | null;
+  cost30dDetail: UsageCost;
   topModels: UsageNamedTokens[];
   topTasks: UsageTask[];
   topProjects: UsageProject[];
