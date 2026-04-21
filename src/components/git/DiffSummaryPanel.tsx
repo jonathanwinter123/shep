@@ -7,10 +7,15 @@ import { useUIStore } from "../../stores/useUIStore";
 import { gitChangedFiles, gitDiffStats } from "../../lib/tauri";
 import type { ChangedFile, DiffFileStat } from "../../lib/types";
 
-const MAX_BAR_PX = 38;
 
 function statusLabel(status: string): string {
   return status.toLowerCase();
+}
+
+function formatNum(n: number): string {
+  if (n >= 10_000) return `${(n / 1000).toFixed(0)}k`;
+  if (n >= 1_000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
 }
 
 interface TooltipState {
@@ -119,26 +124,6 @@ export default function DiffSummaryPanel() {
     });
   }, [files, statsMap]);
 
-  // sqrt-scale bar lengths relative to the largest change in the set
-  const maxSqrt = useMemo(() => {
-    let max = 1;
-    for (const f of dedupedFiles) {
-      const s = statsMap.get(f.path);
-      if (s) max = Math.max(max, Math.sqrt(s.additions + s.deletions));
-    }
-    return max;
-  }, [dedupedFiles, statsMap]);
-
-  const totals = useMemo(() => {
-    let additions = 0;
-    let deletions = 0;
-    for (const f of dedupedFiles) {
-      const s = statsMap.get(f.path);
-      if (s) { additions += s.additions; deletions += s.deletions; }
-    }
-    return { additions, deletions };
-  }, [dedupedFiles, statsMap]);
-
   const handleFileClick = useCallback((file: ChangedFile) => {
     useUIStore.getState().openDiffFile(file.path, file.area);
   }, []);
@@ -151,6 +136,7 @@ export default function DiffSummaryPanel() {
     <div className="diff-strip" onMouseLeave={handleMouseLeave}>
       <div className="diff-strip__header">
         <Diff size={13} className="diff-strip__header-icon" />
+        <span className="diff-strip__header-label">diffs</span>
       </div>
       <div className="diff-strip__list">
         {dedupedFiles.length === 0 ? (
@@ -158,15 +144,10 @@ export default function DiffSummaryPanel() {
         ) : (
           dedupedFiles.map((file) => {
             const stat = statsMap.get(file.path);
-            const total = stat ? stat.additions + stat.deletions : 0;
-            const barTotal = Math.round((Math.sqrt(total) / maxSqrt) * MAX_BAR_PX);
-            const addPx = total > 0 && stat
-              ? Math.max(1, Math.round(barTotal * stat.additions / total))
-              : 0;
-            const delPx = barTotal - addPx;
             const isActive = activeDiffFile?.path === file.path;
-
             const filename = file.path.split("/").pop() ?? file.path;
+            const adds = stat?.additions ?? 0;
+            const dels = stat?.deletions ?? 0;
 
             return (
               <button
@@ -177,19 +158,13 @@ export default function DiffSummaryPanel() {
                 aria-label={filename}
                 onMouseEnter={(e) => setTooltip({ file, stat, rect: e.currentTarget.getBoundingClientRect() })}
               >
-                <span className="diff-strip__bar-wrap">
-                  {total > 0 ? (
-                    <>
-                      {addPx > 0 && (
-                        <span className="diff-strip__bar diff-strip__bar--add" style={{ width: addPx }} />
-                      )}
-                      {delPx > 0 && (
-                        <span className="diff-strip__bar diff-strip__bar--del" style={{ width: delPx }} />
-                      )}
-                    </>
-                  ) : (
-                    <span className="diff-strip__bar diff-strip__bar--unknown" style={{ width: 10 }} />
-                  )}
+                <span className="diff-strip__pill">
+                  <span className={`diff-strip__pill-half diff-strip__pill-half--add${adds > 0 ? "" : " diff-strip__pill-half--empty"}`}>
+                    {adds > 0 ? `+${formatNum(adds)}` : ""}
+                  </span>
+                  <span className={`diff-strip__pill-half diff-strip__pill-half--del${dels > 0 ? "" : " diff-strip__pill-half--empty"}`}>
+                    {dels > 0 ? `−${formatNum(dels)}` : ""}
+                  </span>
                 </span>
               </button>
             );
@@ -198,11 +173,8 @@ export default function DiffSummaryPanel() {
       </div>
       {dedupedFiles.length > 0 && (
         <div className="diff-strip__footer">
-          <span className="diff-strip__footer-stat diff-strip__footer-stat--add">
-            +{totals.additions}
-          </span>
-          <span className="diff-strip__footer-stat diff-strip__footer-stat--del">
-            −{totals.deletions}
+          <span className="diff-strip__footer-stat">
+            {formatNum(dedupedFiles.length)} {dedupedFiles.length === 1 ? "file" : "files"}
           </span>
         </div>
       )}
