@@ -94,6 +94,14 @@ body,
   --status-deleted: #f7768e;
   --diff-add: #9ece6a;
   --diff-del: #f7768e;
+
+  /* Opacity levels for semantic color usage */
+  --color-opacity-utilization: 65%;  /* usage bars fill */
+  --color-opacity-diff: 10%;         /* diff viewer line backgrounds */
+
+  /* Standard spacing */
+  --ui-gutter: 10px;        /* horizontal inset for panel/list content */
+  --ui-gutter-outer: 16px;  /* outer gap between major sections (sidebar margin) */
 }
 
 .logo-unavailable {
@@ -188,7 +196,7 @@ select {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 4px 8px;
+  padding: 4px 10px;
   min-height: 28px;
   border-radius: var(--radius-sm);
   font-size: var(--text-body);
@@ -298,7 +306,7 @@ select {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 8px;
+  padding: 5px 10px;
   border-radius: 6px;
   font-size: 12px;
   color: var(--text-secondary);
@@ -372,7 +380,7 @@ select {
   background: color-mix(in srgb, var(--overlay) 25%, transparent);
 }
 .sidebar-status-dot--active {
-  background: rgb(45, 212, 191);  /* teal-400 */
+  background: var(--status-running);
 }
 .sidebar-status-dot--exited {
   background: var(--status-crashed);
@@ -785,11 +793,11 @@ select {
 }
 
 .notice-card--success {
-  border-color: rgba(45, 212, 191, 0.28);
+  border-color: color-mix(in srgb, var(--status-added) 28%, transparent);
 }
 
 .notice-card--error {
-  border-color: rgba(247, 118, 142, 0.34);
+  border-color: color-mix(in srgb, var(--status-crashed) 34%, transparent);
 }
 
 .notice-card__copy {
@@ -951,7 +959,7 @@ select {
 
 /* Section header (top-level labels like "PROJECTS") */
 .section-label {
-  padding: 12px 12px 6px;
+  padding: 12px 10px 6px;
   font-size: var(--text-label);
   font-weight: 600;
   text-transform: uppercase;
@@ -1109,8 +1117,8 @@ select {
   padding: 6px 8px;
   border-radius: var(--radius-sm);
   font-size: 11px;
-  color: rgb(252, 165, 165);
-  background: rgba(248, 113, 113, 0.1);
+  color: var(--status-crashed);
+  background: color-mix(in srgb, var(--status-crashed) 10%, transparent);
 }
 
 .command-form__actions {
@@ -1144,12 +1152,12 @@ select {
   color: var(--text-secondary);
 }
 .badge-success {
-  background: rgba(16, 185, 129, 0.15);
-  color: rgb(52, 211, 153);
+  background: color-mix(in srgb, var(--status-added) 15%, transparent);
+  color: var(--status-added);
 }
 .badge-warning {
-  background: rgba(245, 158, 11, 0.15);
-  color: rgb(251, 191, 36);
+  background: color-mix(in srgb, var(--status-attention) 15%, transparent);
+  color: var(--status-attention);
 }
 
 /* Small icon button (close ×, play ▶, stop ■) */
@@ -1441,7 +1449,7 @@ select {
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  padding: 0 10px;
+  padding-right: var(--ui-gutter-outer);
 }
 
 .glass-panel {
@@ -1899,9 +1907,9 @@ select {
   letter-spacing: 0.04em;
 }
 
-.usage-list__pace--under { color: rgba(52, 211, 153, 0.8); }
+.usage-list__pace--under { color: var(--status-added); }
 .usage-list__pace--on { color: var(--text-muted); }
-.usage-list__pace--over { color: rgba(248, 113, 113, 0.8); }
+.usage-list__pace--over { color: var(--status-crashed); }
 
 .usage-tooltip {
   display: flex;
@@ -2013,7 +2021,7 @@ select {
 }
 
 .usage-empty--error {
-  color: rgba(248, 113, 113, 0.85);
+  color: color-mix(in srgb, var(--status-crashed) 85%, transparent);
 }
 
 .usage-methodology {
@@ -2915,7 +2923,7 @@ select {
 }
 
 .diff-line--add {
-  background: color-mix(in srgb, var(--diff-add) 14%, transparent);
+  background: color-mix(in srgb, var(--diff-add) var(--color-opacity-diff), transparent);
 }
 .diff-line--add .diff-line__prefix {
   color: var(--diff-add);
@@ -2923,7 +2931,7 @@ select {
 }
 
 .diff-line--del {
-  background: color-mix(in srgb, var(--diff-del) 14%, transparent);
+  background: color-mix(in srgb, var(--diff-del) var(--color-opacity-diff), transparent);
 }
 .diff-line--del .diff-line__prefix {
   color: var(--diff-del);
@@ -2986,141 +2994,181 @@ select {
   opacity: 0.5;
 }
 
-/* ── Diff Summary Panel (right rail — compact file list) ─── */
+/* ── Diff Strip (right rail — compact change-bar strip) ─── */
 
-.diff-summary-panel {
+.diff-strip {
   display: flex;
   flex-direction: column;
-  width: 210px;
+  width: 56px;
   flex-shrink: 0;
   min-height: 0;
   border-left: 1px solid var(--glass-border);
   overflow: hidden;
 }
 
-.diff-summary-panel__header {
+.diff-strip__header {
+  position: relative;
   display: flex;
+  flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 10px;
-  height: 36px;
+  justify-content: center;
+  gap: 3px;
+  height: 38px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--glass-border);
+  overflow: hidden;
+  padding: 6px 4px 0;
+  white-space: nowrap;
 }
-
-.diff-summary-panel__title {
-  font-size: var(--text-label);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.diff-summary-panel__count {
-  font-size: var(--text-badge);
-  font-weight: 600;
-  color: var(--text-muted);
+.diff-strip__header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 10px;
+  right: 0;
+  height: 1px;
   background: color-mix(in srgb, var(--overlay) 8%, transparent);
-  border: 1px solid var(--glass-border);
-  border-radius: 10px;
-  padding: 1px 6px;
-  line-height: 1.4;
 }
 
-.diff-summary-panel__list {
+.diff-strip__header-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.diff-strip__header-label {
+  font-size: var(--text-body);
+  font-weight: 400;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diff-strip__footer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0 8px;
+  flex-shrink: 0;
+}
+
+.diff-strip__footer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10px;
+  right: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
+}
+
+.diff-strip__footer-stat {
+  font-size: 9px;
+  font-family: monospace;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.diff-strip__footer-stat--add {
+  color: var(--diff-add);
+  opacity: 0.8;
+}
+
+.diff-strip__footer-stat--del {
+  color: var(--diff-del);
+  opacity: 0.8;
+}
+
+.diff-strip__list {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0;
-  scrollbar-color: rgba(185, 208, 255, 0.18) transparent;
+  padding: 3px 0;
+  scrollbar-width: none;
 }
 
-.diff-summary-panel__empty {
-  padding: 12px 10px;
-  font-size: var(--text-label);
-  color: var(--text-muted);
-}
+.diff-strip__list::-webkit-scrollbar { display: none; }
 
-.diff-summary-panel__file {
+.diff-strip__clean {
   display: flex;
   align-items: center;
-  gap: 5px;
-  width: 100%;
-  padding: 4px 8px 4px 10px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  text-align: left;
-  color: var(--text-primary);
-  transition: background 120ms ease;
-  min-width: 0;
+  justify-content: center;
+  height: 28px;
+  color: var(--text-muted);
+  opacity: 0.35;
+  font-size: 18px;
+  line-height: 1;
 }
 
-.diff-summary-panel__file:hover {
+.diff-strip__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease;
+}
+
+.diff-strip__row:hover {
   background: var(--surface-hover);
 }
 
-.diff-summary-panel__file--active {
+.diff-strip__row--active {
   background: var(--surface-active);
 }
 
-.diff-summary-panel__file--active:hover {
+.diff-strip__row--active:hover {
   background: var(--surface-active);
 }
 
-.diff-summary-panel__status {
-  flex-shrink: 0;
-  font-size: var(--text-badge);
-  font-weight: 700;
-  font-family: monospace;
-  width: 12px;
-  text-align: center;
-}
+/* Status border colors */
+.diff-strip__row[data-status="M"] { border-left-color: color-mix(in srgb, var(--status-attention) var(--color-opacity-utilization), transparent); }
+.diff-strip__row[data-status="A"] { border-left-color: color-mix(in srgb, var(--status-added) var(--color-opacity-utilization), transparent); }
+.diff-strip__row[data-status="D"] { border-left-color: color-mix(in srgb, var(--status-deleted) var(--color-opacity-utilization), transparent); }
+.diff-strip__row[data-status="R"] { border-left-color: color-mix(in srgb, var(--status-attention) var(--color-opacity-utilization), transparent); }
+.diff-strip__row[data-status="?"] { border-left-color: color-mix(in srgb, var(--status-added) var(--color-opacity-utilization), transparent); }
+.diff-strip__row[data-status="U"] { border-left-color: color-mix(in srgb, var(--status-crashed) var(--color-opacity-utilization), transparent); }
 
-.diff-summary-panel__status[data-status="M"] { color: var(--status-attention); }
-.diff-summary-panel__status[data-status="A"] { color: var(--status-added); }
-.diff-summary-panel__status[data-status="D"] { color: var(--status-deleted); }
-.diff-summary-panel__status[data-status="R"] { color: var(--status-attention); }
-.diff-summary-panel__status[data-status="?"] { color: var(--status-added); }
-.diff-summary-panel__status[data-status="U"] { color: var(--status-crashed); }
-
-.diff-summary-panel__file-info {
-  flex: 1;
-  min-width: 0;
+.diff-strip__bar-wrap {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.diff-summary-panel__filename {
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.3;
-}
-
-.diff-summary-panel__parent {
-  font-size: var(--text-badge);
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
-}
-
-.diff-summary-panel__counts {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
+  gap: 0;
   flex-shrink: 0;
-  gap: 1px;
-  font-size: var(--text-badge);
-  font-family: monospace;
-  line-height: 1.3;
 }
 
-.diff-summary-panel__add { color: var(--diff-add); }
-.diff-summary-panel__del { color: var(--diff-del); }
+.diff-strip__bar {
+  display: inline-block;
+  height: 6px;
+  flex-shrink: 0;
+}
+
+.diff-strip__bar--add {
+  background: color-mix(in srgb, var(--diff-add) var(--color-opacity-utilization), transparent);
+  border-radius: 2px 0 0 2px;
+}
+
+.diff-strip__bar--del {
+  background: color-mix(in srgb, var(--diff-del) var(--color-opacity-utilization), transparent);
+  border-radius: 0 2px 2px 0;
+}
+
+/* Single-segment bars get full rounding */
+.diff-strip__bar--add:last-child {
+  border-radius: 2px;
+}
+
+.diff-strip__bar--del:first-child {
+  border-radius: 2px;
+}
+
+.diff-strip__bar--unknown {
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  border-radius: 2px;
+}
 
 /* ── Diff View Overlay (centered diff view, auto-closes on tab switch) */
 

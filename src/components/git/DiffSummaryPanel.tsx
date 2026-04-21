@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { Diff } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { gitChangedFiles, gitDiffStats } from "../../lib/tauri";
 import type { ChangedFile, DiffFileStat } from "../../lib/types";
+
+const MAX_BAR_PX = 38;
 
 export default function DiffSummaryPanel() {
   const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
@@ -61,63 +64,104 @@ export default function DiffSummaryPanel() {
         byPath.set(f.path, f);
       }
     }
-    return Array.from(byPath.values()).sort((a, b) => a.path.localeCompare(b.path));
-  }, [files]);
+    const vals = Array.from(byPath.values());
+    return vals.sort((a, b) => {
+      const sa = statsMap.get(a.path);
+      const sb = statsMap.get(b.path);
+      const ta = sa ? sa.additions + sa.deletions : 0;
+      const tb = sb ? sb.additions + sb.deletions : 0;
+      return tb - ta;
+    });
+  }, [files, statsMap]);
 
-  const handleFileClick = useCallback(
-    (file: ChangedFile) => {
-      useUIStore.getState().openDiffFile(file.path, file.area);
-    },
-    [],
-  );
+  // sqrt-scale bar lengths relative to the largest change in the set
+  const maxSqrt = useMemo(() => {
+    let max = 1;
+    for (const f of dedupedFiles) {
+      const s = statsMap.get(f.path);
+      if (s) max = Math.max(max, Math.sqrt(s.additions + s.deletions));
+    }
+    return max;
+  }, [dedupedFiles, statsMap]);
+
+  const totals = useMemo(() => {
+    let additions = 0;
+    let deletions = 0;
+    for (const f of dedupedFiles) {
+      const s = statsMap.get(f.path);
+      if (s) { additions += s.additions; deletions += s.deletions; }
+    }
+    return { additions, deletions };
+  }, [dedupedFiles, statsMap]);
+
+  const handleFileClick = useCallback((file: ChangedFile) => {
+    useUIStore.getState().openDiffFile(file.path, file.area);
+  }, []);
 
   if (!activeProjectPath || !gitStatus?.is_git_repo) return null;
 
   return (
-    <div className="diff-summary-panel">
-      <div className="diff-summary-panel__header">
-        <span className="diff-summary-panel__title">Changes</span>
-        {dedupedFiles.length > 0 && (
-          <span className="diff-summary-panel__count">{dedupedFiles.length}</span>
-        )}
+    <div className="diff-strip">
+      <div className="diff-strip__header">
+        <Diff size={13} className="diff-strip__header-icon" />
       </div>
-      <div className="diff-summary-panel__list">
+      <div className="diff-strip__list">
         {dedupedFiles.length === 0 ? (
-          <div className="diff-summary-panel__empty">Working tree clean</div>
+          <div className="diff-strip__clean" title="Working tree clean">·</div>
         ) : (
           dedupedFiles.map((file) => {
             const stat = statsMap.get(file.path);
-            const parts = file.path.split("/");
-            const name = parts[parts.length - 1];
-            const parent = parts.length > 1 ? parts.slice(0, -1).join("/") : "";
+            const total = stat ? stat.additions + stat.deletions : 0;
+            const barTotal = Math.round((Math.sqrt(total) / maxSqrt) * MAX_BAR_PX);
+            const addPx = total > 0 && stat
+              ? Math.max(1, Math.round(barTotal * stat.additions / total))
+              : 0;
+            const delPx = barTotal - addPx;
             const isActive = activeDiffFile?.path === file.path;
+
+            const filename = file.path.split("/").pop() ?? file.path;
+            const tooltip = stat
+              ? `${file.path}  +${stat.additions} −${stat.deletions}`
+              : file.path;
+
             return (
               <button
                 key={`${file.area}:${file.path}`}
-                className={`diff-summary-panel__file${isActive ? " diff-summary-panel__file--active" : ""}`}
+                className={`diff-strip__row${isActive ? " diff-strip__row--active" : ""}`}
+                data-status={file.status}
                 onClick={() => handleFileClick(file)}
-                title={file.path}
+                title={tooltip}
+                aria-label={filename}
               >
-                <span className="diff-summary-panel__status" data-status={file.status}>
-                  {file.status}
-                </span>
-                <span className="diff-summary-panel__file-info">
-                  <span className="diff-summary-panel__filename">{name}</span>
-                  {parent && (
-                    <span className="diff-summary-panel__parent">{parent}</span>
+                <span className="diff-strip__bar-wrap">
+                  {total > 0 ? (
+                    <>
+                      {addPx > 0 && (
+                        <span className="diff-strip__bar diff-strip__bar--add" style={{ width: addPx }} />
+                      )}
+                      {delPx > 0 && (
+                        <span className="diff-strip__bar diff-strip__bar--del" style={{ width: delPx }} />
+                      )}
+                    </>
+                  ) : (
+                    <span className="diff-strip__bar diff-strip__bar--unknown" style={{ width: 10 }} />
                   )}
                 </span>
-                {stat && (
-                  <span className="diff-summary-panel__counts">
-                    <span className="diff-summary-panel__add">+{stat.additions}</span>
-                    <span className="diff-summary-panel__del">-{stat.deletions}</span>
-                  </span>
-                )}
               </button>
             );
           })
         )}
       </div>
+      {dedupedFiles.length > 0 && (
+        <div className="diff-strip__footer">
+          <span className="diff-strip__footer-stat diff-strip__footer-stat--add">
+            +{totals.additions}
+          </span>
+          <span className="diff-strip__footer-stat diff-strip__footer-stat--del">
+            −{totals.deletions}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

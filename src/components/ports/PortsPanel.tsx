@@ -88,7 +88,7 @@ export default function PortsPanel() {
   });
 
   return (
-    <div className="absolute inset-0 overflow-y-auto py-6">
+    <div className="absolute inset-0 overflow-y-auto pt-3 pb-6">
       <div className="flex items-center justify-between mb-4 pr-6 pl-3">
         <h2 className="section-label !p-0">Ports</h2>
         <button

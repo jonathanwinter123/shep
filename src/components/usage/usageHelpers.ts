@@ -3,19 +3,19 @@ import type { ProviderUsageSnapshot, UsageProvider, UsageWindowSnapshot } from "
 const WINDOW_PRIORITY = ["5h", "7d", "30d"];
 export const ALL_USAGE_PROVIDERS: UsageProvider[] = ["claude", "codex", "gemini", "opencode", "pi"];
 export const TONE_COLORS: Record<string, string> = {
-  low: "rgba(52, 211, 153, 0.75)",
-  medium: "rgba(245, 158, 11, 0.75)",
-  high: "rgba(251, 146, 60, 0.85)",
-  critical: "rgba(248, 113, 113, 0.9)",
-  local: "rgba(96, 165, 250, 0.5)",
+  low: "color-mix(in srgb, var(--status-added) var(--color-opacity-utilization), transparent)",
+  medium: "color-mix(in srgb, var(--status-attention) var(--color-opacity-utilization), transparent)",
+  high: "color-mix(in srgb, var(--status-crashed) var(--color-opacity-utilization), var(--status-attention))",
+  critical: "color-mix(in srgb, var(--status-crashed) var(--color-opacity-utilization), transparent)",
+  local: "color-mix(in srgb, var(--status-running) var(--color-opacity-utilization), transparent)",
 };
 
 export const TONE_TRACK: Record<string, string> = {
-  low: "rgba(52, 211, 153, 0.1)",
-  medium: "rgba(245, 158, 11, 0.1)",
-  high: "rgba(251, 146, 60, 0.12)",
-  critical: "rgba(248, 113, 113, 0.14)",
-  local: "rgba(96, 165, 250, 0.08)",
+  low: "color-mix(in srgb, var(--status-added) 10%, transparent)",
+  medium: "color-mix(in srgb, var(--status-attention) 10%, transparent)",
+  high: "color-mix(in srgb, var(--status-crashed) 10%, transparent)",
+  critical: "color-mix(in srgb, var(--status-crashed) 10%, transparent)",
+  local: "color-mix(in srgb, var(--status-running) 10%, transparent)",
 };
 
 export function getPrimaryWindow(snapshot: ProviderUsageSnapshot | null): UsageWindowSnapshot | null {

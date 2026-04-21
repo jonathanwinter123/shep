@@ -472,9 +472,9 @@ function BreakdownList({
 }
 
 const PACE_LABEL_COLORS: Record<string, string> = {
-  under: "rgba(52, 211, 153, 0.8)",
+  under: "var(--status-added)",
   on: "var(--text-muted)",
-  over: "rgba(248, 113, 113, 0.8)",
+  over: "var(--status-crashed)",
 };
 
 function UtilizationSection({
@@ -748,7 +748,7 @@ export default function UsagePanel() {
   const isBusy = loading || overviewLoading;
 
   return (
-    <div className="absolute inset-0 overflow-y-auto py-6">
+    <div className="absolute inset-0 overflow-y-auto pt-3 pb-6">
       <div className="usage-window-tabs-row">
         <div className="usage-window-tabs">
           {TIME_WINDOWS.map((timeWindow) => (
