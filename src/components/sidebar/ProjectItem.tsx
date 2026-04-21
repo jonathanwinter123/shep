@@ -207,11 +207,11 @@ export default function ProjectItem({
       icon: <FolderInput size={14} />,
       children: moveToChildren,
     },
-    ...(!worktreeParent ? [{
+    {
       label: "Create Worktree",
       icon: <Plus size={14} />,
       onClick: handleOpenCreateWorktree,
-    }] : []),
+    },
     {
       label: "Remove Project",
       icon: <Trash2 size={14} />,

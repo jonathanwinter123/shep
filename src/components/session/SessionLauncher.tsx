@@ -3,7 +3,8 @@ import type { CodingAssistant, SessionMode } from "../../lib/types";
 import { CODING_ASSISTANTS } from "../sidebar/constants";
 import { checkCommandExists, getModelsForProvider } from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
-import { HandMetal, ChevronDown, Check } from "lucide-react";
+import { usePiConfigStore } from "../../stores/usePiConfigStore";
+import { HandMetal, ChevronDown, Check, Info } from "lucide-react";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { ASSISTANT_INSTALL_URLS } from "../sidebar/constants";
 
@@ -33,6 +34,14 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   const modelSearchRef = useRef<HTMLInputElement>(null);
   const modelRequestRef = useRef(0);
 
+  const piConfig = usePiConfigStore((s) => s.config);
+  const piHasLoaded = usePiConfigStore((s) => s.hasLoaded);
+  const loadPiConfig = usePiConfigStore((s) => s.loadConfig);
+  const setPiApiKey = usePiConfigStore((s) => s.setApiKey);
+  const [selectedPiProvider, setSelectedPiProvider] = useState<string | null>(null);
+  const [piKeyInputs, setPiKeyInputs] = useState({ provider: "", key: "" });
+  const [piInfoOpen, setPiInfoOpen] = useState(false);
+
   // Check which assistants are installed
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +68,17 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
     };
   }, [installPopover]);
 
+  // Close pi info popover on outside click
+  useEffect(() => {
+    if (!piInfoOpen) return;
+    const handleClick = () => setPiInfoOpen(false);
+    const timer = setTimeout(() => document.addEventListener("mousedown", handleClick), 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [piInfoOpen]);
+
   // Close model picker on outside click
   useEffect(() => {
     if (!modelPickerOpen) return;
@@ -75,18 +95,31 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
   }, [modelPickerOpen]);
 
   const filteredModels = useMemo(() => {
-    if (!modelSearch) return availableModels;
+    let models = availableModels;
+    if (selectedAssistant?.id === "pi" && selectedPiProvider) {
+      models = models.filter((m) => m.startsWith(`${selectedPiProvider}/`));
+    }
+    if (!modelSearch) return models;
     const q = modelSearch.toLowerCase();
-    return availableModels.filter((m) => m.toLowerCase().includes(q));
-  }, [availableModels, modelSearch]);
+    return models.filter((m) => m.toLowerCase().includes(q));
+  }, [availableModels, modelSearch, selectedAssistant, selectedPiProvider]);
+
+  const supportsModelSelection = (id: string) => id !== "pi" && id !== "opencode";
+  const supportsMode = (id: string) => id !== "pi" && id !== "opencode";
 
   const handleSelectAssistant = (assistant: CodingAssistant) => {
     const requestId = modelRequestRef.current + 1;
     modelRequestRef.current = requestId;
     setSelectedAssistant(assistant);
     setSelectedModel(null);
+    setSelectedPiProvider(null);
     setModelPickerOpen(false);
     setAvailableModels([]);
+    if (assistant.id === "pi" && !piHasLoaded) void loadPiConfig();
+    if (!supportsModelSelection(assistant.id)) {
+      setModelFetchStatus("idle");
+      return;
+    }
     setModelFetchStatus("loading");
     getModelsForProvider(assistant.id)
       .then((models) => {
@@ -102,6 +135,21 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         setAvailableModels([]);
         setModelFetchStatus("error");
       });
+  };
+
+  const handleSelectPiProvider = (provider: string) => {
+    const next = selectedPiProvider === provider ? null : provider;
+    setSelectedPiProvider(next);
+    setSelectedModel(null);
+  };
+
+  const handleAddPiKey = () => {
+    const { provider, key } = piKeyInputs;
+    if (!provider.trim() || !key.trim()) return;
+    void setPiApiKey(provider.trim(), key.trim()).then(() => {
+      setPiKeyInputs({ provider: "", key: "" });
+      setSelectedPiProvider(provider.trim());
+    });
   };
 
   const handleStart = async () => {
@@ -122,11 +170,11 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
 
   return (
     <div className="absolute inset-0 overflow-y-auto px-1 py-4">
-      <h2 className="section-label !p-0 mb-6">New AI Assistant Session</h2>
+      <h2 className="section-label !p-0 mb-6">Agents</h2>
 
-      {/* Assistant Picker */}
+      {/* Agent Picker */}
       <div className="mb-6">
-        <label className="section-label !p-0 mb-3 block text-xs opacity-50">Assistant</label>
+        <label className="section-label !p-0 mb-3 block text-xs opacity-50">Agent</label>
         <div className="flex flex-wrap gap-2">
           {CODING_ASSISTANTS.map((assistant) => {
             const logoUrl = assistantLogoSrc[assistant.id];
@@ -203,8 +251,86 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
         </div>
       )}
 
+      {/* Pi provider picker */}
+      {selectedAssistant?.id === "pi" && (
+        <div className="mb-6">
+          <div className="flex items-center gap-1.5 mb-3 relative">
+            <label className="section-label !p-0 block text-xs opacity-50">Provider</label>
+            <button
+              type="button"
+              onClick={() => setPiInfoOpen((o) => !o)}
+              className="opacity-40 hover:opacity-70 transition-opacity"
+              style={{ lineHeight: 0 }}
+            >
+              <Info size={12} />
+            </button>
+            {piInfoOpen && (
+              <div
+                className="absolute left-0 top-full mt-1 z-50 rounded-lg p-3 text-xs leading-relaxed"
+                style={{
+                  background: "var(--glass-panel-strong)",
+                  border: "1px solid var(--glass-border-strong)",
+                  backdropFilter: "blur(24px) saturate(155%)",
+                  WebkitBackdropFilter: "blur(24px) saturate(155%)",
+                  boxShadow: "0 14px 36px rgba(0, 0, 0, 0.28)",
+                  minWidth: 260,
+                  color: "var(--text-muted)",
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <p className="mb-1"><strong style={{ color: "var(--text-primary)" }}>API keys are stored securely in macOS Keychain</strong></p>
+                <p>Provider config is written to <code style={{ color: "rgb(122, 162, 247)" }}>~/.pi/agent/auth.json</code> as a keychain reference that pi resolves at runtime — your key never sits in plaintext on disk.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Configured providers */}
+          {piConfig.configuredProviders.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {piConfig.configuredProviders.map((id) => (
+                <button
+                  key={id}
+                  className={`option-card option-card--compact ${selectedPiProvider === id ? "selected" : ""}`}
+                  onClick={() => handleSelectPiProvider(id)}
+                >
+                  {id}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Add new key */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <input
+              type="text"
+              placeholder="provider"
+              value={piKeyInputs.provider}
+              onChange={(e) => setPiKeyInputs((p) => ({ ...p, provider: e.target.value }))}
+              className="usage-provider-row__budget-input"
+              style={{ minWidth: 140 }}
+            />
+            <input
+              type="password"
+              placeholder="API key"
+              value={piKeyInputs.key}
+              onChange={(e) => setPiKeyInputs((p) => ({ ...p, key: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === "Enter") handleAddPiKey(); }}
+              className="usage-provider-row__budget-input"
+              style={{ minWidth: 220, fontFamily: "monospace" }}
+            />
+            <button
+              className="option-card option-card--compact"
+              disabled={!piKeyInputs.provider.trim() || !piKeyInputs.key.trim()}
+              onClick={handleAddPiKey}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Mode picker */}
-      {selectedAssistant && (
+      {selectedAssistant && supportsMode(selectedAssistant.id) && (
         <div className="mb-6">
           <label className="section-label !p-0 mb-3 block text-xs opacity-50">Mode</label>
           <div className="flex flex-wrap gap-2">
@@ -227,7 +353,7 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
       )}
 
       {/* Model selector */}
-      {selectedAssistant && (
+      {selectedAssistant && supportsModelSelection(selectedAssistant.id) && (
         <div className="mb-6">
           <label className="section-label !p-0 mb-3 block text-xs opacity-50">Model</label>
           <div className="relative" ref={modelPickerRef}>
