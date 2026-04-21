@@ -5,7 +5,7 @@ import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
 import TerminalErrorBoundary from "../terminal/TerminalErrorBoundary";
 import NoticeCenter from "../shared/NoticeCenter";
-import { PanelLeft, PanelLeftOpen, PanelRight, PanelRightOpen } from "lucide-react";
+import { PanelLeft, PanelRight } from "lucide-react";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -611,20 +611,20 @@ export default function AppShell() {
           <button
             onClick={(e) => { e.stopPropagation(); useUIStore.getState().toggleSidebar(); }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="p-1 rounded opacity-30 hover:opacity-70 transition-opacity"
+            className={`p-1 rounded transition-opacity hover:opacity-70 ${sidebarVisible ? "opacity-40" : "opacity-15"}`}
             title={sidebarVisible ? "Hide sidebar (Cmd+B)" : "Show sidebar (Cmd+B)"}
             aria-label={sidebarVisible ? "Hide sidebar" : "Show sidebar"}
           >
-            {sidebarVisible ? <PanelLeft size={20} /> : <PanelLeftOpen size={20} />}
+            <PanelLeft size={20} />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); useUIStore.getState().toggleDiffPanel(); }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="p-1 rounded opacity-30 hover:opacity-70 transition-opacity"
+            className={`p-1 rounded transition-opacity hover:opacity-70 ${diffPanelVisible ? "opacity-40" : "opacity-15"}`}
             title={diffPanelVisible ? "Hide diff panel" : "Show diff panel"}
             aria-label={diffPanelVisible ? "Hide diff panel" : "Show diff panel"}
           >
-            {diffPanelVisible ? <PanelRight size={20} /> : <PanelRightOpen size={20} />}
+            <PanelRight size={20} />
           </button>
         </div>
       </div>
