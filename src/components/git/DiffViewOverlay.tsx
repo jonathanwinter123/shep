@@ -16,6 +16,17 @@ export default function DiffViewOverlay() {
   const area = activeDiffFile?.area ?? null;
   const staged = area === "staged";
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        useUIStore.getState().deactivateAllOverlays();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Fetch diff when the selected file changes
   useEffect(() => {
     if (!activeProjectPath || !path) {

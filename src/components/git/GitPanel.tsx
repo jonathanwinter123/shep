@@ -357,7 +357,7 @@ export default function GitPanel() {
               findTerm={leftSearch}
               rawMarkdown={rawMarkdown}
               initialScrollTop={repoScrollPositions[repoSelectedPath]}
-              onScrollChange={activeProjectPath ? (pos) => useGitPanelStore.getState().setRepoScrollPosition(activeProjectPath, repoSelectedPath, pos) : undefined}
+              onScrollChange={(pos) => useGitPanelStore.getState().setRepoScrollPosition(activeProjectPath, repoSelectedPath, pos)}
             />
           ) : (
             <div className="git-panel__diff">

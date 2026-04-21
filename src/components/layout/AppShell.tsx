@@ -226,6 +226,7 @@ export default function AppShell() {
       try {
         const isFirstVisit = !useCommandStore.getState().hasProject(repoPath);
 
+        useUIStore.getState().deactivateAllOverlays();
         const config = await openRepo(repoPath);
         restoreAttemptedRef.current = true;
         window.localStorage.setItem(LAST_REPO_STORAGE_KEY, repoPath);
@@ -255,6 +256,7 @@ export default function AppShell() {
   const handleAddProject = useCallback(
     async (repoPath: string) => {
       try {
+        useUIStore.getState().deactivateAllOverlays();
         const config = await addRepo(repoPath);
         // addRepo sets activeRepoPath in the repo store, get the canonical path
         const canonicalPath = useRepoStore.getState().activeRepoPath;

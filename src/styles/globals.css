@@ -1829,7 +1829,7 @@ select {
 .usage-list__heading {
   color: var(--text-muted) !important;
   font-size: 10px !important;
-  font-weight: 650 !important;
+  font-weight: 600 !important;
   line-height: 1.2 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
@@ -2535,42 +2535,6 @@ select {
   color: var(--text-primary);
 }
 
-/* Segmented toggle pill — used both for the Diff/File toggle inside the
- * viewer pane and the Diffs/Repo mode bar at the top of the git panel.
- * Base style is inline-flow; absolute positioning comes from the scoped
- * rule below that targets the one inside `.git-panel__viewer-wrap`. */
-.view-toggle {
-  display: flex;
-  gap: 1px;
-  align-items: center;
-  height: 34px;
-  padding: 1px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--overlay) 3%, transparent);
-  border: 1px solid color-mix(in srgb, var(--overlay) 14%, transparent);
-}
-
-.view-toggle__btn {
-  min-width: 66px;
-  height: 30px;
-  padding: 0 11px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
-  border-radius: calc(var(--radius-sm) - 2px);
-  cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
-}
-.view-toggle__btn:hover {
-  color: var(--text-primary);
-}
-.view-toggle__btn--active {
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--overlay) 10%, transparent);
-}
-
 .search-highlight {
   padding: 0 1px;
   border-radius: 3px;
@@ -2593,31 +2557,6 @@ select {
   color: var(--text-muted);
   opacity: 0.45;
   user-select: none;
-}
-
-/* ── File viewer markdown toggle ────────────────────────── */
-
-.file-viewer__md-toggle {
-  position: sticky;
-  top: 10px;
-  float: right;
-  margin: 10px 12px 0 0;
-  clear: right;
-  padding: 2px 8px;
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--overlay) 10%, transparent);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
-  z-index: 2;
-}
-
-.file-viewer__md-toggle:hover {
-  background: color-mix(in srgb, var(--overlay) 18%, transparent);
-  color: var(--text-secondary);
 }
 
 /* ── Commands Panel ────────────────────────────────────── */
@@ -3057,14 +2996,6 @@ select {
 .diff-strip__header-icon {
   color: var(--text-muted);
   flex-shrink: 0;
-}
-
-.diff-strip__header-label {
-  font-size: var(--text-body);
-  font-weight: 400;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .diff-strip__footer {

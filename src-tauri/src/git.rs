@@ -603,6 +603,21 @@ pub struct DiffFileStat {
     pub deletions: u32,
 }
 
+fn parse_numstat_line(line: &str, fallback_path: Option<&str>) -> Option<DiffFileStat> {
+    let parts: Vec<&str> = line.splitn(3, '\t').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    // Binary files report "-" instead of a count — treat as 0.
+    let additions: u32 = parts[0].parse().unwrap_or(0);
+    let deletions: u32 = parts[1].parse().unwrap_or(0);
+    Some(DiffFileStat {
+        path: fallback_path.unwrap_or(parts[2]).to_string(),
+        additions,
+        deletions,
+    })
+}
+
 /// Returns addition/deletion line counts per changed file. Uses `git diff HEAD
 /// --numstat` (all changes vs HEAD) so staged and unstaged changes are combined.
 /// Falls back to `--cached` on repos with no HEAD yet (first commit pending).
@@ -625,23 +640,39 @@ pub fn diff_stats(path: &str) -> Result<Vec<DiffFileStat>, String> {
         String::from_utf8_lossy(&cached.stdout).to_string()
     };
 
-    let stats = stdout
+    let mut stats: Vec<DiffFileStat> = stdout
         .lines()
-        .filter_map(|line| {
-            let parts: Vec<&str> = line.splitn(3, '\t').collect();
-            if parts.len() != 3 {
-                return None;
-            }
-            // Binary files report "-" instead of a count — treat as 0.
-            let additions: u32 = parts[0].parse().unwrap_or(0);
-            let deletions: u32 = parts[1].parse().unwrap_or(0);
-            Some(DiffFileStat {
-                path: parts[2].to_string(),
-                additions,
-                deletions,
-            })
-        })
+        .filter_map(|line| parse_numstat_line(line, None))
         .collect();
+
+    for file in changed_files(path)?
+        .into_iter()
+        .filter(|file| file.area == "untracked")
+    {
+        let output = Command::new("git")
+            .args([
+                "-C",
+                path,
+                "diff",
+                "--no-index",
+                "--numstat",
+                "/dev/null",
+                &file.path,
+            ])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        if output.stdout.is_empty() {
+            continue;
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        stats.extend(
+            stdout
+                .lines()
+                .filter_map(|line| parse_numstat_line(line, Some(&file.path))),
+        );
+    }
 
     Ok(stats)
 }

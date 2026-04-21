@@ -200,9 +200,8 @@ function TreeRow({ node, depth, expanded, selected, search, onToggle, onSelect }
  * Pure presentation component for a file tree. All state lives in the
  * parent — this component just builds the tree structure from the file
  * list (memoized) and renders rows. Used by GitPanel's Files mode to
- * display the full repo browser tree. Shares visual styling with the
- * `.file-item` rows from FileList via the `.list-item` base class plus
- * `.tree-row*` modifiers.
+ * display the full repo browser tree. Shares the `.list-item` base row
+ * styling plus `.tree-row*` modifiers.
  */
 export default function FileTree({
   files,

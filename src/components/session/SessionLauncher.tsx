@@ -4,7 +4,7 @@ import { CODING_ASSISTANTS } from "../sidebar/constants";
 import { checkCommandExists, getModelsForProvider } from "../../lib/tauri";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { usePiConfigStore } from "../../stores/usePiConfigStore";
-import { HandMetal, ChevronDown, Check, Info } from "lucide-react";
+import { HandMetal, ChevronDown, Check, Info, X } from "lucide-react";
 import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogos";
 import { ASSISTANT_INSTALL_URLS } from "../sidebar/constants";
 
@@ -36,8 +36,12 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
 
   const piConfig = usePiConfigStore((s) => s.config);
   const piHasLoaded = usePiConfigStore((s) => s.hasLoaded);
+  const piSaving = usePiConfigStore((s) => s.isSaving);
+  const piError = usePiConfigStore((s) => s.error);
   const loadPiConfig = usePiConfigStore((s) => s.loadConfig);
+  const updatePiSettings = usePiConfigStore((s) => s.updateSettings);
   const setPiApiKey = usePiConfigStore((s) => s.setApiKey);
+  const removePiApiKey = usePiConfigStore((s) => s.removeApiKey);
   const [selectedPiProvider, setSelectedPiProvider] = useState<string | null>(null);
   const [piKeyInputs, setPiKeyInputs] = useState({ provider: "", key: "" });
   const [piInfoOpen, setPiInfoOpen] = useState(false);
@@ -137,19 +141,48 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
       });
   };
 
-  const handleSelectPiProvider = (provider: string) => {
+  useEffect(() => {
+    if (selectedAssistant?.id !== "pi" || !piHasLoaded) return;
+    setSelectedPiProvider(piConfig.settings.defaultProvider ?? null);
+  }, [piConfig.settings.defaultProvider, piHasLoaded, selectedAssistant?.id]);
+
+  const handleSelectPiProvider = async (provider: string) => {
     const next = selectedPiProvider === provider ? null : provider;
+    const previous = selectedPiProvider;
     setSelectedPiProvider(next);
     setSelectedModel(null);
+    try {
+      await updatePiSettings({ defaultProvider: next, defaultModel: null });
+    } catch {
+      setSelectedPiProvider(previous);
+    }
   };
 
-  const handleAddPiKey = () => {
+  const handleAddPiKey = async () => {
     const { provider, key } = piKeyInputs;
     if (!provider.trim() || !key.trim()) return;
-    void setPiApiKey(provider.trim(), key.trim()).then(() => {
+    const providerId = provider.trim();
+    try {
+      await setPiApiKey(providerId, key.trim());
+      await updatePiSettings({ defaultProvider: providerId, defaultModel: null });
       setPiKeyInputs({ provider: "", key: "" });
-      setSelectedPiProvider(provider.trim());
-    });
+      setSelectedPiProvider(providerId);
+    } catch {
+      // The store keeps the error message; leave inputs intact for correction.
+    }
+  };
+
+  const handleRemovePiProvider = async (provider: string) => {
+    try {
+      await removePiApiKey(provider);
+      const nextDefault = selectedPiProvider === provider ? null : selectedPiProvider;
+      if (piConfig.settings.defaultProvider === provider) {
+        await updatePiSettings({ defaultProvider: null, defaultModel: null });
+      }
+      setSelectedPiProvider(nextDefault);
+    } catch {
+      // Error is surfaced below from the store.
+    }
   };
 
   const handleStart = async () => {
@@ -288,13 +321,33 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
           {piConfig.configuredProviders.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
               {piConfig.configuredProviders.map((id) => (
-                <button
+                <div
                   key={id}
                   className={`option-card option-card--compact ${selectedPiProvider === id ? "selected" : ""}`}
-                  onClick={() => handleSelectPiProvider(id)}
+                  style={{ gap: 8 }}
                 >
-                  {id}
-                </button>
+                  <button
+                    type="button"
+                    disabled={piSaving}
+                    onClick={() => void handleSelectPiProvider(id)}
+                    style={{ background: "transparent", border: 0, padding: 0, color: "inherit", cursor: "pointer" }}
+                  >
+                    {id}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={piSaving}
+                    aria-label={`Remove ${id}`}
+                    title={`Remove ${id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleRemovePiProvider(id);
+                    }}
+                    style={{ display: "inline-flex", background: "transparent", border: 0, padding: 0, color: "inherit", cursor: "pointer", opacity: 0.55 }}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -314,18 +367,23 @@ export default function SessionLauncher({ onStartSession }: SessionLauncherProps
               placeholder="API key"
               value={piKeyInputs.key}
               onChange={(e) => setPiKeyInputs((p) => ({ ...p, key: e.target.value }))}
-              onKeyDown={(e) => { if (e.key === "Enter") handleAddPiKey(); }}
+              onKeyDown={(e) => { if (e.key === "Enter") void handleAddPiKey(); }}
               className="usage-provider-row__budget-input"
               style={{ minWidth: 220, fontFamily: "monospace" }}
             />
             <button
               className="option-card option-card--compact"
-              disabled={!piKeyInputs.provider.trim() || !piKeyInputs.key.trim()}
-              onClick={handleAddPiKey}
+              disabled={!piKeyInputs.provider.trim() || !piKeyInputs.key.trim() || piSaving}
+              onClick={() => void handleAddPiKey()}
             >
-              Add
+              {piSaving ? "Saving..." : "Add"}
             </button>
           </div>
+          {piError && (
+            <div className="command-form__error mt-3">
+              {piError}
+            </div>
+          )}
         </div>
       )}
 

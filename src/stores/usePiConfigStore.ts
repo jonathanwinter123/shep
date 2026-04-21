@@ -47,11 +47,13 @@ export const usePiConfigStore = create<PiConfigStore>((set, get) => ({
       await savePiSettings(next.settings);
       set({ isSaving: false, error: null });
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save pi settings";
       set({
         config: prev,
         isSaving: false,
-        error: error instanceof Error ? error.message : "Failed to save pi settings",
+        error: message,
       });
+      throw new Error(message);
     }
   },
 
@@ -65,10 +67,12 @@ export const usePiConfigStore = create<PiConfigStore>((set, get) => ({
         : [...prev.configuredProviders, provider].sort();
       set({ config: { ...prev, configuredProviders: configured }, isSaving: false, error: null });
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save API key";
       set({
         isSaving: false,
-        error: error instanceof Error ? error.message : "Failed to save API key",
+        error: message,
       });
+      throw new Error(message);
     }
   },
 
@@ -86,10 +90,12 @@ export const usePiConfigStore = create<PiConfigStore>((set, get) => ({
         error: null,
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to remove API key";
       set({
         isSaving: false,
-        error: error instanceof Error ? error.message : "Failed to remove API key",
+        error: message,
       });
+      throw new Error(message);
     }
   },
 }));

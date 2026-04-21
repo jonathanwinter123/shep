@@ -21,7 +21,6 @@ import type { CursorStyle, BudgetMode, FontFamily } from "../../lib/types";
 import { getErrorMessage } from "../../lib/errors";
 import { listMonospaceFamilies } from "../../lib/tauri";
 
-
 interface AppMeta {
   name: string;
   version: string;
@@ -93,7 +92,6 @@ export default function SettingsPanel() {
   const loadUsageSettings = useUsageSettingsStore((s) => s.loadSettings);
   const updateProvider = useUsageSettingsStore((s) => s.updateProvider);
   const [budgetInputs, setBudgetInputs] = useState<Record<string, string>>({});
-
 
   const updateStatus = useUpdateStore((s) => s.status);
   const availableVersion = useUpdateStore((s) => s.availableVersion);
