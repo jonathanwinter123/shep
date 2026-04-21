@@ -12,6 +12,7 @@ import FileTree from "./FileTree";
 import FileViewer from "./FileViewer";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
+import { isMarkdownFile } from "../../lib/markdownRenderer";
 
 export default function GitPanel() {
   const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
@@ -28,12 +29,15 @@ export default function GitPanel() {
   const repoExpanded = panelState?.repoExpanded ?? [];
   const leftSearch = panelState?.leftSearch ?? "";
   const sidebarCollapsed = panelState?.sidebarCollapsed ?? false;
+  const repoScrollPositions = panelState?.repoScrollPositions ?? {};
 
   const [files, setFiles] = useState<ChangedFile[]>([]);
   const [repoFiles, setRepoFiles] = useState<string[]>([]);
   const [repoFileContent, setRepoFileContent] = useState<string>("");
   const [repoFileError, setRepoFileError] = useState<string | null>(null);
   const [repoFileLoading, setRepoFileLoading] = useState<boolean>(false);
+  const [rawMarkdown, setRawMarkdown] = useState(false);
+  const isMarkdown = repoSelectedPath ? isMarkdownFile(repoSelectedPath) : false;
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchOpen, setSearchOpen] = useState(() => leftSearch.trim().length > 0);
@@ -185,9 +189,10 @@ export default function GitPanel() {
     return s;
   }, [files]);
 
-  // Remove stale selection when the file list refreshes
+  // Remove stale selection when the file list refreshes — skip when the list
+  // is empty (not yet loaded) to avoid clearing a valid restored selection.
   useEffect(() => {
-    if (!activeProjectPath || !repoSelectedPath) return;
+    if (!activeProjectPath || !repoSelectedPath || repoFiles.length === 0) return;
     if (repoFiles.includes(repoSelectedPath)) return;
     useGitPanelStore.getState().setRepoSelection(activeProjectPath, null);
   }, [activeProjectPath, repoFiles, repoSelectedPath]);
@@ -196,6 +201,7 @@ export default function GitPanel() {
     (path: string) => {
       if (!activeProjectPath) return;
       useGitPanelStore.getState().setRepoSelection(activeProjectPath, path);
+      setRawMarkdown(false);
     },
     [activeProjectPath],
   );
@@ -321,6 +327,16 @@ export default function GitPanel() {
                 </button>
               )}
             </div>
+            {isMarkdown && (
+              <button
+                className="git-panel__pane-toggle"
+                onClick={() => setRawMarkdown((r) => !r)}
+                title={rawMarkdown ? "Show rendered" : "Show raw"}
+                aria-label={rawMarkdown ? "Show rendered markdown" : "Show raw markdown"}
+              >
+                <span style={{ fontSize: 11, fontWeight: 500 }}>{rawMarkdown ? "Render" : "Raw"}</span>
+              </button>
+            )}
             <button
               className="git-panel__pane-toggle"
               onClick={() => handleSetSidebarCollapsed(!sidebarCollapsed)}
@@ -339,6 +355,9 @@ export default function GitPanel() {
               loading={repoFileLoading}
               error={repoFileError}
               findTerm={leftSearch}
+              rawMarkdown={rawMarkdown}
+              initialScrollTop={repoScrollPositions[repoSelectedPath]}
+              onScrollChange={activeProjectPath ? (pos) => useGitPanelStore.getState().setRepoScrollPosition(activeProjectPath, repoSelectedPath, pos) : undefined}
             />
           ) : (
             <div className="git-panel__diff">

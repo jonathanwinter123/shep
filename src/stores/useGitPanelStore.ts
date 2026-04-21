@@ -36,6 +36,8 @@ export interface ProjectPanelState {
   /** Whether the left sidebar (file list/tree + commit area) is hidden
    *  so the viewer can take the full panel width. */
   sidebarCollapsed: boolean;
+  /** Scroll position (scrollTop px) per file path in repo-mode viewer. */
+  repoScrollPositions: Record<string, number>;
 }
 
 const DEFAULT_STATE: ProjectPanelState = {
@@ -46,6 +48,7 @@ const DEFAULT_STATE: ProjectPanelState = {
   repoExpanded: [],
   leftSearch: "",
   sidebarCollapsed: false,
+  repoScrollPositions: {},
 };
 
 interface GitPanelStore {
@@ -60,6 +63,7 @@ interface GitPanelStore {
   setRepoExpanded: (repo: string, expanded: string[]) => void;
   setLeftSearch: (repo: string, search: string) => void;
   setSidebarCollapsed: (repo: string, collapsed: boolean) => void;
+  setRepoScrollPosition: (repo: string, filePath: string, pos: number) => void;
   clearSelection: (repo: string) => void;
 }
 
@@ -122,6 +126,20 @@ export const useGitPanelStore = create<GitPanelStore>((set) => ({
         },
       },
     })),
+
+  setRepoScrollPosition: (repo, filePath, pos) =>
+    set((state) => {
+      const existing = state.perRepo[repo] ?? DEFAULT_STATE;
+      return {
+        perRepo: {
+          ...state.perRepo,
+          [repo]: {
+            ...existing,
+            repoScrollPositions: { ...existing.repoScrollPositions, [filePath]: pos },
+          },
+        },
+      };
+    }),
 
   clearSelection: (repo) =>
     set((state) => ({

@@ -45,7 +45,7 @@ export default function MarkdownViewer({ contents }: MarkdownViewerProps) {
   }, [contents, theme]);
 
   return (
-    <div className="git-panel__diff markdown-view">
+    <div className="markdown-view">
       <div
         className="markdown-view__content"
         dangerouslySetInnerHTML={{ __html: html }}

@@ -2419,7 +2419,7 @@ select {
 }
 
 .markdown-view {
-  padding-top: 48px;
+  padding-top: 8px;
 }
 
 .markdown-view__content {
@@ -2593,6 +2593,31 @@ select {
   color: var(--text-muted);
   opacity: 0.45;
   user-select: none;
+}
+
+/* ── File viewer markdown toggle ────────────────────────── */
+
+.file-viewer__md-toggle {
+  position: sticky;
+  top: 10px;
+  float: right;
+  margin: 10px 12px 0 0;
+  clear: right;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--overlay) 10%, transparent);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+  z-index: 2;
+}
+
+.file-viewer__md-toggle:hover {
+  background: color-mix(in srgb, var(--overlay) 18%, transparent);
+  color: var(--text-secondary);
 }
 
 /* ── Commands Panel ────────────────────────────────────── */

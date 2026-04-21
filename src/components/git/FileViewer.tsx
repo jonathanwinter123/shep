@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useThemeStore } from "../../stores/useThemeStore";
 import {
   highlightSource,
@@ -18,6 +18,12 @@ interface FileViewerProps {
    *  whose content contains the term (case-insensitive) get a highlight
    *  class, and the first match is scrolled into view. */
   findTerm?: string;
+  /** When true, renders raw source instead of markdown preview. */
+  rawMarkdown?: boolean;
+  /** Scroll position to restore on mount (from persistent store). */
+  initialScrollTop?: number;
+  /** Called (debounced) when the user scrolls, so the caller can persist position. */
+  onScrollChange?: (pos: number) => void;
 }
 
 /** Files above this byte count skip Shiki and render as plain monospace —
@@ -32,18 +38,34 @@ export default function FileViewer({
   loading,
   error,
   findTerm = "",
+  rawMarkdown = false,
+  initialScrollTop,
+  onScrollChange,
 }: FileViewerProps) {
   const theme = useThemeStore((s) => s.theme);
   const [tokens, setTokens] = useState<ThemedToken[][] | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const lang = useMemo(() => langForFile(filePath), [filePath]);
   const markdownFile = useMemo(() => isMarkdownFile(filePath), [filePath]);
   const oversized = contents.length > SHIKI_MAX_BYTES;
 
-  // Pre-compute the set of line indices that match the find term. Empty
-  // term returns an empty set (no highlights). Match on raw line content
-  // (not Shiki tokens) since tokens don't exist for plain text fallback.
+  // Restore scroll position before first paint to avoid visible jump.
+  useLayoutEffect(() => {
+    if (initialScrollTop && scrollRef.current) {
+      scrollRef.current.scrollTop = initialScrollTop;
+    }
+  }, []); // intentionally runs only on mount
+
+  const handleScroll = useCallback(() => {
+    if (!onScrollChange || !scrollRef.current) return;
+    const pos = scrollRef.current.scrollTop;
+    if (scrollSaveTimer.current) clearTimeout(scrollSaveTimer.current);
+    scrollSaveTimer.current = setTimeout(() => onScrollChange(pos), 300);
+  }, [onScrollChange]);
+
+  // Pre-compute the set of line indices that match the find term.
   const matchSet = useMemo(() => {
     const s = new Set<number>();
     const needle = findTerm.trim().toLowerCase();
@@ -55,10 +77,7 @@ export default function FileViewer({
     return s;
   }, [contents, findTerm]);
 
-  // Scroll to the first match whenever the find term changes. Uses the
-  // line's index-based attribute so we can find it in the DOM after a
-  // token render pass. useEffect + imperative scroll is appropriate here
-  // because we're integrating with the DOM (a legitimate effect use).
+  // Scroll to the first find match whenever the term changes.
   useEffect(() => {
     if (matchSet.size === 0 || !scrollRef.current) return;
     const firstIdx = Math.min(...matchSet);
@@ -68,11 +87,9 @@ export default function FileViewer({
     if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [matchSet]);
 
-  // Tokenize once per (contents, file, theme) triple. Same Shiki effect
-  // pattern used by DiffViewer — async external library, cancelled flag
-  // guards against stale writes during rapid file/mode switches.
+  // Tokenize once per (contents, file, theme) triple.
   useEffect(() => {
-    if (!lang || !contents || oversized) {
+    if (!lang || !contents || oversized || (markdownFile && !rawMarkdown)) {
       setTokens(null);
       return;
     }
@@ -86,10 +103,8 @@ export default function FileViewer({
         if (!cancelled) setTokens(null);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [contents, lang, theme, oversized]);
+    return () => { cancelled = true; };
+  }, [contents, lang, theme, oversized, markdownFile, rawMarkdown]);
 
   if (error) {
     return (
@@ -115,14 +130,18 @@ export default function FileViewer({
     );
   }
 
-  if (markdownFile) {
-    return <MarkdownViewer contents={contents} />;
+  if (markdownFile && !rawMarkdown) {
+    return (
+      <div className="git-panel__diff" ref={scrollRef} onScroll={handleScroll}>
+        <MarkdownViewer contents={contents} />
+      </div>
+    );
   }
 
   const lines = contents.split("\n");
 
   return (
-    <div className="git-panel__diff" ref={scrollRef}>
+    <div className="git-panel__diff" ref={scrollRef} onScroll={handleScroll}>
       <div className="diff-content file-view">
         {lines.map((line, i) => {
           const lineTokens = tokens?.[i];
@@ -141,7 +160,7 @@ export default function FileViewer({
                   </span>
                 ))
               ) : (
-                <span>{line || "\u00A0"}</span>
+                <span>{line || " "}</span>
               )}
             </div>
           );
