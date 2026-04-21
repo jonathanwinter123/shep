@@ -10,15 +10,31 @@ This assumes:
 - GitHub Releases is the distribution channel
 - the primary artifact is the `.dmg`
 
+## Step-by-Step Release Workflow
+
+```
+1. bump-version.sh       — update all 3 version files and commit
+2. release-build.sh      — build, sign, notarize, generate latest.json
+3. Smoke test            — install from the DMG and run through checklist
+4. Tag + push            — git tag vX.Y.Z && git push origin main vX.Y.Z
+5. gh release create     — attach artifacts, paste release notes
+```
+
 ## Version Files
 
-Update the version in all three places before building a release:
+All three files must agree on the version:
 
 - `package.json`
 - `src-tauri/tauri.conf.json`
 - `src-tauri/Cargo.toml`
 
-Use the same version everywhere. Example: `0.2.0`
+Use `scripts/bump-version.sh` to update all three at once:
+
+```bash
+./scripts/bump-version.sh 0.2.4
+```
+
+This updates the files, confirms they agree, and commits the bump.
 
 ## Pre-Release Checklist
 
@@ -26,14 +42,13 @@ Before tagging a release:
 
 1. Make sure the app version in Settings matches the intended release version.
 2. Make sure `README.md` is current.
-3. Make sure the screenshot placeholder is replaced if you want a polished release page.
-4. Review any known issues you want to mention in the release notes.
+3. Review any known issues you want to mention in the release notes.
 
 ## Build
 
 ### The easy path: `scripts/release-build.sh`
 
-After bumping versions, run:
+After bumping the version, run:
 
 ```bash
 ./scripts/release-build.sh
