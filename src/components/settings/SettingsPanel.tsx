@@ -230,7 +230,7 @@ export default function SettingsPanel() {
   };
 
   return (
-    <div className="absolute inset-0 overflow-y-auto py-6">
+    <div className="absolute inset-0 overflow-y-auto pt-3 pb-6">
       {/* ── Theme ──────────────────────────────────────────── */}
       <section className="settings-section">
         <h2 className="section-label !p-0 settings-section__header">Theme</h2>

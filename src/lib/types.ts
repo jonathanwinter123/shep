@@ -177,6 +177,14 @@ export interface CreatedWorktree {
   branch: string;
 }
 
+// ── Git diff stats ───────────────────────────────────────────────────
+
+export interface DiffFileStat {
+  path: string;
+  additions: number;
+  deletions: number;
+}
+
 // ── Git changed files ────────────────────────────────────────────────
 
 export interface ChangedFile {
@@ -187,6 +195,19 @@ export interface ChangedFile {
 }
 
 // ── Port info ───────────────────────────────────────────────────────
+
+// ── Pi config ──────────────────────────────────────────────────────
+
+export interface PiSettings {
+  defaultProvider: string | null;
+  defaultModel: string | null;
+  defaultThinkingLevel: string | null;
+}
+
+export interface PiConfig {
+  settings: PiSettings;
+  configuredProviders: string[];
+}
 
 export interface PortInfo {
   port: number;

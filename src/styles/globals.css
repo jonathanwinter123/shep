@@ -94,6 +94,14 @@ body,
   --status-deleted: #f7768e;
   --diff-add: #9ece6a;
   --diff-del: #f7768e;
+
+  /* Opacity levels for semantic color usage */
+  --color-opacity-utilization: 65%;  /* usage bars fill */
+  --color-opacity-diff: 10%;         /* diff viewer line backgrounds */
+
+  /* Standard spacing */
+  --ui-gutter: 10px;        /* horizontal inset for panel/list content */
+  --ui-gutter-outer: 16px;  /* outer gap between major sections (sidebar margin) */
 }
 
 .logo-unavailable {
@@ -188,7 +196,7 @@ select {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 4px 8px;
+  padding: 4px 10px;
   min-height: 28px;
   border-radius: var(--radius-sm);
   font-size: var(--text-body);
@@ -298,7 +306,7 @@ select {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 8px;
+  padding: 5px 10px;
   border-radius: 6px;
   font-size: 12px;
   color: var(--text-secondary);
@@ -372,7 +380,7 @@ select {
   background: color-mix(in srgb, var(--overlay) 25%, transparent);
 }
 .sidebar-status-dot--active {
-  background: rgb(45, 212, 191);  /* teal-400 */
+  background: var(--status-running);
 }
 .sidebar-status-dot--exited {
   background: var(--status-crashed);
@@ -785,11 +793,11 @@ select {
 }
 
 .notice-card--success {
-  border-color: rgba(45, 212, 191, 0.28);
+  border-color: color-mix(in srgb, var(--status-added) 28%, transparent);
 }
 
 .notice-card--error {
-  border-color: rgba(247, 118, 142, 0.34);
+  border-color: color-mix(in srgb, var(--status-crashed) 34%, transparent);
 }
 
 .notice-card__copy {
@@ -951,7 +959,7 @@ select {
 
 /* Section header (top-level labels like "PROJECTS") */
 .section-label {
-  padding: 12px 12px 6px;
+  padding: 12px 10px 6px;
   font-size: var(--text-label);
   font-weight: 600;
   text-transform: uppercase;
@@ -1109,8 +1117,8 @@ select {
   padding: 6px 8px;
   border-radius: var(--radius-sm);
   font-size: 11px;
-  color: rgb(252, 165, 165);
-  background: rgba(248, 113, 113, 0.1);
+  color: var(--status-crashed);
+  background: color-mix(in srgb, var(--status-crashed) 10%, transparent);
 }
 
 .command-form__actions {
@@ -1144,12 +1152,12 @@ select {
   color: var(--text-secondary);
 }
 .badge-success {
-  background: rgba(16, 185, 129, 0.15);
-  color: rgb(52, 211, 153);
+  background: color-mix(in srgb, var(--status-added) 15%, transparent);
+  color: var(--status-added);
 }
 .badge-warning {
-  background: rgba(245, 158, 11, 0.15);
-  color: rgb(251, 191, 36);
+  background: color-mix(in srgb, var(--status-attention) 15%, transparent);
+  color: var(--status-attention);
 }
 
 /* Small icon button (close ×, play ▶, stop ■) */
@@ -1441,7 +1449,7 @@ select {
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  padding: 0 10px;
+  padding-right: var(--ui-gutter-outer);
 }
 
 .glass-panel {
@@ -1821,7 +1829,7 @@ select {
 .usage-list__heading {
   color: var(--text-muted) !important;
   font-size: 10px !important;
-  font-weight: 650 !important;
+  font-weight: 600 !important;
   line-height: 1.2 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
@@ -1899,9 +1907,9 @@ select {
   letter-spacing: 0.04em;
 }
 
-.usage-list__pace--under { color: rgba(52, 211, 153, 0.8); }
+.usage-list__pace--under { color: var(--status-added); }
 .usage-list__pace--on { color: var(--text-muted); }
-.usage-list__pace--over { color: rgba(248, 113, 113, 0.8); }
+.usage-list__pace--over { color: var(--status-crashed); }
 
 .usage-tooltip {
   display: flex;
@@ -2013,7 +2021,7 @@ select {
 }
 
 .usage-empty--error {
-  color: rgba(248, 113, 113, 0.85);
+  color: color-mix(in srgb, var(--status-crashed) 85%, transparent);
 }
 
 .usage-methodology {
@@ -2254,11 +2262,11 @@ select {
  * Icon and name both tint together. Untracked files additionally dim
  * their name to signal "not yet tracked by git". */
 .tree-row--added .tree-row__name {
-  color: var(--status-added);
+  color: color-mix(in srgb, var(--status-added) var(--color-opacity-utilization), var(--text-primary));
   font-weight: 600;
 }
 .tree-row--modified .tree-row__name {
-  color: var(--status-attention);
+  color: color-mix(in srgb, var(--status-attention) var(--color-opacity-utilization), var(--text-primary));
   font-weight: 600;
 }
 
@@ -2411,7 +2419,7 @@ select {
 }
 
 .markdown-view {
-  padding-top: 48px;
+  padding-top: 8px;
 }
 
 .markdown-view__content {
@@ -2525,42 +2533,6 @@ select {
 
 .markdown-view__content th {
   color: var(--text-primary);
-}
-
-/* Segmented toggle pill — used both for the Diff/File toggle inside the
- * viewer pane and the Diffs/Repo mode bar at the top of the git panel.
- * Base style is inline-flow; absolute positioning comes from the scoped
- * rule below that targets the one inside `.git-panel__viewer-wrap`. */
-.view-toggle {
-  display: flex;
-  gap: 1px;
-  align-items: center;
-  height: 34px;
-  padding: 1px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--overlay) 3%, transparent);
-  border: 1px solid color-mix(in srgb, var(--overlay) 14%, transparent);
-}
-
-.view-toggle__btn {
-  min-width: 66px;
-  height: 30px;
-  padding: 0 11px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
-  border-radius: calc(var(--radius-sm) - 2px);
-  cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
-}
-.view-toggle__btn:hover {
-  color: var(--text-primary);
-}
-.view-toggle__btn--active {
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--overlay) 10%, transparent);
 }
 
 .search-highlight {
@@ -2915,7 +2887,7 @@ select {
 }
 
 .diff-line--add {
-  background: color-mix(in srgb, var(--diff-add) 14%, transparent);
+  background: color-mix(in srgb, var(--diff-add) var(--color-opacity-diff), transparent);
 }
 .diff-line--add .diff-line__prefix {
   color: var(--diff-add);
@@ -2923,7 +2895,7 @@ select {
 }
 
 .diff-line--del {
-  background: color-mix(in srgb, var(--diff-del) 14%, transparent);
+  background: color-mix(in srgb, var(--diff-del) var(--color-opacity-diff), transparent);
 }
 .diff-line--del .diff-line__prefix {
   color: var(--diff-del);
@@ -2984,4 +2956,318 @@ select {
 .branch-dropdown__input::placeholder {
   color: var(--text-muted);
   opacity: 0.5;
+}
+
+/* ── Diff Strip (right rail — compact change-bar strip) ─── */
+
+.diff-strip {
+  display: flex;
+  flex-direction: column;
+  width: 64px;
+  flex-shrink: 0;
+  min-height: 0;
+  border-left: 1px solid var(--glass-border);
+  overflow: hidden;
+}
+
+.diff-strip__header {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  flex-shrink: 0;
+  overflow: hidden;
+  padding: 14px 0px 6px;
+  white-space: nowrap;
+}
+.diff-strip__header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 10px;
+  right: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
+}
+
+.diff-strip__header-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.diff-strip__header-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.diff-strip__footer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0 8px 10px;
+  flex-shrink: 0;
+}
+
+.diff-strip__footer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10px;
+  right: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
+}
+
+.diff-strip__footer-stat {
+  font-size: 10px;
+  font-family: monospace;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-muted);
+}
+
+.diff-strip__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 0 3px;
+  scrollbar-width: none;
+}
+
+.diff-strip__list::-webkit-scrollbar { display: none; }
+
+.diff-strip__clean {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  color: var(--text-muted);
+  opacity: 0.35;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.diff-strip__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 20px;
+  padding: 0 0 0 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+
+.diff-strip__row:hover {
+  background: var(--surface-hover);
+}
+
+.diff-strip__row--active {
+  background: var(--surface-active);
+}
+
+.diff-strip__row--active:hover {
+  background: var(--surface-active);
+}
+
+.diff-strip__pill {
+  display: flex;
+  width: 100%;
+  height: 18px;
+  border-radius: 4px;
+  overflow: hidden;
+  font-family: monospace;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+}
+
+.diff-strip__pill-half {
+  flex: 1;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.diff-strip__pill-half--add {
+  background: color-mix(in srgb, var(--diff-add) 15%, transparent);
+  color: var(--diff-add);
+  text-align: center;
+  border-radius: 4px 0 0 4px;
+}
+
+.diff-strip__pill-half--del {
+  background: color-mix(in srgb, var(--diff-del) 15%, transparent);
+  color: var(--diff-del);
+  text-align: center;
+  border-radius: 0 4px 4px 0;
+}
+
+.diff-strip__pill-half--empty {
+  background: transparent;
+}
+
+/* ── Diff strip tooltip ──────────────────────────────────── */
+
+.diff-strip__tooltip {
+  position: fixed;
+  z-index: 200;
+  min-width: 180px;
+  max-width: 280px;
+  padding: 10px 12px;
+  background: var(--glass-panel-strong);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.diff-strip__tooltip-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.diff-strip__tooltip-filename {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.diff-strip__tooltip-status {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.diff-strip__tooltip-status[data-status="M"] { color: var(--status-attention); }
+.diff-strip__tooltip-status[data-status="A"] { color: var(--status-added); }
+.diff-strip__tooltip-status[data-status="?"] { color: var(--status-added); }
+.diff-strip__tooltip-status[data-status="D"] { color: var(--status-deleted); }
+.diff-strip__tooltip-status[data-status="R"] { color: var(--status-attention); }
+.diff-strip__tooltip-status[data-status="U"] { color: var(--status-crashed); }
+
+.diff-strip__tooltip-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.diff-strip__tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-strip__tooltip-row--add { color: var(--diff-add); }
+.diff-strip__tooltip-row--del { color: var(--diff-del); }
+
+.diff-strip__tooltip-path {
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+/* ── Diff View Overlay (centered diff view, auto-closes on tab switch) */
+
+.diff-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--frame-tint);
+}
+
+.diff-overlay__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 38px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--overlay) 3%, transparent);
+}
+
+.diff-overlay__filename {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.diff-overlay__path {
+  font-size: var(--text-label);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.diff-overlay__area {
+  font-size: var(--text-badge);
+  font-weight: 600;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.diff-overlay__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.diff-overlay__close:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.diff-overlay__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }

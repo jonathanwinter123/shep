@@ -5,7 +5,7 @@ import TabBar from "./TabBar";
 import TerminalView from "../terminal/TerminalView";
 import TerminalErrorBoundary from "../terminal/TerminalErrorBoundary";
 import NoticeCenter from "../shared/NoticeCenter";
-import { PanelLeft, PanelLeftOpen } from "lucide-react";
+import { PanelLeft, PanelRight } from "lucide-react";
 import { useRepoStore } from "../../stores/useRepoStore";
 import { useCommandStore } from "../../stores/useCommandStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
@@ -41,6 +41,8 @@ const CommandsPanel = lazy(() => import("../commands/CommandsPanel"));
 const SessionLauncher = lazy(() => import("../session/SessionLauncher"));
 const UsagePanel = lazy(() => import("../usage/UsagePanel"));
 const PortsPanel = lazy(() => import("../ports/PortsPanel"));
+const DiffSummaryPanel = lazy(() => import("../git/DiffSummaryPanel"));
+const DiffViewOverlay = lazy(() => import("../git/DiffViewOverlay"));
 
 function toCommandConfig(command: CommandState): CommandConfig {
   return {
@@ -152,12 +154,14 @@ export default function AppShell() {
   );
 
   const {
-    settingsActive, usagePanelActive, portsPanelActive, sidebarVisible,
+    settingsActive, usagePanelActive, portsPanelActive, sidebarVisible, diffPanelVisible, activeDiffFile,
   } = useUIStore(useShallow((s) => ({
     settingsActive: s.settingsActive,
     usagePanelActive: s.usagePanelActive,
     portsPanelActive: s.portsPanelActive,
     sidebarVisible: s.sidebarVisible,
+    diffPanelVisible: s.diffPanelVisible,
+    activeDiffFile: s.activeDiffFile,
   })));
 
   // Derive which kind of local tab is active (for panel content rendering)
@@ -222,6 +226,7 @@ export default function AppShell() {
       try {
         const isFirstVisit = !useCommandStore.getState().hasProject(repoPath);
 
+        useUIStore.getState().deactivateAllOverlays();
         const config = await openRepo(repoPath);
         restoreAttemptedRef.current = true;
         window.localStorage.setItem(LAST_REPO_STORAGE_KEY, repoPath);
@@ -251,6 +256,7 @@ export default function AppShell() {
   const handleAddProject = useCallback(
     async (repoPath: string) => {
       try {
+        useUIStore.getState().deactivateAllOverlays();
         const config = await addRepo(repoPath);
         // addRepo sets activeRepoPath in the repo store, get the canonical path
         const canonicalPath = useRepoStore.getState().activeRepoPath;
@@ -585,7 +591,7 @@ export default function AppShell() {
     return () => { unlisten.then((f) => f()); };
   }, [handleNewShell, handleNewAssistant, handleOpenInEditor, pushNotice]);
 
-  const showOverlay = settingsActive || usagePanelActive || portsPanelActive;
+  const showOverlay = settingsActive || usagePanelActive || portsPanelActive || !!activeDiffFile;
 
   return (
     <div className="app-shell">
@@ -603,19 +609,26 @@ export default function AppShell() {
           }
         }}
       >
-        <button
-          onClick={(e) => { e.stopPropagation(); useUIStore.getState().toggleSidebar(); }}
-          onMouseDown={(e) => e.stopPropagation()}
-          className="absolute right-6 top-1/2 -translate-y-1/2 p-1 rounded opacity-30 hover:opacity-70 transition-opacity z-20"
-          title={sidebarVisible ? "Hide sidebar (Cmd+B)" : "Show sidebar (Cmd+B)"}
-          aria-label={sidebarVisible ? "Hide sidebar" : "Show sidebar"}
-        >
-          {sidebarVisible ? (
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-20">
+          <button
+            onClick={(e) => { e.stopPropagation(); useUIStore.getState().toggleSidebar(); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            className={`p-1 rounded transition-opacity hover:opacity-70 ${sidebarVisible ? "opacity-40" : "opacity-15"}`}
+            title={sidebarVisible ? "Hide sidebar (Cmd+B)" : "Show sidebar (Cmd+B)"}
+            aria-label={sidebarVisible ? "Hide sidebar" : "Show sidebar"}
+          >
             <PanelLeft size={20} />
-          ) : (
-            <PanelLeftOpen size={20} />
-          )}
-        </button>
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); useUIStore.getState().toggleDiffPanel(); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            className={`p-1 rounded transition-opacity hover:opacity-70 ${diffPanelVisible ? "opacity-40" : "opacity-15"}`}
+            title={diffPanelVisible ? "Hide diff panel" : "Show diff panel"}
+            aria-label={diffPanelVisible ? "Hide diff panel" : "Show diff panel"}
+          >
+            <PanelRight size={20} />
+          </button>
+        </div>
       </div>
 
       <div className="app-shell__frame">
@@ -651,7 +664,12 @@ export default function AppShell() {
           />
 
           <div ref={terminalContainerRef} className="terminal-stage">
-            {/* Global overlays (Settings, Usage, Ports) */}
+            {/* Global overlays (Settings, Usage, Ports, Diff) */}
+            {!!activeDiffFile && (
+              <Suspense fallback={<PanelLoader />}>
+                <DiffViewOverlay />
+              </Suspense>
+            )}
             {settingsActive && (
               <Suspense fallback={<PanelLoader />}>
                 <SettingsPanel />
@@ -722,6 +740,12 @@ export default function AppShell() {
             ))}
           </div>
         </div>
+
+        {diffPanelVisible && (
+          <Suspense fallback={null}>
+            <DiffSummaryPanel />
+          </Suspense>
+        )}
       </div>
     </div>
   );

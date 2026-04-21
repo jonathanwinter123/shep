@@ -10,7 +10,7 @@ use url::Url;
 
 use crate::fonts::{self, FontFaceData, FontFamily};
 use crate::git;
-use crate::git::{ChangedFile, CreatedWorktree, GitStatus, WorktreeEntry};
+use crate::git::{ChangedFile, CreatedWorktree, DiffFileStat, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::{PtyColorTheme, PtyOutput};
 use crate::usage::{
@@ -418,6 +418,11 @@ pub async fn git_switch_branch(path: String, branch_name: String) -> Result<(), 
 #[tauri::command]
 pub async fn git_create_branch(path: String, branch_name: String) -> Result<(), String> {
     git::create_branch(&path, &branch_name)
+}
+
+#[tauri::command]
+pub async fn git_diff_stats(path: String) -> Result<Vec<DiffFileStat>, String> {
+    git::diff_stats(&path)
 }
 
 // ── System commands ────────────────────────────────────────────────
@@ -992,4 +997,26 @@ pub async fn kill_port(pid: u32) -> Result<(), String> {
             .map_err(|e| format!("Failed to force-kill process {pid}: {e}"))?;
     }
     Ok(())
+}
+
+// ── Pi config commands ─────────────────────────────────────────────
+
+#[tauri::command]
+pub fn get_pi_config() -> Result<crate::pi_config::PiConfig, String> {
+    crate::pi_config::get_pi_config()
+}
+
+#[tauri::command]
+pub fn save_pi_settings(settings: crate::pi_config::PiSettings) -> Result<(), String> {
+    crate::pi_config::save_pi_settings(settings)
+}
+
+#[tauri::command]
+pub fn save_pi_api_key(provider: String, api_key: String) -> Result<(), String> {
+    crate::pi_config::save_pi_api_key(&provider, &api_key)
+}
+
+#[tauri::command]
+pub fn delete_pi_api_key(provider: String) -> Result<(), String> {
+    crate::pi_config::delete_pi_api_key(&provider)
 }

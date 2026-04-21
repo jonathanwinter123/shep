@@ -5,18 +5,14 @@ import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitPanelStore } from "../../stores/useGitPanelStore";
 import {
-  gitChangedFiles, gitFileDiff, gitFileContents, gitListFiles,
+  gitChangedFiles, gitFileContents, gitListFiles,
 } from "../../lib/tauri";
 import type { ChangedFile } from "../../lib/types";
-import FileList from "./FileList";
 import FileTree from "./FileTree";
-import DiffViewer from "./DiffViewer";
 import FileViewer from "./FileViewer";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
-
-type PanelMode = "diffs" | "files";
-const PANEL_MODE_KEY = "shep:gitPanelMode";
+import { isMarkdownFile } from "../../lib/markdownRenderer";
 
 export default function GitPanel() {
   const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
@@ -26,43 +22,29 @@ export default function GitPanel() {
     (s) => activeProjectPath ? s.projectGitStatus[activeProjectPath] ?? null : null,
   );
 
-  // Persistent per-repo UI state lives in useGitPanelStore so it survives
-  // GitPanel unmounts (switching tabs or navigating away and back).
   const panelState = useGitPanelStore((s) =>
     activeProjectPath ? s.perRepo[activeProjectPath] ?? null : null,
   );
-  const selectedPath = panelState?.diffsSelectedPath ?? null;
-  const selectedArea = panelState?.diffsSelectedArea ?? null;
   const repoSelectedPath = panelState?.repoSelectedPath ?? null;
   const repoExpanded = panelState?.repoExpanded ?? [];
   const leftSearch = panelState?.leftSearch ?? "";
   const sidebarCollapsed = panelState?.sidebarCollapsed ?? false;
+  const repoScrollPositions = panelState?.repoScrollPositions ?? {};
 
-  // Transient local state — reset on every mount, no need to persist.
   const [files, setFiles] = useState<ChangedFile[]>([]);
-  const [diffContent, setDiffContent] = useState<string>("");
   const [repoFiles, setRepoFiles] = useState<string[]>([]);
   const [repoFileContent, setRepoFileContent] = useState<string>("");
   const [repoFileError, setRepoFileError] = useState<string | null>(null);
   const [repoFileLoading, setRepoFileLoading] = useState<boolean>(false);
+  const [rawMarkdown, setRawMarkdown] = useState(false);
+  const isMarkdown = repoSelectedPath ? isMarkdownFile(repoSelectedPath) : false;
 
-  // Panel mode persists via localStorage, with backwards compat for the
-  // old "repo" value (renamed to "files" in the UI).
-  const [panelMode, setPanelMode] = useState<PanelMode>(() => {
-    const stored = localStorage.getItem(PANEL_MODE_KEY);
-    return stored === "files" || stored === "repo" ? "files" : "diffs";
-  });
-
-  // A single unified search term (`leftSearch`, persisted in the panel
-  // store) drives both the sidebar file filter AND the in-viewer
-  // find-in-file highlight. The header control can collapse visually,
-  // but the underlying term stays unified.
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchOpen, setSearchOpen] = useState(() => leftSearch.trim().length > 0);
 
   const canLoadGitFiles = !!activeProjectPath && !!gitStatus?.is_git_repo;
 
-  // ── Diffs mode: fetch changed files ───────────────────────────────
+  // Fetch changed files for tree highlighting
   const fetchFiles = useCallback(async () => {
     if (!canLoadGitFiles || !activeProjectPath) {
       setFiles([]);
@@ -71,70 +53,17 @@ export default function GitPanel() {
     try {
       const result = await gitChangedFiles(activeProjectPath);
       setFiles(result);
-    } catch (error) {
+    } catch {
       setFiles([]);
-      pushNotice({ tone: "error", title: "Couldn't load changed files", message: getErrorMessage(error) });
     }
-  }, [canLoadGitFiles, activeProjectPath, pushNotice]);
+  }, [canLoadGitFiles, activeProjectPath]);
 
   const statusKey = gitStatus
     ? `${gitStatus.staged}:${gitStatus.unstaged}:${gitStatus.untracked}`
     : "";
   useEffect(() => { fetchFiles(); }, [fetchFiles, statusKey]);
 
-  // ── Diffs mode: fetch diff content on selection change ─────────────
-  useEffect(() => {
-    if (!activeProjectPath || !selectedPath || !selectedArea) {
-      setDiffContent("");
-      return;
-    }
-    const repo = activeProjectPath;
-    const path = selectedPath;
-    const staged = selectedArea === "staged";
-
-    let cancelled = false;
-    setDiffContent("");
-    void (async () => {
-      try {
-        const diff = await gitFileDiff(repo, path, staged);
-        if (!cancelled) setDiffContent(diff);
-      } catch (error) {
-        if (!cancelled) {
-          pushNotice({
-            tone: "error",
-            title: "Couldn't load diff",
-            message: getErrorMessage(error),
-          });
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeProjectPath, selectedPath, selectedArea, pushNotice]);
-
-  // ── Diffs mode: watcher refresh for the open diff ──────────────────
-  useEffect(() => {
-    if (!activeProjectPath || !selectedPath || !selectedArea) return;
-    const repo = activeProjectPath;
-    const path = selectedPath;
-    const staged = selectedArea === "staged";
-
-    const unlistenPromise = listen<{ paths: string[] }>("git-fs-changed", async (event) => {
-      if (!event.payload.paths.includes(repo)) return;
-      try {
-        const diff = await gitFileDiff(repo, path, staged);
-        setDiffContent(diff);
-      } catch {
-        // File may have been committed away — silent ignore.
-      }
-    });
-    return () => {
-      unlistenPromise.then((f) => f());
-    };
-  }, [activeProjectPath, selectedPath, selectedArea]);
-
-  // ── Files mode: fetch repo file list ───────────────────────────────
+  // Fetch repo file list
   useEffect(() => {
     if (!canLoadGitFiles || !activeProjectPath) {
       setRepoFiles([]);
@@ -149,38 +78,30 @@ export default function GitPanel() {
       } catch (error) {
         if (!cancelled) {
           setRepoFiles([]);
-          pushNotice({
-            tone: "error",
-            title: "Couldn't list repo files",
-            message: getErrorMessage(error),
-          });
+          pushNotice({ tone: "error", title: "Couldn't list repo files", message: getErrorMessage(error) });
         }
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [canLoadGitFiles, activeProjectPath, pushNotice]);
 
-  // ── Files mode: watcher refresh for the repo file list ────────────
+  // Live-refresh repo file list
   useEffect(() => {
     if (!canLoadGitFiles || !activeProjectPath) return;
     const repo = activeProjectPath;
-    const unlistenPromise = listen<{ paths: string[] }>("git-fs-changed", async (event) => {
+    const unlistenP = listen<{ paths: string[] }>("git-fs-changed", async (event) => {
       if (!event.payload.paths.includes(repo)) return;
       try {
         const result = await gitListFiles(repo);
         setRepoFiles(result);
       } catch {
-        // Silent — initial fetch already pushed an error notice if needed.
+        // Silent.
       }
     });
-    return () => {
-      unlistenPromise.then((f) => f());
-    };
+    return () => { unlistenP.then((f) => f()); };
   }, [canLoadGitFiles, activeProjectPath]);
 
-  // ── Files mode: fetch file contents on selection change ────────────
+  // Fetch file contents when selection changes
   useEffect(() => {
     if (!canLoadGitFiles || !activeProjectPath || !repoSelectedPath) {
       setRepoFileContent("");
@@ -204,17 +125,15 @@ export default function GitPanel() {
         if (!cancelled) setRepoFileLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [canLoadGitFiles, activeProjectPath, repoSelectedPath]);
 
-  // ── Files mode: watcher refresh for the open file contents ────────
+  // Live-refresh open file contents
   useEffect(() => {
     if (!canLoadGitFiles || !activeProjectPath || !repoSelectedPath) return;
     const repo = activeProjectPath;
     const path = repoSelectedPath;
-    const unlistenPromise = listen<{ paths: string[] }>("git-fs-changed", async (event) => {
+    const unlistenP = listen<{ paths: string[] }>("git-fs-changed", async (event) => {
       if (!event.payload.paths.includes(repo)) return;
       try {
         const content = await gitFileContents(repo, path, "working");
@@ -224,13 +143,10 @@ export default function GitPanel() {
         setRepoFileError(getErrorMessage(error));
       }
     });
-    return () => {
-      unlistenPromise.then((f) => f());
-    };
+    return () => { unlistenP.then((f) => f()); };
   }, [canLoadGitFiles, activeProjectPath, repoSelectedPath]);
 
-  // Cmd+F (or Ctrl+F) focuses the always-visible unified search input.
-  // Listener is only bound while GitPanel is mounted.
+  // Cmd+F focuses the search input while this panel is mounted
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
@@ -255,45 +171,37 @@ export default function GitPanel() {
     return () => window.cancelAnimationFrame(id);
   }, [searchOpen]);
 
-  const handleSelect = useCallback(
-    (file: ChangedFile) => {
-      if (!activeProjectPath) return;
-      useGitPanelStore.getState().setDiffsSelection(
-        activeProjectPath,
-        file.path,
-        file.area,
-        file.status,
-      );
-    },
-    [activeProjectPath],
-  );
+  const changedPathsMap = useMemo(() => {
+    const m = new Map<string, "added" | "modified">();
+    for (const f of files) {
+      const kind: "added" | "modified" =
+        f.status === "A" || f.status === "?" ? "added" : "modified";
+      m.set(f.path, kind);
+    }
+    return m;
+  }, [files]);
 
-  const handleSetPanelMode = useCallback((mode: PanelMode) => {
-    setPanelMode(mode);
-    localStorage.setItem(PANEL_MODE_KEY, mode);
-  }, []);
+  const untrackedPaths = useMemo(() => {
+    const s = new Set<string>();
+    for (const f of files) {
+      if (f.status === "?") s.add(f.path);
+    }
+    return s;
+  }, [files]);
 
-  const handleSetLeftSearch = useCallback(
-    (value: string) => {
-      if (!activeProjectPath) return;
-      useGitPanelStore.getState().setLeftSearch(activeProjectPath, value);
-    },
-    [activeProjectPath],
-  );
-
-  const handleOpenSearch = useCallback(() => {
-    setSearchOpen(true);
-  }, []);
-
-  const handleCloseSearch = useCallback(() => {
-    handleSetLeftSearch("");
-    setSearchOpen(false);
-  }, [handleSetLeftSearch]);
+  // Remove stale selection when the file list refreshes — skip when the list
+  // is empty (not yet loaded) to avoid clearing a valid restored selection.
+  useEffect(() => {
+    if (!activeProjectPath || !repoSelectedPath || repoFiles.length === 0) return;
+    if (repoFiles.includes(repoSelectedPath)) return;
+    useGitPanelStore.getState().setRepoSelection(activeProjectPath, null);
+  }, [activeProjectPath, repoFiles, repoSelectedPath]);
 
   const handleRepoSelect = useCallback(
     (path: string) => {
       if (!activeProjectPath) return;
       useGitPanelStore.getState().setRepoSelection(activeProjectPath, path);
+      setRawMarkdown(false);
     },
     [activeProjectPath],
   );
@@ -314,86 +222,20 @@ export default function GitPanel() {
     [activeProjectPath],
   );
 
-  // Classify each changed file into "added" (new: status A or ?) or
-  // "modified" (everything else) for the repo-browser tree coloring.
-  // Also build a set of untracked paths (status ?) so the tree can dim
-  // their names to signal "not tracked by git yet".
-  const changedPathsMap = useMemo(() => {
-    const m = new Map<string, "added" | "modified">();
-    for (const f of files) {
-      const kind: "added" | "modified" =
-        f.status === "A" || f.status === "?" ? "added" : "modified";
-      m.set(f.path, kind);
-    }
-    return m;
-  }, [files]);
+  const handleSetLeftSearch = useCallback(
+    (value: string) => {
+      if (!activeProjectPath) return;
+      useGitPanelStore.getState().setLeftSearch(activeProjectPath, value);
+    },
+    [activeProjectPath],
+  );
 
-  const untrackedPaths = useMemo(() => {
-    const s = new Set<string>();
-    for (const f of files) {
-      if (f.status === "?") s.add(f.path);
-    }
-    return s;
-  }, [files]);
+  const handleOpenSearch = useCallback(() => setSearchOpen(true), []);
 
-  // Filter the changed files list for FileList based on the same lifted
-  // leftSearch term. Empty search returns all files.
-  const filteredFiles = useMemo(() => {
-    if (!leftSearch.trim()) return files;
-    const needle = leftSearch.trim().toLowerCase();
-    return files.filter((f) => f.path.toLowerCase().includes(needle));
-  }, [files, leftSearch]);
-
-  const preferredDiffFiles = useMemo(() => {
-    const priority = (area: string) => {
-      if (area === "unstaged" || area === "untracked") return 2;
-      if (area === "staged") return 1;
-      return 0;
-    };
-
-    const byPath = new Map<string, ChangedFile>();
-    for (const file of filteredFiles) {
-      const current = byPath.get(file.path);
-      if (!current || priority(file.area) > priority(current.area)) {
-        byPath.set(file.path, file);
-      }
-    }
-
-    return Array.from(byPath.values()).sort((a, b) => a.path.localeCompare(b.path));
-  }, [filteredFiles]);
-
-  useEffect(() => {
-    if (!activeProjectPath || panelMode !== "diffs") return;
-
-    const currentValid = preferredDiffFiles.some(
-      (file) => file.path === selectedPath && file.area === selectedArea,
-    );
-
-    if (currentValid) return;
-
-    const fallback =
-      preferredDiffFiles.find((file) => file.path === selectedPath)
-      ?? preferredDiffFiles[0]
-      ?? null;
-    if (!fallback) return;
-
-    useGitPanelStore.getState().setDiffsSelection(
-      activeProjectPath,
-      fallback.path,
-      fallback.area,
-      fallback.status,
-    );
-  }, [activeProjectPath, panelMode, preferredDiffFiles, selectedArea, selectedPath]);
-
-  useEffect(() => {
-    if (!activeProjectPath || panelMode !== "files") return;
-    if (!repoSelectedPath) return;
-
-    const currentValid = repoFiles.includes(repoSelectedPath);
-    if (currentValid) return;
-
-    useGitPanelStore.getState().setRepoSelection(activeProjectPath, null);
-  }, [activeProjectPath, panelMode, repoFiles, repoSelectedPath]);
+  const handleCloseSearch = useCallback(() => {
+    handleSetLeftSearch("");
+    setSearchOpen(false);
+  }, [handleSetLeftSearch]);
 
   if (!activeProjectPath) {
     return (
@@ -416,25 +258,16 @@ export default function GitPanel() {
       <div className="git-panel__body">
         {!sidebarCollapsed && (
           <div className="git-panel__sidebar">
-            {panelMode === "files" ? (
-              <FileTree
-                files={repoFiles}
-                changedPaths={changedPathsMap}
-                untrackedPaths={untrackedPaths}
-                search={leftSearch}
-                selectedPath={repoSelectedPath}
-                onSelect={handleRepoSelect}
-                expandedPaths={repoExpanded}
-                onExpandedChange={handleRepoExpandedChange}
-              />
-            ) : (
-              <FileList
-                files={preferredDiffFiles}
-                search={leftSearch}
-                selectedPath={selectedPath}
-                onSelect={handleSelect}
-              />
-            )}
+            <FileTree
+              files={repoFiles}
+              changedPaths={changedPathsMap}
+              untrackedPaths={untrackedPaths}
+              search={leftSearch}
+              selectedPath={repoSelectedPath}
+              onSelect={handleRepoSelect}
+              expandedPaths={repoExpanded}
+              onExpandedChange={handleRepoExpandedChange}
+            />
           </div>
         )}
 
@@ -448,7 +281,7 @@ export default function GitPanel() {
                     ref={searchInputRef}
                     className="git-panel__search-input"
                     type="text"
-                    placeholder="Search files, filter diffs…"
+                    placeholder="Search files…"
                     value={leftSearch}
                     onChange={(e) => handleSetLeftSearch(e.target.value)}
                     onBlur={() => {
@@ -494,6 +327,16 @@ export default function GitPanel() {
                 </button>
               )}
             </div>
+            {isMarkdown && (
+              <button
+                className="git-panel__pane-toggle"
+                onClick={() => setRawMarkdown((r) => !r)}
+                title={rawMarkdown ? "Show rendered" : "Show raw"}
+                aria-label={rawMarkdown ? "Show rendered markdown" : "Show raw markdown"}
+              >
+                <span style={{ fontSize: 11, fontWeight: 500 }}>{rawMarkdown ? "Render" : "Raw"}</span>
+              </button>
+            )}
             <button
               className="git-panel__pane-toggle"
               onClick={() => handleSetSidebarCollapsed(!sidebarCollapsed)}
@@ -502,49 +345,19 @@ export default function GitPanel() {
             >
               {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeft size={16} />}
             </button>
-            <div className="view-toggle" role="tablist" aria-label="Panel mode">
-              <button
-                role="tab"
-                aria-selected={panelMode === "files"}
-                className={`view-toggle__btn${panelMode === "files" ? " view-toggle__btn--active" : ""}`}
-                onClick={() => handleSetPanelMode("files")}
-              >
-                Files
-              </button>
-              <button
-                role="tab"
-                aria-selected={panelMode === "diffs"}
-                className={`view-toggle__btn${panelMode === "diffs" ? " view-toggle__btn--active" : ""}`}
-                onClick={() => handleSetPanelMode("diffs")}
-              >
-                Diffs
-              </button>
-            </div>
           </div>
-          {/* Viewer content — mode-switched. */}
-          {panelMode === "files" ? (
-            repoSelectedPath ? (
-              <FileViewer
-                key={repoSelectedPath}
-                contents={repoFileContent}
-                filePath={repoSelectedPath}
-                loading={repoFileLoading}
-                error={repoFileError}
-                findTerm={leftSearch}
-              />
-            ) : (
-              <div className="git-panel__diff">
-                <div style={{ padding: 24, opacity: 0.35, fontSize: 12 }}>
-                  Select a file to view
-                </div>
-              </div>
-            )
-          ) : selectedPath ? (
-            <DiffViewer
-              key={selectedPath}
-              diff={diffContent}
-              filePath={selectedPath}
+
+          {repoSelectedPath ? (
+            <FileViewer
+              key={repoSelectedPath}
+              contents={repoFileContent}
+              filePath={repoSelectedPath}
+              loading={repoFileLoading}
+              error={repoFileError}
               findTerm={leftSearch}
+              rawMarkdown={rawMarkdown}
+              initialScrollTop={repoScrollPositions[repoSelectedPath]}
+              onScrollChange={(pos) => useGitPanelStore.getState().setRepoScrollPosition(activeProjectPath, repoSelectedPath, pos)}
             />
           ) : (
             <div className="git-panel__diff">

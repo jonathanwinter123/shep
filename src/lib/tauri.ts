@@ -23,6 +23,9 @@ import type {
   UsageOverview,
   UsageProjectAliasReviewItem,
   PortInfo,
+  PiConfig,
+  PiSettings,
+  DiffFileStat,
 } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -255,6 +258,10 @@ export function gitCreateBranch(path: string, branchName: string): Promise<void>
   return invoke("git_create_branch", { path, branchName });
 }
 
+export function gitDiffStats(path: string): Promise<DiffFileStat[]> {
+  return invoke("git_diff_stats", { path });
+}
+
 // ── System commands ────────────────────────────────────────────────
 
 export function getUsername(): Promise<string> {
@@ -330,4 +337,22 @@ export function listListeningPorts(): Promise<PortInfo[]> {
 
 export function killPort(pid: number): Promise<void> {
   return invoke("kill_port", { pid });
+}
+
+// ── Pi config commands ────────────────────────────────────────────
+
+export function getPiConfig(): Promise<PiConfig> {
+  return invoke("get_pi_config");
+}
+
+export function savePiSettings(settings: PiSettings): Promise<void> {
+  return invoke("save_pi_settings", { settings });
+}
+
+export function savePiApiKey(provider: string, apiKey: string): Promise<void> {
+  return invoke("save_pi_api_key", { provider, apiKey });
+}
+
+export function deletePiApiKey(provider: string): Promise<void> {
+  return invoke("delete_pi_api_key", { provider });
 }

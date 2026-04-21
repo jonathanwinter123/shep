@@ -29,9 +29,9 @@ const WINDOWS: { key: SidebarWindow; label: string }[] = [
 ];
 
 const PACE_LABEL_COLORS: Record<PaceStatus, string> = {
-  under: "rgba(52, 211, 153, 0.8)",
+  under: "var(--status-added)",
   on: "var(--text-muted)",
-  over: "rgba(248, 113, 113, 0.8)",
+  over: "var(--status-crashed)",
 };
 
 interface SidebarUtilizationItem {

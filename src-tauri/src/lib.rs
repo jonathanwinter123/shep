@@ -2,6 +2,7 @@ mod commands;
 mod fonts;
 mod git;
 mod menu;
+mod pi_config;
 mod pty;
 mod usage;
 mod watcher;
@@ -128,6 +129,7 @@ pub fn run() {
             commands::git_unstage_all,
             commands::git_switch_branch,
             commands::git_create_branch,
+            commands::git_diff_stats,
             commands::check_command_exists,
             commands::get_usage_settings,
             commands::save_usage_settings,
@@ -144,6 +146,10 @@ pub fn run() {
             commands::list_listening_ports,
             commands::kill_port,
             commands::open_url,
+            commands::get_pi_config,
+            commands::save_pi_settings,
+            commands::save_pi_api_key,
+            commands::delete_pi_api_key,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
