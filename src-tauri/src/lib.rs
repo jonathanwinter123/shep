@@ -129,6 +129,7 @@ pub fn run() {
             commands::git_unstage_all,
             commands::git_switch_branch,
             commands::git_create_branch,
+            commands::git_diff_stats,
             commands::check_command_exists,
             commands::get_usage_settings,
             commands::save_usage_settings,

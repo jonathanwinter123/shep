@@ -25,6 +25,7 @@ import type {
   PortInfo,
   PiConfig,
   PiSettings,
+  DiffFileStat,
 } from "./types";
 
 // ── Workspace commands ──────────────────────────────────────────────
@@ -255,6 +256,10 @@ export function gitSwitchBranch(path: string, branchName: string): Promise<void>
 
 export function gitCreateBranch(path: string, branchName: string): Promise<void> {
   return invoke("git_create_branch", { path, branchName });
+}
+
+export function gitDiffStats(path: string): Promise<DiffFileStat[]> {
+  return invoke("git_diff_stats", { path });
 }
 
 // ── System commands ────────────────────────────────────────────────

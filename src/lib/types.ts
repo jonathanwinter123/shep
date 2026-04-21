@@ -177,6 +177,14 @@ export interface CreatedWorktree {
   branch: string;
 }
 
+// ── Git diff stats ───────────────────────────────────────────────────
+
+export interface DiffFileStat {
+  path: string;
+  additions: number;
+  deletions: number;
+}
+
 // ── Git changed files ────────────────────────────────────────────────
 
 export interface ChangedFile {

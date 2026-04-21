@@ -10,7 +10,7 @@ use url::Url;
 
 use crate::fonts::{self, FontFaceData, FontFamily};
 use crate::git;
-use crate::git::{ChangedFile, CreatedWorktree, GitStatus, WorktreeEntry};
+use crate::git::{ChangedFile, CreatedWorktree, DiffFileStat, GitStatus, WorktreeEntry};
 use crate::pty::manager::PtyManager;
 use crate::pty::session::{PtyColorTheme, PtyOutput};
 use crate::usage::{
@@ -418,6 +418,11 @@ pub async fn git_switch_branch(path: String, branch_name: String) -> Result<(), 
 #[tauri::command]
 pub async fn git_create_branch(path: String, branch_name: String) -> Result<(), String> {
     git::create_branch(&path, &branch_name)
+}
+
+#[tauri::command]
+pub async fn git_diff_stats(path: String) -> Result<Vec<DiffFileStat>, String> {
+    git::diff_stats(&path)
 }
 
 // ── System commands ────────────────────────────────────────────────

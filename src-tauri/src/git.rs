@@ -594,6 +594,58 @@ pub fn file_diff(path: &str, file_path: &str, staged: bool) -> Result<String, St
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+// ── Per-file diff stats ──────────────────────────────────────────────
+
+#[derive(serde::Serialize, Clone)]
+pub struct DiffFileStat {
+    pub path: String,
+    pub additions: u32,
+    pub deletions: u32,
+}
+
+/// Returns addition/deletion line counts per changed file. Uses `git diff HEAD
+/// --numstat` (all changes vs HEAD) so staged and unstaged changes are combined.
+/// Falls back to `--cached` on repos with no HEAD yet (first commit pending).
+pub fn diff_stats(path: &str) -> Result<Vec<DiffFileStat>, String> {
+    let output = Command::new("git")
+        .args(["-C", path, "diff", "HEAD", "--numstat"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let stdout = if output.status.success() {
+        String::from_utf8_lossy(&output.stdout).to_string()
+    } else {
+        let cached = Command::new("git")
+            .args(["-C", path, "diff", "--cached", "--numstat"])
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !cached.status.success() {
+            return Ok(vec![]);
+        }
+        String::from_utf8_lossy(&cached.stdout).to_string()
+    };
+
+    let stats = stdout
+        .lines()
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.splitn(3, '\t').collect();
+            if parts.len() != 3 {
+                return None;
+            }
+            // Binary files report "-" instead of a count — treat as 0.
+            let additions: u32 = parts[0].parse().unwrap_or(0);
+            let deletions: u32 = parts[1].parse().unwrap_or(0);
+            Some(DiffFileStat {
+                path: parts[2].to_string(),
+                additions,
+                deletions,
+            })
+        })
+        .collect();
+
+    Ok(stats)
+}
+
 pub fn stage_file(path: &str, file_path: &str) -> Result<(), String> {
     let output = Command::new("git")
         .args(["-C", path, "add", "--", file_path])
