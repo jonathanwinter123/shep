@@ -253,14 +253,6 @@ pub fn create_worktree(path: &str, branch_name: &str) -> Result<CreatedWorktree,
         return Err("Branch name is required".to_string());
     }
 
-    let repo_path = std::path::Path::new(path)
-        .canonicalize()
-        .map_err(|e| format!("Failed to resolve repo path: {e}"))?;
-
-    if repo_path.join(".git").is_file() {
-        return Err("Create worktree is only available from the main repo checkout".to_string());
-    }
-
     let validate = Command::new("git")
         .args(["-C", path, "check-ref-format", "--branch", branch_name])
         .output()
@@ -274,11 +266,25 @@ pub fn create_worktree(path: &str, branch_name: &str) -> Result<CreatedWorktree,
         });
     }
 
-    let repo_name = repo_path
+    // Always derive the output path from the main repo, not the calling worktree,
+    // so all worktrees end up in the same .shep-worktrees/<repo>/ directory.
+    let main_repo_path = {
+        let out = Command::new("git")
+            .args(["-C", path, "worktree", "list", "--porcelain"])
+            .output()
+            .map_err(|e| format!("Failed to list worktrees: {e}"))?;
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        stdout
+            .lines()
+            .find_map(|l| l.strip_prefix("worktree ").map(|p| std::path::PathBuf::from(p.trim())))
+            .ok_or_else(|| "Could not determine main repo path".to_string())?
+    };
+
+    let repo_name = main_repo_path
         .file_name()
         .and_then(|n| n.to_str())
         .ok_or_else(|| "Could not determine repo name".to_string())?;
-    let repo_parent = repo_path
+    let repo_parent = main_repo_path
         .parent()
         .ok_or_else(|| "Could not determine repo parent".to_string())?;
 
