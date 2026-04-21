@@ -9,6 +9,50 @@ import type { ChangedFile, DiffFileStat } from "../../lib/types";
 
 const MAX_BAR_PX = 38;
 
+function statusLabel(status: string): string {
+  return status.toLowerCase();
+}
+
+interface TooltipState {
+  file: ChangedFile;
+  stat: DiffFileStat | undefined;
+  rect: DOMRect;
+}
+
+function DiffTooltip({ tip }: { tip: TooltipState }) {
+  const { file, stat } = tip;
+  const top = tip.rect.top + tip.rect.height / 2;
+  const right = window.innerWidth - tip.rect.left + 10;
+  const filename = file.path.split("/").pop() ?? file.path;
+
+  return (
+    <div
+      className="diff-strip__tooltip"
+      style={{ top, right, transform: "translateY(-50%)" }}
+    >
+      <div className="diff-strip__tooltip-header">
+        <span className="diff-strip__tooltip-filename">{filename}</span>
+        <span className="diff-strip__tooltip-status" data-status={file.status}>
+          {statusLabel(file.status)}
+        </span>
+      </div>
+      {stat && (
+        <div className="diff-strip__tooltip-rows">
+          <div className="diff-strip__tooltip-row diff-strip__tooltip-row--add">
+            <span>Added</span>
+            <span>+{stat.additions}</span>
+          </div>
+          <div className="diff-strip__tooltip-row diff-strip__tooltip-row--del">
+            <span>Removed</span>
+            <span>−{stat.deletions}</span>
+          </div>
+        </div>
+      )}
+      <div className="diff-strip__tooltip-path">{file.path}</div>
+    </div>
+  );
+}
+
 export default function DiffSummaryPanel() {
   const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
   const gitStatus = useGitStore(
@@ -18,6 +62,7 @@ export default function DiffSummaryPanel() {
 
   const [files, setFiles] = useState<ChangedFile[]>([]);
   const [statsMap, setStatsMap] = useState<Map<string, DiffFileStat>>(new Map());
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   const canLoad = !!activeProjectPath && !!gitStatus?.is_git_repo;
 
@@ -98,10 +143,12 @@ export default function DiffSummaryPanel() {
     useUIStore.getState().openDiffFile(file.path, file.area);
   }, []);
 
+  const handleMouseLeave = useCallback(() => setTooltip(null), []);
+
   if (!activeProjectPath || !gitStatus?.is_git_repo) return null;
 
   return (
-    <div className="diff-strip">
+    <div className="diff-strip" onMouseLeave={handleMouseLeave}>
       <div className="diff-strip__header">
         <Diff size={13} className="diff-strip__header-icon" />
       </div>
@@ -120,9 +167,6 @@ export default function DiffSummaryPanel() {
             const isActive = activeDiffFile?.path === file.path;
 
             const filename = file.path.split("/").pop() ?? file.path;
-            const tooltip = stat
-              ? `${file.path}  +${stat.additions} −${stat.deletions}`
-              : file.path;
 
             return (
               <button
@@ -130,8 +174,8 @@ export default function DiffSummaryPanel() {
                 className={`diff-strip__row${isActive ? " diff-strip__row--active" : ""}`}
                 data-status={file.status}
                 onClick={() => handleFileClick(file)}
-                title={tooltip}
                 aria-label={filename}
+                onMouseEnter={(e) => setTooltip({ file, stat, rect: e.currentTarget.getBoundingClientRect() })}
               >
                 <span className="diff-strip__bar-wrap">
                   {total > 0 ? (
@@ -162,6 +206,7 @@ export default function DiffSummaryPanel() {
           </span>
         </div>
       )}
+      {tooltip && <DiffTooltip tip={tooltip} />}
     </div>
   );
 }

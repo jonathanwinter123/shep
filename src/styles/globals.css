@@ -3108,9 +3108,8 @@ select {
   padding: 0;
   background: transparent;
   border: none;
-  border-left: 3px solid transparent;
   cursor: pointer;
-  transition: background 100ms ease, border-color 100ms ease;
+  transition: background 100ms ease;
 }
 
 .diff-strip__row:hover {
@@ -3124,14 +3123,6 @@ select {
 .diff-strip__row--active:hover {
   background: var(--surface-active);
 }
-
-/* Status border colors */
-.diff-strip__row[data-status="M"] { border-left-color: color-mix(in srgb, var(--status-attention) var(--color-opacity-utilization), transparent); }
-.diff-strip__row[data-status="A"] { border-left-color: color-mix(in srgb, var(--status-added) var(--color-opacity-utilization), transparent); }
-.diff-strip__row[data-status="D"] { border-left-color: color-mix(in srgb, var(--status-deleted) var(--color-opacity-utilization), transparent); }
-.diff-strip__row[data-status="R"] { border-left-color: color-mix(in srgb, var(--status-attention) var(--color-opacity-utilization), transparent); }
-.diff-strip__row[data-status="?"] { border-left-color: color-mix(in srgb, var(--status-added) var(--color-opacity-utilization), transparent); }
-.diff-strip__row[data-status="U"] { border-left-color: color-mix(in srgb, var(--status-crashed) var(--color-opacity-utilization), transparent); }
 
 .diff-strip__bar-wrap {
   display: flex;
@@ -3170,6 +3161,85 @@ select {
   border-radius: 2px;
 }
 
+/* ── Diff strip tooltip ──────────────────────────────────── */
+
+.diff-strip__tooltip {
+  position: fixed;
+  z-index: 200;
+  min-width: 180px;
+  max-width: 280px;
+  padding: 10px 12px;
+  background: var(--glass-panel-strong);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.diff-strip__tooltip-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.diff-strip__tooltip-filename {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.diff-strip__tooltip-status {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.diff-strip__tooltip-status[data-status="M"] { color: var(--status-attention); }
+.diff-strip__tooltip-status[data-status="A"] { color: var(--status-added); }
+.diff-strip__tooltip-status[data-status="?"] { color: var(--status-added); }
+.diff-strip__tooltip-status[data-status="D"] { color: var(--status-deleted); }
+.diff-strip__tooltip-status[data-status="R"] { color: var(--status-attention); }
+.diff-strip__tooltip-status[data-status="U"] { color: var(--status-crashed); }
+
+.diff-strip__tooltip-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.diff-strip__tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-strip__tooltip-row--add { color: var(--diff-add); }
+.diff-strip__tooltip-row--del { color: var(--diff-del); }
+
+.diff-strip__tooltip-path {
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
 /* ── Diff View Overlay (centered diff view, auto-closes on tab switch) */
 
 .diff-overlay {
@@ -3184,10 +3254,9 @@ select {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px 0 16px;
-  height: 40px;
+  padding: 0 12px;
+  height: 38px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--glass-border);
   background: color-mix(in srgb, var(--overlay) 3%, transparent);
 }
 

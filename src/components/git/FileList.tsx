@@ -10,12 +10,12 @@ interface FileListProps {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  M: "Modified",
-  A: "Added",
-  D: "Deleted",
-  R: "Renamed",
-  U: "Unmerged",
-  "?": "Untracked",
+  M: "modified",
+  A: "added",
+  D: "deleted",
+  R: "renamed",
+  U: "unmerged",
+  "?": "untracked",
 };
 
 /** Immediate parent dir + filename; empty parent for root-level files. */
