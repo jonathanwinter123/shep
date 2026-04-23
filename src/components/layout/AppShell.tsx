@@ -232,6 +232,7 @@ export default function AppShell() {
         window.localStorage.setItem(LAST_REPO_STORAGE_KEY, repoPath);
         useTerminalStore.getState().switchProject(repoPath);
         useCommandStore.getState().switchProject(repoPath);
+        void useGitStore.getState().refreshStatus(repoPath);
         if (isFirstVisit) {
           useCommandStore.getState().loadCommands(repoPath, config.commands);
 
@@ -266,6 +267,7 @@ export default function AppShell() {
         useTerminalStore.getState().switchProject(canonicalPath);
         useCommandStore.getState().switchProject(canonicalPath);
         useCommandStore.getState().loadCommands(canonicalPath, config.commands);
+        void useGitStore.getState().refreshStatus(canonicalPath);
       } catch (error) {
         pushNotice({
           tone: "error",
