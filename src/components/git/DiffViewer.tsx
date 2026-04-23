@@ -5,7 +5,6 @@ import { getCodeViewCSSVariables, getDiffViewOptions } from "./codeViewTheme";
 interface DiffViewerProps {
   diff: string;
   filePath: string;
-  findTerm?: string;
   loading?: boolean;
   error?: string | null;
 }
@@ -13,14 +12,12 @@ interface DiffViewerProps {
 export default function DiffViewer({
   diff,
   filePath,
-  findTerm = "",
   loading = false,
   error = null,
 }: DiffViewerProps) {
   const theme = useThemeStore((s) => s.theme);
   const codeViewCSSVariables = getCodeViewCSSVariables();
   const diffViewOptions = getDiffViewOptions(theme);
-  void findTerm;
 
   if (error) {
     return (

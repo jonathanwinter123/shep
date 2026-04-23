@@ -275,11 +275,14 @@ export default function GitPanel() {
 
   // Remove stale selection when the file list refreshes — skip when the list
   // is empty (not yet loaded) to avoid clearing a valid restored selection.
+  // Also keep the selection alive when the file is in the changed-files list
+  // (e.g. staged deletions disappear from git ls-files but remain in git status).
   useEffect(() => {
     if (!activeProjectPath || !repoSelectedPath || repoFiles.length === 0) return;
     if (repoFiles.includes(repoSelectedPath)) return;
+    if (changedPathsMap.has(repoSelectedPath)) return;
     useGitPanelStore.getState().setRepoSelection(activeProjectPath, null);
-  }, [activeProjectPath, repoFiles, repoSelectedPath]);
+  }, [activeProjectPath, changedPathsMap, repoFiles, repoSelectedPath]);
 
   const handleRepoSelect = useCallback(
     (path: string) => {
@@ -341,7 +344,18 @@ export default function GitPanel() {
     if (viewerMode === "diff" && !hasSelectedDiff) {
       handleSetViewerMode("file");
     }
-  }, [handleSetViewerMode, hasSelectedDiff, viewerMode]);
+    // Auto-switch to diff when the selected file only exists in the changed
+    // list (e.g. staged deletion) — there's no working-tree content to show.
+    if (
+      viewerMode === "file" &&
+      hasSelectedDiff &&
+      repoSelectedPath &&
+      !repoFiles.includes(repoSelectedPath) &&
+      changedPathsMap.has(repoSelectedPath)
+    ) {
+      handleSetViewerMode("diff");
+    }
+  }, [changedPathsMap, handleSetViewerMode, hasSelectedDiff, repoFiles, repoSelectedPath, viewerMode]);
 
   if (!activeProjectPath) {
     return (
@@ -507,7 +521,6 @@ export default function GitPanel() {
                   key={`${repoSelectedPath}:${resolvedDiffArea ?? "none"}`}
                   diff={repoDiffContent}
                   filePath={repoSelectedPath}
-                  findTerm={leftSearch}
                   loading={repoDiffLoading}
                   error={repoDiffError}
                 />
