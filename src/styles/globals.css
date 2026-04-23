@@ -2160,6 +2160,7 @@ select {
   border: 1px solid color-mix(in srgb, var(--overlay) 14%, transparent);
   transition: border-color 160ms ease, background 160ms ease;
 }
+
 .git-panel__header-search:focus-within {
   background: color-mix(in srgb, var(--overlay) 5%, transparent);
   border-color: color-mix(in srgb, var(--overlay) 14%, transparent);
@@ -2170,6 +2171,7 @@ select {
   opacity: 0.65;
   flex-shrink: 0;
 }
+
 .git-panel__search-input {
   flex: 1;
   min-width: 0;
@@ -2181,10 +2183,12 @@ select {
   border: none;
   outline: none;
 }
+
 .git-panel__search-input::placeholder {
   color: var(--text-muted);
   opacity: 0.55;
 }
+
 .git-panel__search-clear,
 .git-panel__search-dismiss {
   flex-shrink: 0;
@@ -2193,6 +2197,7 @@ select {
   opacity: 0.55;
   padding: 0;
 }
+
 .git-panel__search-clear:hover,
 .git-panel__search-dismiss:hover {
   opacity: 1;
@@ -2224,9 +2229,6 @@ select {
   opacity: 0.75;
 }
 
-/* Repo browser file tree — rows inherit .list-item styling and use a
- * disclosure chevron slot on the left. Depth is set inline via
- * paddingLeft on the row so folders nest visually. */
 .repo-browser__tree {
   flex: 1;
   overflow-y: auto;
@@ -2234,46 +2236,18 @@ select {
   scrollbar-color: rgba(185, 208, 255, 0.24) transparent;
 }
 
-.tree-row {
-  min-height: 26px;
-  padding-top: 3px;
-  padding-bottom: 3px;
-  padding-right: 8px;
-  gap: 6px;
-  font-size: 13px;
-}
-
-.tree-row__chevron {
-  flex-shrink: 0;
-  width: 13px;
-  color: var(--text-muted);
-  opacity: 0.55;
-}
-
-.tree-row__name {
+.repo-browser__tree--trees {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-/* Changed-file / changed-folder highlight. Two-color scheme matching
- * the file-list convention: green for new (added/untracked), attention
- * amber for modified and for folders with any descendants changed.
- * Icon and name both tint together. Untracked files additionally dim
- * their name to signal "not yet tracked by git". */
-.tree-row--added .tree-row__name {
-  color: color-mix(in srgb, var(--status-added) var(--color-opacity-utilization), var(--text-primary));
-  font-weight: 600;
+.repo-browser__trees-host {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
 }
-.tree-row--modified .tree-row__name {
-  color: color-mix(in srgb, var(--status-attention) var(--color-opacity-utilization), var(--text-primary));
-  font-weight: 600;
-}
-
-.tree-row--untracked .tree-row__name {
-  opacity: 0.6;
-}
-
 
 .git-panel__body {
   display: flex;

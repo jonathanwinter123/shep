@@ -1,6 +1,10 @@
-import { useCallback, useMemo } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { renderSearchHighlight } from "./searchHighlight";
+import { useEffect, useMemo, useRef, type CSSProperties } from "react";
+import {
+  prepareFileTreeInput,
+  type FileTreeIconConfig,
+  type GitStatusEntry,
+} from "@pierre/trees";
+import { FileTree, useFileTree } from "@pierre/trees/react";
 
 /** Change classification for a node in the tree. `added` covers untracked
  *  and newly-staged files (rendered green); `modified` covers existing
@@ -19,9 +23,9 @@ export interface FileTreeProps {
    *  dimmed name so the eye can distinguish "new on disk, not in git yet"
    *  from "new and already staged" even though both are colored green. */
   untrackedPaths: Set<string>;
-  /** Filter term. When non-empty, only files whose path contains the
-   *  (case-insensitive) substring are shown, and every matching file's
-   *  ancestor folders are auto-expanded so matches are immediately visible. */
+  /** Filter term from the Git panel search. When non-empty, paths are
+   *  filtered before reaching Trees so the same term can also highlight
+   *  matching lines in the file viewer. */
   search: string;
   selectedPath: string | null;
   onSelect: (path: string) => void;
@@ -29,233 +33,232 @@ export interface FileTreeProps {
   onExpandedChange: (expanded: string[]) => void;
 }
 
-interface TreeNode {
-  name: string;
-  /** full repo-relative path; "" for the synthetic root */
-  path: string;
-  /** undefined = file, Map = directory */
-  children?: Map<string, TreeNode>;
-  /** `added` / `modified` / null (no change) — for files, taken directly
-   *  from changedPaths; for folders, the most-severe kind among descendants
-   *  (modified dominates added since folders with modified descendants are
-   *  more important to surface). */
-  changeKind: ChangeKind;
-  /** True if this file is untracked (status `?`). Only meaningful for
-   *  leaf nodes; folders always false. */
-  untracked: boolean;
+type TreeStyle = CSSProperties & Record<`--${string}`, string | number>;
+
+const TREE_ICONS: FileTreeIconConfig = {
+  set: "complete",
+  colored: true,
+};
+
+const TREE_STYLE: TreeStyle = {
+  "--trees-bg-override": "transparent",
+  "--trees-fg-override": "var(--text-secondary)",
+  "--trees-fg-muted-override": "var(--text-muted)",
+  "--trees-bg-muted-override": "color-mix(in srgb, var(--overlay) 5%, transparent)",
+  "--trees-accent-override": "var(--status-running)",
+  "--trees-border-color-override": "transparent",
+  "--trees-focus-ring-color-override": "transparent",
+  "--trees-focus-ring-width-override": "0px",
+  "--trees-selected-fg-override": "var(--text-primary)",
+  "--trees-selected-bg-override": "color-mix(in srgb, var(--overlay) 6%, transparent)",
+  "--trees-selected-focused-border-color-override": "transparent",
+  "--trees-status-added-override": "color-mix(in srgb, var(--status-added) var(--color-opacity-utilization), var(--text-primary))",
+  "--trees-status-untracked-override": "color-mix(in srgb, var(--status-added) var(--color-opacity-utilization), var(--text-primary))",
+  "--trees-status-modified-override": "color-mix(in srgb, var(--status-attention) var(--color-opacity-utilization), var(--text-primary))",
+  "--trees-status-renamed-override": "color-mix(in srgb, var(--status-attention) var(--color-opacity-utilization), var(--text-primary))",
+  "--trees-status-deleted-override": "var(--status-deleted)",
+  "--trees-git-added-color-override": "var(--trees-status-added)",
+  "--trees-git-untracked-color-override": "var(--trees-status-untracked)",
+  "--trees-git-modified-color-override": "var(--trees-status-modified)",
+  "--trees-git-renamed-color-override": "var(--trees-status-renamed)",
+  "--trees-git-deleted-color-override": "var(--trees-status-deleted)",
+  "--trees-font-family-override": "inherit",
+  "--trees-font-size-override": "13px",
+  "--trees-font-weight-regular-override": "400",
+  "--trees-font-weight-semibold-override": "600",
+  "--trees-item-height": "26px",
+  "--trees-level-gap-override": "8px",
+  "--trees-item-padding-x-override": "4px",
+  "--trees-item-margin-x-override": "0px",
+  "--trees-padding-inline-override": "0px",
+  "--trees-icon-width-override": "14px",
+  "--trees-git-lane-width-override": "12px",
+  "--trees-action-lane-width-override": "0px",
+};
+
+const TREE_UNSAFE_CSS = `
+  [data-item-git-status='untracked'] > [data-item-section='content'] {
+    opacity: 0.6;
+  }
+
+  [data-item-section='action'] {
+    display: none;
+  }
+`;
+
+function normalizeDirectoryPath(path: string): string {
+  return path.endsWith("/") ? path.slice(0, -1) : path;
 }
 
-/**
- * Build a nested tree from a flat list of repo-relative paths. Children are
- * sorted at build time so the tree renders in stable order without
- * per-row sorting: directories first, then files, both alphabetical. Also
- * marks each node with a `changeKind` (added | modified | null) and each
- * file with an `untracked` flag — both propagate upward into folder
- * aggregation for `changeKind` (modified dominates added).
- */
-function buildTree(
-  paths: string[],
-  changedPaths: Map<string, Exclude<ChangeKind, null>>,
-  untrackedPaths: Set<string>,
-): TreeNode {
-  const root: TreeNode = {
-    name: "",
-    path: "",
-    children: new Map(),
-    changeKind: null,
-    untracked: false,
-  };
-  for (const path of paths) {
-    const parts = path.split("/");
-    let node = root;
-    for (let i = 0; i < parts.length; i++) {
-      const name = parts[i];
-      const isLeaf = i === parts.length - 1;
-      if (!node.children) node.children = new Map();
-      if (!node.children.has(name)) {
-        const fullPath = parts.slice(0, i + 1).join("/");
-        node.children.set(name, {
-          name,
-          path: fullPath,
-          children: isLeaf ? undefined : new Map(),
-          changeKind: null,
-          untracked: false,
-        });
-      }
-      node = node.children.get(name)!;
+function collectDirectoryPaths(files: readonly string[]): string[] {
+  const directories = new Set<string>();
+  for (const file of files) {
+    const parts = file.split("/");
+    for (let index = 1; index < parts.length; index++) {
+      directories.add(parts.slice(0, index).join("/"));
     }
   }
-  sortTree(root);
-  markChanges(root, changedPaths, untrackedPaths);
-  return root;
+  return Array.from(directories).sort();
 }
 
-function sortTree(node: TreeNode): void {
-  if (!node.children) return;
-  const entries = Array.from(node.children.entries());
-  entries.sort(([, a], [, b]) => {
-    const aDir = !!a.children;
-    const bDir = !!b.children;
-    if (aDir !== bDir) return aDir ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-  node.children = new Map(entries);
-  for (const child of node.children.values()) sortTree(child);
+function areSamePaths(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index++) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
 }
 
-/** Recursively compute `changeKind` for each node. For files, it's a
- *  direct lookup in `changedPaths`; for folders, the most-severe kind
- *  among descendants (modified > added > null). Returns the node's own
- *  kind for the caller to aggregate. Also flags untracked files. */
-function markChanges(
-  node: TreeNode,
+function createPathListKey(paths: readonly string[]): string {
+  return paths.join("\0");
+}
+
+function resolveInitialExpandedPaths(
+  expandedPaths: readonly string[],
+  directoryPaths: readonly string[],
+  searchValue: string,
+): string[] {
+  if (!searchValue) return [...expandedPaths];
+  return Array.from(new Set([...expandedPaths, ...directoryPaths])).sort();
+}
+
+function buildGitStatus(
   changedPaths: Map<string, Exclude<ChangeKind, null>>,
   untrackedPaths: Set<string>,
-): ChangeKind {
-  if (!node.children) {
-    node.changeKind = changedPaths.get(node.path) ?? null;
-    node.untracked = untrackedPaths.has(node.path);
-    return node.changeKind;
+): GitStatusEntry[] {
+  const entries: GitStatusEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const path of untrackedPaths) {
+    entries.push({ path, status: "untracked" });
+    seen.add(path);
   }
-  let best: ChangeKind = null;
-  for (const child of node.children.values()) {
-    const kind = markChanges(child, changedPaths, untrackedPaths);
-    if (kind === "modified") best = "modified";
-    else if (kind === "added" && best !== "modified") best = "added";
+
+  for (const [path, kind] of changedPaths) {
+    if (seen.has(path)) continue;
+    entries.push({ path, status: kind === "added" ? "added" : "modified" });
   }
-  node.changeKind = best;
-  return best;
+
+  return entries;
 }
 
-interface TreeRowProps {
-  node: TreeNode;
-  depth: number;
-  expanded: Set<string>;
-  selected: string | null;
-  search: string;
-  onToggle: (path: string) => void;
-  onSelect: (path: string) => void;
+interface TreesFileTreeProps extends FileTreeProps {
+  directoryPaths: string[];
+  gitStatus: GitStatusEntry[];
+  hasSearchMatches: boolean;
+  searchValue: string;
 }
 
-function TreeRow({ node, depth, expanded, selected, search, onToggle, onSelect }: TreeRowProps) {
-  const isDir = !!node.children;
-  const isExpanded = expanded.has(node.path);
-  const isSelected = !isDir && selected === node.path;
-
-  const handleClick = () => {
-    if (isDir) onToggle(node.path);
-    else onSelect(node.path);
-  };
-
-  const classes = [
-    "list-item",
-    "tree-row",
-    isSelected ? "active" : "",
-    node.changeKind === "added" ? "tree-row--added" : "",
-    node.changeKind === "modified" ? "tree-row--modified" : "",
-    node.untracked ? "tree-row--untracked" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  return (
-    <>
-      <div
-        className={classes}
-        style={{ paddingLeft: depth * 14 }}
-        onClick={handleClick}
-        title={node.path}
-      >
-        {isDir ? (
-          isExpanded ? (
-            <ChevronDown size={13} className="tree-row__chevron" />
-          ) : (
-            <ChevronRight size={13} className="tree-row__chevron" />
-          )
-        ) : (
-          <span className="tree-row__chevron" />
-        )}
-        <span className="tree-row__name">{renderSearchHighlight(node.name, search)}</span>
-      </div>
-      {isDir &&
-        isExpanded &&
-        node.children &&
-        Array.from(node.children.values()).map((child) => (
-          <TreeRow
-            key={child.path}
-            node={child}
-            depth={depth + 1}
-            expanded={expanded}
-            selected={selected}
-            search={search}
-            onToggle={onToggle}
-            onSelect={onSelect}
-          />
-        ))}
-    </>
-  );
-}
-
-/**
- * Pure presentation component for a file tree. All state lives in the
- * parent — this component just builds the tree structure from the file
- * list (memoized) and renders rows. Used by GitPanel's Files mode to
- * display the full repo browser tree. Shares the `.list-item` base row
- * styling plus `.tree-row*` modifiers.
- */
-export default function FileTree({
+function TreesFileTree({
   files,
-  changedPaths,
-  untrackedPaths,
-  search,
-  selectedPath,
-  onSelect,
+  directoryPaths,
   expandedPaths,
+  gitStatus,
+  hasSearchMatches,
   onExpandedChange,
-}: FileTreeProps) {
-  // Convert the lifted expandedPaths array to a Set for the tree's lookup.
-  const expanded = useMemo(() => new Set(expandedPaths), [expandedPaths]);
-
-  // Filter the flat path list by search before building the tree. Empty
-  // search returns all files. Case-insensitive substring match on the full
-  // repo-relative path so "foo/bar" matches "src/foo/components/bar.tsx".
-  const filteredFiles = useMemo(() => {
-    if (!search.trim()) return files;
-    const needle = search.trim().toLowerCase();
-    return files.filter((p) => p.toLowerCase().includes(needle));
-  }, [files, search]);
-
-  const tree = useMemo(
-    () => buildTree(filteredFiles, changedPaths, untrackedPaths),
-    [filteredFiles, changedPaths, untrackedPaths],
+  onSelect,
+  search,
+  searchValue,
+  selectedPath,
+}: TreesFileTreeProps) {
+  const filesKey = useMemo(() => createPathListKey(files), [files]);
+  const fileSet = useMemo(() => new Set(files), [filesKey]);
+  const fileSetRef = useRef(fileSet);
+  const onSelectRef = useRef(onSelect);
+  const expandedPathsRef = useRef(expandedPaths);
+  const directoryPathsRef = useRef(directoryPaths);
+  const preparedInput = useMemo(
+    () => prepareFileTreeInput(files, { flattenEmptyDirectories: false }),
+    [filesKey],
   );
+  const lastExpandedRef = useRef<string[]>([...expandedPaths].sort());
 
-  // When actively searching, auto-expand every folder in the filtered
-  // result so matches are immediately visible without manual clicking.
-  // Uses a derived Set so it doesn't fight user toggles when search is cleared.
-  const effectiveExpanded = useMemo(() => {
-    if (!search.trim()) return expanded;
-    const all = new Set<string>(expanded);
-    for (const path of filteredFiles) {
-      const parts = path.split("/");
-      for (let i = 1; i < parts.length; i++) {
-        all.add(parts.slice(0, i).join("/"));
-      }
-    }
-    return all;
-  }, [expanded, filteredFiles, search]);
+  useEffect(() => {
+    fileSetRef.current = fileSet;
+  }, [fileSet]);
 
-  const handleToggle = useCallback(
-    (path: string) => {
-      const next = new Set(expanded);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      onExpandedChange(Array.from(next));
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
+
+  useEffect(() => {
+    expandedPathsRef.current = expandedPaths;
+  }, [expandedPaths]);
+
+  useEffect(() => {
+    directoryPathsRef.current = directoryPaths;
+  }, [directoryPaths]);
+
+  const { model } = useFileTree({
+    preparedInput,
+    initialExpandedPaths: resolveInitialExpandedPaths(
+      expandedPaths,
+      directoryPaths,
+      searchValue,
+    ),
+    initialSelectedPaths: selectedPath ? [selectedPath] : [],
+    fileTreeSearchMode: "hide-non-matches",
+    gitStatus,
+    icons: TREE_ICONS,
+    itemHeight: 26,
+    overscan: 10,
+    search: false,
+    searchBlurBehavior: "retain",
+    stickyFolders: false,
+    unsafeCSS: TREE_UNSAFE_CSS,
+    onSelectionChange: (selectedPaths) => {
+      const selectedFile = selectedPaths.find((path) => fileSetRef.current.has(path));
+      if (selectedFile) onSelectRef.current(selectedFile);
     },
-    [expanded, onExpandedChange],
-  );
+  });
 
-  if (!tree.children || tree.children.size === 0) {
+  useEffect(() => {
+    model.resetPaths(files, {
+      preparedInput,
+      initialExpandedPaths: resolveInitialExpandedPaths(
+        expandedPathsRef.current,
+        directoryPathsRef.current,
+        searchValue,
+      ),
+    });
+  }, [filesKey, model, preparedInput, searchValue]);
+
+  useEffect(() => {
+    model.setGitStatus(gitStatus);
+  }, [gitStatus, model]);
+
+  useEffect(() => {
+    for (const path of model.getSelectedPaths()) {
+      if (path !== selectedPath) model.getItem(path)?.deselect();
+    }
+    if (!selectedPath || !fileSet.has(selectedPath)) return;
+    const selectedItem = model.getItem(selectedPath);
+    selectedItem?.select();
+    selectedItem?.focus();
+  }, [fileSet, model, selectedPath]);
+
+  useEffect(() => {
+    const syncExpandedPaths = () => {
+      if (searchValue) return;
+
+      const expandedVisiblePaths = directoryPaths
+        .filter((path) => {
+          const item = model.getItem(path);
+          return item?.isDirectory() && "isExpanded" in item && item.isExpanded();
+        })
+        .map(normalizeDirectoryPath)
+        .sort();
+
+      if (areSamePaths(lastExpandedRef.current, expandedVisiblePaths)) return;
+      lastExpandedRef.current = expandedVisiblePaths;
+      onExpandedChange(expandedVisiblePaths);
+    };
+
+    syncExpandedPaths();
+    return model.subscribe(syncExpandedPaths);
+  }, [directoryPaths, model, onExpandedChange, searchValue]);
+
+  if (!files.length || (search.trim() && !hasSearchMatches)) {
     return (
       <div className="repo-browser__tree">
         <div style={{ padding: 16, opacity: 0.5, fontSize: 12 }}>
@@ -266,19 +269,66 @@ export default function FileTree({
   }
 
   return (
-    <div className="repo-browser__tree">
-      {Array.from(tree.children.values()).map((child) => (
-        <TreeRow
-          key={child.path}
-          node={child}
-          depth={0}
-          expanded={effectiveExpanded}
-          selected={selectedPath}
-          search={search}
-          onToggle={handleToggle}
-          onSelect={onSelect}
-        />
-      ))}
+    <div className="repo-browser__tree repo-browser__tree--trees">
+      <FileTree
+        model={model}
+        className="repo-browser__trees-host"
+        style={TREE_STYLE}
+      />
     </div>
+  );
+}
+
+/**
+ * File browser tree for GitPanel. The public props stay controlled by GitPanel,
+ * while the rendering, keyboard navigation, icons, virtualization, and row
+ * status presentation are delegated to @pierre/trees.
+ */
+export default function RepoFileTree({
+  files,
+  changedPaths,
+  untrackedPaths,
+  search,
+  selectedPath,
+  onSelect,
+  expandedPaths,
+  onExpandedChange,
+}: FileTreeProps) {
+  const gitStatus = useMemo(
+    () => buildGitStatus(changedPaths, untrackedPaths),
+    [changedPaths, untrackedPaths],
+  );
+  const allFilesKey = useMemo(() => createPathListKey(files), [files]);
+  const searchValue = search.trim().toLowerCase();
+  const visibleFiles = useMemo(() => {
+    if (!searchValue) return files;
+    return files.filter((path) => path.toLowerCase().includes(searchValue));
+  }, [allFilesKey, files, searchValue]);
+  const visibleFilesKey = useMemo(() => createPathListKey(visibleFiles), [visibleFiles]);
+  const directoryPaths = useMemo(
+    () => collectDirectoryPaths(visibleFiles),
+    [visibleFilesKey],
+  );
+  const hasSearchMatches = useMemo(() => {
+    if (!searchValue) return true;
+    return visibleFiles.length > 0;
+  }, [searchValue, visibleFiles.length]);
+
+  return (
+    <TreesFileTree
+      key="repo-file-tree"
+      files={visibleFiles}
+      changedPaths={changedPaths}
+      untrackedPaths={untrackedPaths}
+      search={search}
+      searchValue={searchValue}
+      selectedPath={selectedPath}
+      onSelect={onSelect}
+      expandedPaths={expandedPaths}
+      onExpandedChange={onExpandedChange}
+      directoryPaths={directoryPaths}
+      gitStatus={gitStatus}
+      hasSearchMatches={hasSearchMatches}
+    />
   );
 }
