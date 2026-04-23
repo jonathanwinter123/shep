@@ -80,7 +80,7 @@ export default function FileViewer({
   // Scroll to the first find match whenever the term changes.
   useEffect(() => {
     if (matchSet.size === 0 || !scrollRef.current) return;
-    const firstIdx = Math.min(...matchSet);
+    const firstIdx = matchSet.values().next().value;
     const el = scrollRef.current.querySelector<HTMLDivElement>(
       `[data-line-idx="${firstIdx}"]`,
     );

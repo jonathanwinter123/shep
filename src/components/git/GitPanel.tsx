@@ -15,7 +15,9 @@ import { getErrorMessage } from "../../lib/errors";
 import { isMarkdownFile } from "../../lib/markdownRenderer";
 import { getCodeViewCSSVariables } from "./codeViewTheme";
 
-const DiffViewer = lazy(() => import("./DiffViewer"));
+const diffViewerLoader = () => import("./DiffViewer");
+diffViewerLoader();
+const DiffViewer = lazy(diffViewerLoader);
 
 export default function GitPanel() {
   const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
