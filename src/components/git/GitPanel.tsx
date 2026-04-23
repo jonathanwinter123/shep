@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Search, X, PanelLeft, PanelLeftOpen } from "lucide-react";
+import { Suspense, lazy, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Search, X, PanelLeft, PanelLeftOpen, FileText, Diff } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useGitStore } from "../../stores/useGitStore";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitPanelStore } from "../../stores/useGitPanelStore";
 import {
-  gitChangedFiles, gitFileContents, gitListFiles,
+  gitChangedFiles, gitFileContents, gitFileDiff, gitListFiles,
 } from "../../lib/tauri";
 import type { ChangedFile } from "../../lib/types";
 import FileTree from "./FileTree";
@@ -13,6 +13,9 @@ import FileViewer from "./FileViewer";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
 import { isMarkdownFile } from "../../lib/markdownRenderer";
+import { getCodeViewCSSVariables } from "./codeViewTheme";
+
+const DiffViewer = lazy(() => import("./DiffViewer"));
 
 export default function GitPanel() {
   const activeProjectPath = useTerminalStore((s) => s.activeProjectPath);
@@ -28,6 +31,8 @@ export default function GitPanel() {
   const repoSelectedPath = panelState?.repoSelectedPath ?? null;
   const repoExpanded = panelState?.repoExpanded ?? [];
   const leftSearch = panelState?.leftSearch ?? "";
+  const viewerMode = panelState?.viewerMode ?? "file";
+  const repoPreferredDiffArea = panelState?.repoPreferredDiffArea ?? {};
   const sidebarCollapsed = panelState?.sidebarCollapsed ?? false;
   const repoScrollPositions = panelState?.repoScrollPositions ?? {};
 
@@ -36,13 +41,45 @@ export default function GitPanel() {
   const [repoFileContent, setRepoFileContent] = useState<string>("");
   const [repoFileError, setRepoFileError] = useState<string | null>(null);
   const [repoFileLoading, setRepoFileLoading] = useState<boolean>(false);
+  const [repoDiffContent, setRepoDiffContent] = useState<string>("");
+  const [repoDiffError, setRepoDiffError] = useState<string | null>(null);
+  const [repoDiffLoading, setRepoDiffLoading] = useState<boolean>(false);
   const [rawMarkdown, setRawMarkdown] = useState(false);
   const isMarkdown = repoSelectedPath ? isMarkdownFile(repoSelectedPath) : false;
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchOpen, setSearchOpen] = useState(() => leftSearch.trim().length > 0);
+  const codeViewCSSVariables = getCodeViewCSSVariables();
 
   const canLoadGitFiles = !!activeProjectPath && !!gitStatus?.is_git_repo;
+
+  const selectedFileChanges = useMemo(
+    () => (repoSelectedPath ? files.filter((file) => file.path === repoSelectedPath) : []),
+    [files, repoSelectedPath],
+  );
+
+  const availableDiffAreas = useMemo(() => {
+    const areaPriority = { unstaged: 0, untracked: 1, staged: 2 } as const;
+    return Array.from(
+      new Set(
+        selectedFileChanges
+          .map((file) => file.area)
+          .filter((area): area is "staged" | "unstaged" | "untracked" =>
+            area === "staged" || area === "unstaged" || area === "untracked",
+          ),
+      ),
+    ).sort((a, b) => areaPriority[a] - areaPriority[b]);
+  }, [selectedFileChanges]);
+
+  const resolvedDiffArea = useMemo(() => {
+    if (!repoSelectedPath || availableDiffAreas.length === 0) return null;
+    const preferred = repoPreferredDiffArea[repoSelectedPath];
+    return preferred && availableDiffAreas.includes(preferred)
+      ? preferred
+      : availableDiffAreas[0];
+  }, [availableDiffAreas, repoPreferredDiffArea, repoSelectedPath]);
+
+  const hasSelectedDiff = resolvedDiffArea !== null;
 
   // Fetch changed files for tree highlighting
   const fetchFiles = useCallback(async () => {
@@ -128,6 +165,33 @@ export default function GitPanel() {
     return () => { cancelled = true; };
   }, [canLoadGitFiles, activeProjectPath, repoSelectedPath]);
 
+  useEffect(() => {
+    if (!canLoadGitFiles || !activeProjectPath || !repoSelectedPath || !resolvedDiffArea) {
+      setRepoDiffContent("");
+      setRepoDiffError(null);
+      setRepoDiffLoading(false);
+      return;
+    }
+    const repo = activeProjectPath;
+    const path = repoSelectedPath;
+    const staged = resolvedDiffArea === "staged";
+    let cancelled = false;
+    setRepoDiffContent("");
+    setRepoDiffError(null);
+    setRepoDiffLoading(true);
+    void (async () => {
+      try {
+        const diff = await gitFileDiff(repo, path, staged);
+        if (!cancelled) setRepoDiffContent(diff);
+      } catch (error) {
+        if (!cancelled) setRepoDiffError(getErrorMessage(error));
+      } finally {
+        if (!cancelled) setRepoDiffLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [canLoadGitFiles, activeProjectPath, repoSelectedPath, resolvedDiffArea]);
+
   // Live-refresh open file contents
   useEffect(() => {
     if (!canLoadGitFiles || !activeProjectPath || !repoSelectedPath) return;
@@ -145,6 +209,24 @@ export default function GitPanel() {
     });
     return () => { unlistenP.then((f) => f()); };
   }, [canLoadGitFiles, activeProjectPath, repoSelectedPath]);
+
+  useEffect(() => {
+    if (!canLoadGitFiles || !activeProjectPath || !repoSelectedPath || !resolvedDiffArea) return;
+    const repo = activeProjectPath;
+    const path = repoSelectedPath;
+    const staged = resolvedDiffArea === "staged";
+    const unlistenP = listen<{ paths: string[] }>("git-fs-changed", async (event) => {
+      if (!event.payload.paths.includes(repo)) return;
+      try {
+        const diff = await gitFileDiff(repo, path, staged);
+        setRepoDiffContent(diff);
+        setRepoDiffError(null);
+      } catch (error) {
+        setRepoDiffError(getErrorMessage(error));
+      }
+    });
+    return () => { unlistenP.then((f) => f()); };
+  }, [canLoadGitFiles, activeProjectPath, repoSelectedPath, resolvedDiffArea]);
 
   // Cmd+F focuses the search input while this panel is mounted
   useEffect(() => {
@@ -232,10 +314,32 @@ export default function GitPanel() {
 
   const handleOpenSearch = useCallback(() => setSearchOpen(true), []);
 
+  const handleSetViewerMode = useCallback(
+    (mode: "file" | "diff") => {
+      if (!activeProjectPath) return;
+      useGitPanelStore.getState().setViewerMode(activeProjectPath, mode);
+    },
+    [activeProjectPath],
+  );
+
+  const handleSetPreferredDiffArea = useCallback(
+    (area: "staged" | "unstaged" | "untracked") => {
+      if (!activeProjectPath || !repoSelectedPath) return;
+      useGitPanelStore.getState().setRepoPreferredDiffArea(activeProjectPath, repoSelectedPath, area);
+    },
+    [activeProjectPath, repoSelectedPath],
+  );
+
   const handleCloseSearch = useCallback(() => {
     handleSetLeftSearch("");
     setSearchOpen(false);
   }, [handleSetLeftSearch]);
+
+  useEffect(() => {
+    if (viewerMode === "diff" && !hasSelectedDiff) {
+      handleSetViewerMode("file");
+    }
+  }, [handleSetViewerMode, hasSelectedDiff, viewerMode]);
 
   if (!activeProjectPath) {
     return (
@@ -271,7 +375,10 @@ export default function GitPanel() {
           </div>
         )}
 
-        <div className={`git-panel__viewer-area${sidebarCollapsed ? " git-panel__viewer-area--wide" : ""}`}>
+        <div
+          className={`git-panel__viewer-area${sidebarCollapsed ? " git-panel__viewer-area--wide" : ""}`}
+          style={codeViewCSSVariables}
+        >
           <div className="git-panel__viewer-controls">
             <div className={`git-panel__header-search-shell${searchOpen ? " git-panel__header-search-shell--open" : ""}`}>
               {searchOpen ? (
@@ -327,7 +434,45 @@ export default function GitPanel() {
                 </button>
               )}
             </div>
-            {isMarkdown && (
+            {repoSelectedPath && (
+              <div className="git-panel__segmented" role="tablist" aria-label="Viewer mode">
+                <button
+                  className={`git-panel__segment${viewerMode === "file" ? " git-panel__segment--active" : ""}`}
+                  onClick={() => handleSetViewerMode("file")}
+                  aria-pressed={viewerMode === "file"}
+                  title="Show file contents"
+                >
+                  <FileText size={13} />
+                  <span>File</span>
+                </button>
+                <button
+                  className={`git-panel__segment${viewerMode === "diff" ? " git-panel__segment--active" : ""}`}
+                  onClick={() => handleSetViewerMode("diff")}
+                  aria-pressed={viewerMode === "diff"}
+                  title={hasSelectedDiff ? "Show file diff" : "No diff available"}
+                  disabled={!hasSelectedDiff}
+                >
+                  <Diff size={13} />
+                  <span>Diff</span>
+                </button>
+              </div>
+            )}
+            {viewerMode === "diff" && availableDiffAreas.length > 1 && (
+              <div className="git-panel__segmented" role="tablist" aria-label="Diff area">
+                {availableDiffAreas.map((area) => (
+                  <button
+                    key={area}
+                    className={`git-panel__segment${resolvedDiffArea === area ? " git-panel__segment--active" : ""}`}
+                    onClick={() => handleSetPreferredDiffArea(area)}
+                    aria-pressed={resolvedDiffArea === area}
+                    title={area === "staged" ? "Show staged diff" : area === "unstaged" ? "Show working tree diff" : "Show untracked diff"}
+                  >
+                    <span>{area === "staged" ? "Staged" : area === "unstaged" ? "Working" : "New"}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {viewerMode === "file" && isMarkdown && (
               <button
                 className="git-panel__pane-toggle"
                 onClick={() => setRawMarkdown((r) => !r)}
@@ -348,17 +493,36 @@ export default function GitPanel() {
           </div>
 
           {repoSelectedPath ? (
-            <FileViewer
-              key={repoSelectedPath}
-              contents={repoFileContent}
-              filePath={repoSelectedPath}
-              loading={repoFileLoading}
-              error={repoFileError}
-              findTerm={leftSearch}
-              rawMarkdown={rawMarkdown}
-              initialScrollTop={repoScrollPositions[repoSelectedPath]}
-              onScrollChange={(pos) => useGitPanelStore.getState().setRepoScrollPosition(activeProjectPath, repoSelectedPath, pos)}
-            />
+            viewerMode === "diff" ? (
+              <Suspense
+                fallback={(
+                  <div className="git-panel__diff">
+                    <div style={{ padding: 24, opacity: 0.45, fontSize: 12 }}>Loading diff viewer…</div>
+                  </div>
+                )}
+              >
+                <DiffViewer
+                  key={`${repoSelectedPath}:${resolvedDiffArea ?? "none"}`}
+                  diff={repoDiffContent}
+                  filePath={repoSelectedPath}
+                  findTerm={leftSearch}
+                  loading={repoDiffLoading}
+                  error={repoDiffError}
+                />
+              </Suspense>
+            ) : (
+              <FileViewer
+                key={repoSelectedPath}
+                contents={repoFileContent}
+                filePath={repoSelectedPath}
+                loading={repoFileLoading}
+                error={repoFileError}
+                findTerm={leftSearch}
+                rawMarkdown={rawMarkdown}
+                initialScrollTop={repoScrollPositions[repoSelectedPath]}
+                onScrollChange={(pos) => useGitPanelStore.getState().setRepoScrollPosition(activeProjectPath, repoSelectedPath, pos)}
+              />
+            )
           ) : (
             <div className="git-panel__diff">
               <div style={{ padding: 24, opacity: 0.35, fontSize: 12 }}>

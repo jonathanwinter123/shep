@@ -101,6 +101,15 @@ function collectDirectoryPaths(files: readonly string[]): string[] {
   return Array.from(directories).sort();
 }
 
+function collectAncestorPaths(path: string): string[] {
+  const parts = path.split("/");
+  const ancestors: string[] = [];
+  for (let index = 1; index < parts.length; index++) {
+    ancestors.push(parts.slice(0, index).join("/"));
+  }
+  return ancestors;
+}
+
 function areSamePaths(left: readonly string[], right: readonly string[]): boolean {
   if (left.length !== right.length) return false;
   for (let index = 0; index < left.length; index++) {
@@ -232,10 +241,33 @@ function TreesFileTree({
       if (path !== selectedPath) model.getItem(path)?.deselect();
     }
     if (!selectedPath || !fileSet.has(selectedPath)) return;
+
+    const ancestorPaths = collectAncestorPaths(selectedPath).filter((path) =>
+      directoryPathsRef.current.includes(path),
+    );
+    for (const path of ancestorPaths) {
+      const item = model.getItem(path);
+      if (item?.isDirectory() && "expand" in item) item.expand();
+    }
+
+    if (!searchValue && ancestorPaths.length > 0) {
+      const nextExpandedPaths = Array.from(
+        new Set([
+          ...expandedPathsRef.current.map(normalizeDirectoryPath),
+          ...ancestorPaths.map(normalizeDirectoryPath),
+        ]),
+      ).sort();
+
+      if (!areSamePaths(lastExpandedRef.current, nextExpandedPaths)) {
+        lastExpandedRef.current = nextExpandedPaths;
+        onExpandedChange(nextExpandedPaths);
+      }
+    }
+
     const selectedItem = model.getItem(selectedPath);
     selectedItem?.select();
     selectedItem?.focus();
-  }, [fileSet, model, selectedPath]);
+  }, [fileSet, model, onExpandedChange, searchValue, selectedPath]);
 
   useEffect(() => {
     const syncExpandedPaths = () => {

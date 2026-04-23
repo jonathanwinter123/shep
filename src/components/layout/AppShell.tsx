@@ -42,7 +42,6 @@ const SessionLauncher = lazy(() => import("../session/SessionLauncher"));
 const UsagePanel = lazy(() => import("../usage/UsagePanel"));
 const PortsPanel = lazy(() => import("../ports/PortsPanel"));
 const DiffSummaryPanel = lazy(() => import("../git/DiffSummaryPanel"));
-const DiffViewOverlay = lazy(() => import("../git/DiffViewOverlay"));
 
 function toCommandConfig(command: CommandState): CommandConfig {
   return {
@@ -154,14 +153,13 @@ export default function AppShell() {
   );
 
   const {
-    settingsActive, usagePanelActive, portsPanelActive, sidebarVisible, diffPanelVisible, activeDiffFile,
+    settingsActive, usagePanelActive, portsPanelActive, sidebarVisible, diffPanelVisible,
   } = useUIStore(useShallow((s) => ({
     settingsActive: s.settingsActive,
     usagePanelActive: s.usagePanelActive,
     portsPanelActive: s.portsPanelActive,
     sidebarVisible: s.sidebarVisible,
     diffPanelVisible: s.diffPanelVisible,
-    activeDiffFile: s.activeDiffFile,
   })));
 
   // Derive which kind of local tab is active (for panel content rendering)
@@ -593,7 +591,7 @@ export default function AppShell() {
     return () => { unlisten.then((f) => f()); };
   }, [handleNewShell, handleNewAssistant, handleOpenInEditor, pushNotice]);
 
-  const showOverlay = settingsActive || usagePanelActive || portsPanelActive || !!activeDiffFile;
+  const showOverlay = settingsActive || usagePanelActive || portsPanelActive;
 
   return (
     <div className="app-shell">
@@ -666,12 +664,7 @@ export default function AppShell() {
           />
 
           <div ref={terminalContainerRef} className="terminal-stage">
-            {/* Global overlays (Settings, Usage, Ports, Diff) */}
-            {!!activeDiffFile && (
-              <Suspense fallback={<PanelLoader />}>
-                <DiffViewOverlay />
-              </Suspense>
-            )}
+            {/* Global overlays (Settings, Usage, Ports) */}
             {settingsActive && (
               <Suspense fallback={<PanelLoader />}>
                 <SettingsPanel />

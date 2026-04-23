@@ -3,7 +3,7 @@ import { Diff } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
-import { useUIStore } from "../../stores/useUIStore";
+import { useGitPanelStore } from "../../stores/useGitPanelStore";
 import { gitChangedFiles, gitDiffStats } from "../../lib/tauri";
 import type { ChangedFile, DiffFileStat } from "../../lib/types";
 
@@ -63,7 +63,12 @@ export default function DiffSummaryPanel() {
   const gitStatus = useGitStore(
     (s) => (activeProjectPath ? s.projectGitStatus[activeProjectPath] ?? null : null),
   );
-  const activeDiffFile = useUIStore((s) => s.activeDiffFile);
+  const panelState = useGitPanelStore((s) =>
+    activeProjectPath ? s.perRepo[activeProjectPath] ?? null : null,
+  );
+  const repoSelectedPath = panelState?.repoSelectedPath ?? null;
+  const viewerMode = panelState?.viewerMode ?? "file";
+  const repoPreferredDiffArea = panelState?.repoPreferredDiffArea ?? {};
 
   const [files, setFiles] = useState<ChangedFile[]>([]);
   const [statsMap, setStatsMap] = useState<Map<string, DiffFileStat>>(new Map());
@@ -125,8 +130,13 @@ export default function DiffSummaryPanel() {
   }, [files, statsMap]);
 
   const handleFileClick = useCallback((file: ChangedFile) => {
-    useUIStore.getState().openDiffFile(file.path, file.area);
-  }, []);
+    if (!activeProjectPath) return;
+    if (file.area !== "staged" && file.area !== "unstaged" && file.area !== "untracked") return;
+    useTerminalStore.getState().addPanelTab("git");
+    useGitPanelStore.getState().setRepoSelection(activeProjectPath, file.path);
+    useGitPanelStore.getState().setRepoPreferredDiffArea(activeProjectPath, file.path, file.area);
+    useGitPanelStore.getState().setViewerMode(activeProjectPath, "diff");
+  }, [activeProjectPath]);
 
   const handleMouseLeave = useCallback(() => setTooltip(null), []);
 
@@ -144,7 +154,10 @@ export default function DiffSummaryPanel() {
         ) : (
           dedupedFiles.map((file) => {
             const stat = statsMap.get(file.path);
-            const isActive = activeDiffFile?.path === file.path;
+            const isActive =
+              viewerMode === "diff" &&
+              repoSelectedPath === file.path &&
+              (repoPreferredDiffArea[file.path] ?? file.area) === file.area;
             const filename = file.path.split("/").pop() ?? file.path;
             const adds = stat?.additions ?? 0;
             const dels = stat?.deletions ?? 0;

@@ -21,9 +21,12 @@ export interface ProjectPanelState {
   /** Expanded folder paths in the repo-mode tree. Stored as an array for
    *  Zustand serialization friendliness; converted to Set at read time. */
   repoExpanded: string[];
-  /** Current left-panel search term. Persists across Diffs/Repo toggles
-   *  so typing a filter in one mode carries over to the other. */
+  /** Current left-panel search term. */
   leftSearch: string;
+  /** Whether the right pane is showing file contents or the selected file's diff. */
+  viewerMode: "file" | "diff";
+  /** Preferred diff area per path when a file has both staged and unstaged changes. */
+  repoPreferredDiffArea: Record<string, "staged" | "unstaged" | "untracked">;
   /** Whether the left sidebar (file list/tree + commit area) is hidden
    *  so the viewer can take the full panel width. */
   sidebarCollapsed: boolean;
@@ -35,6 +38,8 @@ const DEFAULT_STATE: ProjectPanelState = {
   repoSelectedPath: null,
   repoExpanded: [],
   leftSearch: "",
+  viewerMode: "file",
+  repoPreferredDiffArea: {},
   sidebarCollapsed: false,
   repoScrollPositions: {},
 };
@@ -44,6 +49,12 @@ interface GitPanelStore {
   setRepoSelection: (repo: string, path: string | null) => void;
   setRepoExpanded: (repo: string, expanded: string[]) => void;
   setLeftSearch: (repo: string, search: string) => void;
+  setViewerMode: (repo: string, mode: "file" | "diff") => void;
+  setRepoPreferredDiffArea: (
+    repo: string,
+    filePath: string,
+    area: "staged" | "unstaged" | "untracked",
+  ) => void;
   setSidebarCollapsed: (repo: string, collapsed: boolean) => void;
   setRepoScrollPosition: (repo: string, filePath: string, pos: number) => void;
 }
@@ -83,6 +94,34 @@ export const useGitPanelStore = create<GitPanelStore>((set) => ({
         },
       },
     })),
+
+  setViewerMode: (repo, mode) =>
+    set((state) => ({
+      perRepo: {
+        ...state.perRepo,
+        [repo]: {
+          ...(state.perRepo[repo] ?? DEFAULT_STATE),
+          viewerMode: mode,
+        },
+      },
+    })),
+
+  setRepoPreferredDiffArea: (repo, filePath, area) =>
+    set((state) => {
+      const existing = state.perRepo[repo] ?? DEFAULT_STATE;
+      return {
+        perRepo: {
+          ...state.perRepo,
+          [repo]: {
+            ...existing,
+            repoPreferredDiffArea: {
+              ...existing.repoPreferredDiffArea,
+              [filePath]: area,
+            },
+          },
+        },
+      };
+    }),
 
   setSidebarCollapsed: (repo, collapsed) =>
     set((state) => ({

@@ -2268,19 +2268,23 @@ select {
  * mode toggle) can absolute-position relative to it without fighting
  * the scroll container inside DiffViewer/FileViewer. */
 .git-panel__viewer-area {
+  --code-view-font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  --code-view-font-size: 12px;
+  --code-view-line-height: 18px;
+  --code-view-line-padding-x: 14px;
+  --code-view-file-line-padding-left: 6px;
+  --code-view-file-line-padding-right: 12px;
+  --code-view-line-number-width: 2.5em;
+  --code-view-line-number-gap: 8px;
+  --code-view-block-padding: 8px;
+  --code-view-diff-gutter-padding-right: 8px;
+  --code-view-diff-prefix-width: 1ch;
+  --code-view-diff-prefix-offset: 6px;
   position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-}
-
-.git-panel__viewer-area--wide .diff-line {
-  padding-left: 6px;
-}
-
-.git-panel__viewer-area--wide .file-view .diff-line {
-  padding-left: 2px;
 }
 
 .git-panel__viewer-controls {
@@ -2317,6 +2321,56 @@ select {
 .git-panel__pane-toggle:hover {
   color: var(--text-primary);
   opacity: 1;
+}
+
+.git-panel__segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+
+.git-panel__segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.git-panel__segment:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.git-panel__segment:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.git-panel__segment--active {
+  background: color-mix(in srgb, var(--overlay) 22%, transparent);
+  color: var(--text-primary);
+}
+
+.git-panel__diff--pierre {
+  padding-top: var(--code-view-block-padding);
+}
+
+.git-panel__diff-surface {
+  display: block;
+  min-height: 100%;
 }
 
 
@@ -2525,9 +2579,10 @@ select {
 /* File-viewer line number gutter — muted and non-interactive. */
 .file-view__line-no {
   display: inline-block;
-  width: 2.5em;
-  margin-right: 8px;
+  width: var(--code-view-line-number-width);
+  margin-right: var(--code-view-line-number-gap);
   text-align: right;
+  font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   opacity: 0.45;
   user-select: none;
@@ -2831,21 +2886,21 @@ select {
 /* ── Diff lines ────────────────────────────────────────── */
 
 .diff-content {
-  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-  font-size: 12px;
-  line-height: 1.5;
+  font-family: var(--code-view-font-family);
+  font-size: var(--code-view-font-size);
+  line-height: var(--code-view-line-height);
   white-space: pre;
-  padding: 8px 0;
+  padding: var(--code-view-block-padding) 0;
 }
 
 .diff-line {
-  padding: 0 14px;
+  padding: 0 var(--code-view-line-padding-x);
   color: var(--app-fg);
 }
 
 .file-view .diff-line {
-  padding-left: 6px;
-  padding-right: 12px;
+  padding-left: var(--code-view-file-line-padding-left);
+  padding-right: var(--code-view-file-line-padding-right);
 }
 
 /* Shiki tokens set their own inline `color`. The line-level `color` on
@@ -2853,9 +2908,9 @@ select {
  * file's language isn't supported — inline token colors win when present. */
 .diff-line__prefix {
   display: inline-block;
-  width: 14px;
+  width: calc(var(--code-view-diff-prefix-offset) + var(--code-view-diff-prefix-width));
   text-align: center;
-  margin-right: 4px;
+  margin-right: 0;
   opacity: 0.4;
   user-select: none;
 }
@@ -3168,80 +3223,4 @@ select {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: monospace;
-}
-
-/* ── Diff View Overlay (centered diff view, auto-closes on tab switch) */
-
-.diff-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--frame-tint);
-}
-
-.diff-overlay__header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  height: 38px;
-  flex-shrink: 0;
-  background: color-mix(in srgb, var(--overlay) 3%, transparent);
-}
-
-.diff-overlay__filename {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.diff-overlay__path {
-  font-size: var(--text-label);
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  min-width: 0;
-}
-
-.diff-overlay__area {
-  font-size: var(--text-badge);
-  font-weight: 600;
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--overlay) 8%, transparent);
-  border: 1px solid var(--glass-border);
-  border-radius: 4px;
-  padding: 2px 6px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.diff-overlay__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
-}
-
-.diff-overlay__close:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.diff-overlay__body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
 }
