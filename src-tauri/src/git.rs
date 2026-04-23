@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::Command;
 
@@ -491,7 +492,9 @@ fn decode_preview_bytes(bytes: Vec<u8>, file_path: &str) -> Result<String, Strin
 /// List all files known to git in this repo — tracked files plus untracked
 /// files that aren't gitignored. Uses the same flags `git status` uses
 /// internally, so the result matches what a user would consider "files in
-/// the project" (no node_modules, target/, etc.).
+/// the project" (no node_modules, target/, etc.). We also include root-level
+/// `.env`, `.env.*`, and `.envrc` files so common local config remains
+/// inspectable even when ignored by git.
 pub fn list_files(path: &str) -> Result<Vec<String>, String> {
     let output = Command::new("git")
         .args([
@@ -508,7 +511,31 @@ pub fn list_files(path: &str) -> Result<Vec<String>, String> {
         return Err(String::from_utf8_lossy(&output.stderr).to_string());
     }
     let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(stdout.lines().map(|s| s.to_string()).collect())
+    let mut files = stdout
+        .lines()
+        .map(|s| s.to_string())
+        .collect::<BTreeSet<_>>();
+
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let file_name = entry.file_name();
+            let Some(name) = file_name.to_str() else { continue };
+            if !is_root_env_file(name) {
+                continue;
+            }
+            let Ok(file_type) = entry.file_type() else { continue };
+            if !file_type.is_file() {
+                continue;
+            }
+            files.insert(name.to_string());
+        }
+    }
+
+    Ok(files.into_iter().collect())
+}
+
+fn is_root_env_file(name: &str) -> bool {
+    name == ".env" || name == ".envrc" || name.starts_with(".env.")
 }
 
 /// Read a file's contents for preview in the file-viewer mode. `source`
