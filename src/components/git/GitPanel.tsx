@@ -10,6 +10,7 @@ import {
 import type { ChangedFile } from "../../lib/types";
 import FileTree from "./FileTree";
 import FileViewer from "./FileViewer";
+import ErrorBoundary from "../shared/ErrorBoundary";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
 import { isMarkdownFile } from "../../lib/markdownRenderer";
@@ -39,6 +40,7 @@ export default function GitPanel() {
   const repoScrollPositions = panelState?.repoScrollPositions ?? {};
 
   const [files, setFiles] = useState<ChangedFile[]>([]);
+  const [changedFilesLoadedFor, setChangedFilesLoadedFor] = useState<string | null>(null);
   const [repoFiles, setRepoFiles] = useState<string[]>([]);
   const [repoFileContent, setRepoFileContent] = useState<string>("");
   const [repoFileError, setRepoFileError] = useState<string | null>(null);
@@ -89,11 +91,14 @@ export default function GitPanel() {
       setFiles([]);
       return;
     }
+    const repo = activeProjectPath;
     try {
-      const result = await gitChangedFiles(activeProjectPath);
+      const result = await gitChangedFiles(repo);
       setFiles(result);
     } catch {
       setFiles([]);
+    } finally {
+      setChangedFilesLoadedFor(repo);
     }
   }, [canLoadGitFiles, activeProjectPath]);
 
@@ -341,6 +346,11 @@ export default function GitPanel() {
   }, [handleSetLeftSearch]);
 
   useEffect(() => {
+    // Wait until the changed-files list has actually loaded for this repo.
+    // Otherwise hasSelectedDiff is spuriously false on initial mount and the
+    // "diff" mode set by an external caller (e.g. DiffSummaryPanel click)
+    // gets flipped back to "file".
+    if (changedFilesLoadedFor !== activeProjectPath) return;
     if (viewerMode === "diff" && !hasSelectedDiff) {
       handleSetViewerMode("file");
     }
@@ -355,7 +365,7 @@ export default function GitPanel() {
     ) {
       handleSetViewerMode("diff");
     }
-  }, [changedPathsMap, handleSetViewerMode, hasSelectedDiff, repoFiles, repoSelectedPath, viewerMode]);
+  }, [activeProjectPath, changedFilesLoadedFor, changedPathsMap, handleSetViewerMode, hasSelectedDiff, repoFiles, repoSelectedPath, viewerMode]);
 
   if (!activeProjectPath) {
     return (
@@ -510,21 +520,33 @@ export default function GitPanel() {
 
           {repoSelectedPath ? (
             viewerMode === "diff" ? (
-              <Suspense
-                fallback={(
+              <ErrorBoundary
+                resetKey={`${repoSelectedPath}:${resolvedDiffArea ?? "none"}`}
+                fallback={(error) => (
                   <div className="git-panel__diff">
-                    <div style={{ padding: 24, opacity: 0.45, fontSize: 12 }}>Loading diff viewer…</div>
+                    <div style={{ padding: 24, opacity: 0.55, fontSize: 12 }}>
+                      Couldn't render diff for {repoSelectedPath}
+                      {import.meta.env.DEV && `: ${error.message}`}
+                    </div>
                   </div>
                 )}
               >
-                <DiffViewer
-                  key={`${repoSelectedPath}:${resolvedDiffArea ?? "none"}`}
-                  diff={repoDiffContent}
-                  filePath={repoSelectedPath}
-                  loading={repoDiffLoading}
-                  error={repoDiffError}
-                />
-              </Suspense>
+                <Suspense
+                  fallback={(
+                    <div className="git-panel__diff">
+                      <div style={{ padding: 24, opacity: 0.45, fontSize: 12 }}>Loading diff viewer…</div>
+                    </div>
+                  )}
+                >
+                  <DiffViewer
+                    key={`${repoSelectedPath}:${resolvedDiffArea ?? "none"}`}
+                    diff={repoDiffContent}
+                    filePath={repoSelectedPath}
+                    loading={repoDiffLoading}
+                    error={repoDiffError}
+                  />
+                </Suspense>
+              </ErrorBoundary>
             ) : (
               <FileViewer
                 key={repoSelectedPath}

@@ -2711,6 +2711,16 @@
   },
   {
     "provider": "alibaba-cn",
+    "modelPattern": "kimi-k2.6",
+    "inputPerM": 0.929,
+    "outputPerM": 3.858,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-21"
+  },
+  {
+    "provider": "alibaba-cn",
     "modelPattern": "kimi/kimi-k2.5",
     "inputPerM": 0.6,
     "outputPerM": 3,
@@ -3666,6 +3676,26 @@
     "outputPerM": 15,
     "cacheReadPerM": 0.3,
     "cacheWritePerM": 3.75,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-02-17"
+  },
+  {
+    "provider": "amazon-bedrock",
+    "modelPattern": "au.anthropic.claude-opus-4-6-v1",
+    "inputPerM": 16.5,
+    "outputPerM": 82.5,
+    "cacheReadPerM": 1.65,
+    "cacheWritePerM": 20.625,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-02-05"
+  },
+  {
+    "provider": "amazon-bedrock",
+    "modelPattern": "au.anthropic.claude-sonnet-4-6",
+    "inputPerM": 3.3,
+    "outputPerM": 16.5,
+    "cacheReadPerM": 0.33,
+    "cacheWritePerM": 4.125,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-02-17"
   },
@@ -4678,6 +4708,16 @@
     "cacheWritePerM": 3.75,
     "thoughtsPerM": 0.0,
     "releaseDate": "2025-11-18"
+  },
+  {
+    "provider": "azure",
+    "modelPattern": "claude-sonnet-4-6",
+    "inputPerM": 3,
+    "outputPerM": 15,
+    "cacheReadPerM": 0.3,
+    "cacheWritePerM": 3.75,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-02-17"
   },
   {
     "provider": "azure",
@@ -6761,6 +6801,16 @@
   },
   {
     "provider": "baseten",
+    "modelPattern": "moonshotai/Kimi-K2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-21"
+  },
+  {
+    "provider": "baseten",
     "modelPattern": "nvidia/Nemotron-120B-A12B",
     "inputPerM": 0.3,
     "outputPerM": 0.75,
@@ -7318,6 +7368,16 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-01-27"
+  },
+  {
+    "provider": "chutes",
+    "modelPattern": "moonshotai/Kimi-K2.6-TEE",
+    "inputPerM": 0.44,
+    "outputPerM": 2,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-20"
   },
   {
     "provider": "chutes",
@@ -8881,6 +8941,16 @@
   },
   {
     "provider": "cortecs",
+    "modelPattern": "kimi-k2.6",
+    "inputPerM": 0.81,
+    "outputPerM": 3.54,
+    "cacheReadPerM": 0.2,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-17"
+  },
+  {
+    "provider": "cortecs",
     "modelPattern": "llama-3.1-405b-instruct",
     "inputPerM": 0,
     "outputPerM": 0,
@@ -9028,6 +9098,36 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2025-07-23"
+  },
+  {
+    "provider": "deepinfra",
+    "modelPattern": "Qwen/Qwen3.5-35B-A3B",
+    "inputPerM": 0.2,
+    "outputPerM": 0.95,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-02-01"
+  },
+  {
+    "provider": "deepinfra",
+    "modelPattern": "Qwen/Qwen3.5-397B-A17B",
+    "inputPerM": 0.54,
+    "outputPerM": 3.4,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-02-01"
+  },
+  {
+    "provider": "deepinfra",
+    "modelPattern": "Qwen/Qwen3.6-35B-A3B",
+    "inputPerM": 0.2,
+    "outputPerM": 1,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-01"
   },
   {
     "provider": "deepinfra",
@@ -9181,6 +9281,16 @@
   },
   {
     "provider": "deepinfra",
+    "modelPattern": "moonshotai/Kimi-K2.6",
+    "inputPerM": 0.75,
+    "outputPerM": 3.5,
+    "cacheReadPerM": 0.15,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-21"
+  },
+  {
+    "provider": "deepinfra",
     "modelPattern": "openai/gpt-oss-120b",
     "inputPerM": 0.05,
     "outputPerM": 0.24,
@@ -9288,6 +9398,26 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2025-12-01"
+  },
+  {
+    "provider": "deepseek",
+    "modelPattern": "deepseek-v4-flash",
+    "inputPerM": 0.14,
+    "outputPerM": 0.28,
+    "cacheReadPerM": 0.028,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-24"
+  },
+  {
+    "provider": "deepseek",
+    "modelPattern": "deepseek-v4-pro",
+    "inputPerM": 1.74,
+    "outputPerM": 3.48,
+    "cacheReadPerM": 0.145,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-24"
   },
   {
     "provider": "digitalocean",
@@ -10171,6 +10301,16 @@
   },
   {
     "provider": "fireworks-ai",
+    "modelPattern": "accounts/fireworks/models/kimi-k2p6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-17"
+  },
+  {
+    "provider": "fireworks-ai",
     "modelPattern": "accounts/fireworks/models/minimax-m2p1",
     "inputPerM": 0.3,
     "outputPerM": 1.2,
@@ -10418,6 +10558,16 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2025-08-28"
+  },
+  {
+    "provider": "firmware",
+    "modelPattern": "kimi-k2-6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "1970-01-01"
   },
   {
     "provider": "firmware",
@@ -13621,6 +13771,16 @@
   },
   {
     "provider": "huggingface",
+    "modelPattern": "moonshotai/Kimi-K2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-20"
+  },
+  {
+    "provider": "huggingface",
     "modelPattern": "zai-org/GLM-4.7",
     "inputPerM": 0.6,
     "outputPerM": 2.2,
@@ -16241,6 +16401,16 @@
   },
   {
     "provider": "kilo",
+    "modelPattern": "moonshotai/kimi-k2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-20"
+  },
+  {
+    "provider": "kilo",
     "modelPattern": "morph/morph-v3-fast",
     "inputPerM": 0.8,
     "outputPerM": 1.2,
@@ -18038,6 +18208,16 @@
     "cacheWritePerM": 0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-01"
+  },
+  {
+    "provider": "kimi-for-coding",
+    "modelPattern": "k2p6",
+    "inputPerM": 0,
+    "outputPerM": 0,
+    "cacheReadPerM": 0,
+    "cacheWritePerM": 0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04"
   },
   {
     "provider": "kimi-for-coding",
@@ -20900,6 +21080,16 @@
     "releaseDate": "2026-01"
   },
   {
+    "provider": "moonshotai",
+    "modelPattern": "kimi-k2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-21"
+  },
+  {
     "provider": "moonshotai-cn",
     "modelPattern": "kimi-k2-0711-preview",
     "inputPerM": 0.6,
@@ -20958,6 +21148,16 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-01"
+  },
+  {
+    "provider": "moonshotai-cn",
+    "modelPattern": "kimi-k2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-21"
   },
   {
     "provider": "morph",
@@ -22468,6 +22668,16 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2024-07-23"
+  },
+  {
+    "provider": "nano-gpt",
+    "modelPattern": "alibaba/qwen3.6-flash",
+    "inputPerM": 0.19,
+    "outputPerM": 1.16,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-17"
   },
   {
     "provider": "nano-gpt",
@@ -24891,6 +25101,26 @@
   },
   {
     "provider": "nano-gpt",
+    "modelPattern": "moonshotai/kimi-k2.6",
+    "inputPerM": 0.53,
+    "outputPerM": 2.73,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-16"
+  },
+  {
+    "provider": "nano-gpt",
+    "modelPattern": "moonshotai/kimi-k2.6:thinking",
+    "inputPerM": 0.53,
+    "outputPerM": 2.73,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-16"
+  },
+  {
+    "provider": "nano-gpt",
     "modelPattern": "nex-agi/deepseek-v3.1-nex-n1",
     "inputPerM": 0.27999999999999997,
     "outputPerM": 0.42000000000000004,
@@ -25461,6 +25691,16 @@
   },
   {
     "provider": "nano-gpt",
+    "modelPattern": "qwen-3.6-plus",
+    "inputPerM": 0.45,
+    "outputPerM": 2.7,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-02"
+  },
+  {
+    "provider": "nano-gpt",
     "modelPattern": "qwen-long",
     "inputPerM": 0.1003,
     "outputPerM": 0.408,
@@ -25498,6 +25738,26 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2024-11-01"
+  },
+  {
+    "provider": "nano-gpt",
+    "modelPattern": "qwen/Qwen3.6-35B-A3B",
+    "inputPerM": 0.29,
+    "outputPerM": 1.74,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-17"
+  },
+  {
+    "provider": "nano-gpt",
+    "modelPattern": "qwen/Qwen3.6-35B-A3B:thinking",
+    "inputPerM": 0.29,
+    "outputPerM": 1.74,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-19"
   },
   {
     "provider": "nano-gpt",
@@ -25568,6 +25828,16 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2025-08-26"
+  },
+  {
+    "provider": "nano-gpt",
+    "modelPattern": "qwen3.6-max-preview",
+    "inputPerM": 1.3,
+    "outputPerM": 7.8,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-20"
   },
   {
     "provider": "nano-gpt",
@@ -26771,6 +27041,26 @@
   },
   {
     "provider": "novita-ai",
+    "modelPattern": "deepseek/deepseek-r1-distill-qwen-14b",
+    "inputPerM": 0.15,
+    "outputPerM": 0.15,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2025-01-20"
+  },
+  {
+    "provider": "novita-ai",
+    "modelPattern": "deepseek/deepseek-r1-distill-qwen-32b",
+    "inputPerM": 0.3,
+    "outputPerM": 0.3,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2025-01-20"
+  },
+  {
+    "provider": "novita-ai",
     "modelPattern": "deepseek/deepseek-r1-turbo",
     "inputPerM": 0.7,
     "outputPerM": 2.5,
@@ -26841,6 +27131,16 @@
   },
   {
     "provider": "novita-ai",
+    "modelPattern": "google/gemma-3-12b-it",
+    "inputPerM": 0.05,
+    "outputPerM": 0.1,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2025-03-13"
+  },
+  {
+    "provider": "novita-ai",
     "modelPattern": "google/gemma-3-27b-it",
     "inputPerM": 0.119,
     "outputPerM": 0.2,
@@ -26881,6 +27181,16 @@
   },
   {
     "provider": "novita-ai",
+    "modelPattern": "inclusionai/ling-2.6-1t",
+    "inputPerM": 0,
+    "outputPerM": 0,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-23"
+  },
+  {
+    "provider": "novita-ai",
     "modelPattern": "kwaipilot/kat-coder-pro",
     "inputPerM": 0.3,
     "outputPerM": 1.2,
@@ -26918,6 +27228,16 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2024-07-24"
+  },
+  {
+    "provider": "novita-ai",
+    "modelPattern": "meta-llama/llama-3.2-3b-instruct",
+    "inputPerM": 0.03,
+    "outputPerM": 0.05,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2024-09-18"
   },
   {
     "provider": "novita-ai",
@@ -27068,6 +27388,16 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-01-27"
+  },
+  {
+    "provider": "novita-ai",
+    "modelPattern": "moonshotai/kimi-k2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-21"
   },
   {
     "provider": "novita-ai",
@@ -28641,6 +28971,16 @@
   },
   {
     "provider": "openai",
+    "modelPattern": "gpt-5.5",
+    "inputPerM": 5,
+    "outputPerM": 30,
+    "cacheReadPerM": 0.5,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-23"
+  },
+  {
+    "provider": "openai",
     "modelPattern": "o1",
     "inputPerM": 15,
     "outputPerM": 60,
@@ -29121,6 +29461,16 @@
   },
   {
     "provider": "opencode",
+    "modelPattern": "hy3-preview-free",
+    "inputPerM": 0,
+    "outputPerM": 0,
+    "cacheReadPerM": 0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-20"
+  },
+  {
+    "provider": "opencode",
     "modelPattern": "kimi-k2",
     "inputPerM": 0.4,
     "outputPerM": 2.5,
@@ -29158,6 +29508,26 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-01-27"
+  },
+  {
+    "provider": "opencode",
+    "modelPattern": "kimi-k2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-21"
+  },
+  {
+    "provider": "opencode",
+    "modelPattern": "ling-2.6-flash-free",
+    "inputPerM": 0,
+    "outputPerM": 0,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-21"
   },
   {
     "provider": "opencode",
@@ -29231,6 +29601,16 @@
   },
   {
     "provider": "opencode",
+    "modelPattern": "minimax-m2.7",
+    "inputPerM": 0.3,
+    "outputPerM": 1.2,
+    "cacheReadPerM": 0.06,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-03-18"
+  },
+  {
+    "provider": "opencode",
     "modelPattern": "nemotron-3-super-free",
     "inputPerM": 0,
     "outputPerM": 0,
@@ -29291,6 +29671,26 @@
   },
   {
     "provider": "opencode-go",
+    "modelPattern": "deepseek-v4-flash",
+    "inputPerM": 0.14,
+    "outputPerM": 0.28,
+    "cacheReadPerM": 0.028,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-24"
+  },
+  {
+    "provider": "opencode-go",
+    "modelPattern": "deepseek-v4-pro",
+    "inputPerM": 1.74,
+    "outputPerM": 3.48,
+    "cacheReadPerM": 0.145,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-24"
+  },
+  {
+    "provider": "opencode-go",
     "modelPattern": "glm-5",
     "inputPerM": 1,
     "outputPerM": 3.2,
@@ -29322,9 +29722,9 @@
   {
     "provider": "opencode-go",
     "modelPattern": "kimi-k2.6",
-    "inputPerM": 0.95,
-    "outputPerM": 4,
-    "cacheReadPerM": 0.16,
+    "inputPerM": 0.32,
+    "outputPerM": 1.34,
+    "cacheReadPerM": 0.054,
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-04-21"
@@ -29348,6 +29748,26 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-03-18"
+  },
+  {
+    "provider": "opencode-go",
+    "modelPattern": "mimo-v2.5",
+    "inputPerM": 0.4,
+    "outputPerM": 2,
+    "cacheReadPerM": 0.08,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-22"
+  },
+  {
+    "provider": "opencode-go",
+    "modelPattern": "mimo-v2.5-pro",
+    "inputPerM": 1,
+    "outputPerM": 3,
+    "cacheReadPerM": 0.2,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-22"
   },
   {
     "provider": "opencode-go",
@@ -29658,6 +30078,26 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2025-12-01"
+  },
+  {
+    "provider": "openrouter",
+    "modelPattern": "deepseek/deepseek-v4-flash",
+    "inputPerM": 0.14,
+    "outputPerM": 0.28,
+    "cacheReadPerM": 0.028,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-24"
+  },
+  {
+    "provider": "openrouter",
+    "modelPattern": "deepseek/deepseek-v4-pro",
+    "inputPerM": 1.74,
+    "outputPerM": 3.48,
+    "cacheReadPerM": 0.145,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-24"
   },
   {
     "provider": "openrouter",
@@ -30221,6 +30661,16 @@
   },
   {
     "provider": "openrouter",
+    "modelPattern": "moonshotai/kimi-k2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-20"
+  },
+  {
+    "provider": "openrouter",
     "modelPattern": "nousresearch/hermes-3-llama-3.1-405b:free",
     "inputPerM": 0,
     "outputPerM": 0,
@@ -30522,9 +30972,9 @@
   {
     "provider": "openrouter",
     "modelPattern": "openai/gpt-5.4-mini",
-    "inputPerM": 7.5e-07,
-    "outputPerM": 4.5e-06,
-    "cacheReadPerM": 7.5e-08,
+    "inputPerM": 0.75,
+    "outputPerM": 4.5,
+    "cacheReadPerM": 0.075,
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-03-17"
@@ -30532,9 +30982,9 @@
   {
     "provider": "openrouter",
     "modelPattern": "openai/gpt-5.4-nano",
-    "inputPerM": 2e-07,
-    "outputPerM": 1.25e-06,
-    "cacheReadPerM": 2e-08,
+    "inputPerM": 0.2,
+    "outputPerM": 1.25,
+    "cacheReadPerM": 0.02,
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-03-17"
@@ -32091,6 +32541,16 @@
   },
   {
     "provider": "poe",
+    "modelPattern": "openai/gpt-image-2",
+    "inputPerM": 5.0505,
+    "outputPerM": 32.3232,
+    "cacheReadPerM": 1.2626,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-21"
+  },
+  {
+    "provider": "poe",
     "modelPattern": "openai/o1",
     "inputPerM": 14,
     "outputPerM": 54,
@@ -32388,6 +32848,136 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2025-12-11"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "gpt-oss-120b",
+    "inputPerM": 1,
+    "outputPerM": 4.2,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2025-08-05"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "gpt-oss-20b",
+    "inputPerM": 0.4,
+    "outputPerM": 1.8,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-03-01"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "llama-3.1-8b-instruct",
+    "inputPerM": 0.05,
+    "outputPerM": 0.25,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2025-04-07"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "llama-3.3-70b-instruct",
+    "inputPerM": 0.6,
+    "outputPerM": 2.7,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2025-04-28"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "minimax-m2.5",
+    "inputPerM": 0.8,
+    "outputPerM": 3.5,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-03-10"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "mistral-small-4-119b",
+    "inputPerM": 0.75,
+    "outputPerM": 3,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-03-15"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "mistral-small3.2",
+    "inputPerM": 0.5,
+    "outputPerM": 2.2,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2025-01-31"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "qwen-image",
+    "inputPerM": 0.5,
+    "outputPerM": 2,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-03-01"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "qwen3-coder-next",
+    "inputPerM": 0.3,
+    "outputPerM": 1.2,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-03-01"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "qwen3-embedding-8b",
+    "inputPerM": 0.1,
+    "outputPerM": 0.1,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-02-01"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "qwen3-reranker-4b",
+    "inputPerM": 0.12,
+    "outputPerM": 0.12,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-02-01"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "qwen3.5-122b",
+    "inputPerM": 0.9,
+    "outputPerM": 3.6,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-02-01"
+  },
+  {
+    "provider": "regolo-ai",
+    "modelPattern": "qwen3.5-9b",
+    "inputPerM": 0.15,
+    "outputPerM": 0.6,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-02-01"
   },
   {
     "provider": "requesty",
@@ -33732,12 +34322,22 @@
   {
     "provider": "siliconflow",
     "modelPattern": "moonshotai/Kimi-K2.5",
-    "inputPerM": 0.55,
-    "outputPerM": 3,
+    "inputPerM": 0.45,
+    "outputPerM": 2.25,
     "cacheReadPerM": 0.0,
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-01-27"
+  },
+  {
+    "provider": "siliconflow",
+    "modelPattern": "moonshotai/Kimi-K2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-21"
   },
   {
     "provider": "siliconflow",
@@ -34012,12 +34612,22 @@
   {
     "provider": "siliconflow-cn",
     "modelPattern": "Pro/moonshotai/Kimi-K2.5",
-    "inputPerM": 0.55,
-    "outputPerM": 3,
+    "inputPerM": 0.45,
+    "outputPerM": 2.25,
     "cacheReadPerM": 0.0,
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-01-27"
+  },
+  {
+    "provider": "siliconflow-cn",
+    "modelPattern": "Pro/moonshotai/Kimi-K2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-21"
   },
   {
     "provider": "siliconflow-cn",
@@ -34418,6 +35028,16 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-03-03"
+  },
+  {
+    "provider": "siliconflow-cn",
+    "modelPattern": "Qwen/Qwen3.6-35B-A3B",
+    "inputPerM": 0.23,
+    "outputPerM": 1.86,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-17"
   },
   {
     "provider": "siliconflow-cn",
@@ -35290,16 +35910,6 @@
     "releaseDate": "2026-03-08"
   },
   {
-    "provider": "tencent-token-plan",
-    "modelPattern": "hy3-preview",
-    "inputPerM": 0,
-    "outputPerM": 0,
-    "cacheReadPerM": 0,
-    "cacheWritePerM": 0,
-    "thoughtsPerM": 0.0,
-    "releaseDate": "2026-04-20"
-  },
-  {
     "provider": "tencent-tokenhub",
     "modelPattern": "hy3-preview",
     "inputPerM": 0,
@@ -35438,6 +36048,16 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-01-27"
+  },
+  {
+    "provider": "togetherai",
+    "modelPattern": "moonshotai/Kimi-K2.6",
+    "inputPerM": 1.2,
+    "outputPerM": 4.5,
+    "cacheReadPerM": 0.2,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-21"
   },
   {
     "provider": "togetherai",
@@ -35611,6 +36231,26 @@
   },
   {
     "provider": "venice",
+    "modelPattern": "deepseek-v4-flash",
+    "inputPerM": 0.175,
+    "outputPerM": 0.35,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-24"
+  },
+  {
+    "provider": "venice",
+    "modelPattern": "deepseek-v4-pro",
+    "inputPerM": 2.175,
+    "outputPerM": 4.35,
+    "cacheReadPerM": 0.0,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-24"
+  },
+  {
+    "provider": "venice",
     "modelPattern": "gemini-3-1-pro-preview",
     "inputPerM": 2.5,
     "outputPerM": 15,
@@ -35718,6 +36358,16 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-01-27"
+  },
+  {
+    "provider": "venice",
+    "modelPattern": "kimi-k2-6",
+    "inputPerM": 0.7448,
+    "outputPerM": 4.655,
+    "cacheReadPerM": 0.1463,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-20"
   },
   {
     "provider": "venice",
@@ -39578,6 +40228,16 @@
     "cacheWritePerM": 0.0,
     "thoughtsPerM": 0.0,
     "releaseDate": "2026-01-27"
+  },
+  {
+    "provider": "zenmux",
+    "modelPattern": "moonshotai/kimi-k2.6",
+    "inputPerM": 0.95,
+    "outputPerM": 4,
+    "cacheReadPerM": 0.16,
+    "cacheWritePerM": 0.0,
+    "thoughtsPerM": 0.0,
+    "releaseDate": "2026-04-20"
   },
   {
     "provider": "zenmux",

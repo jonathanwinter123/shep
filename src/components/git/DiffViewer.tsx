@@ -50,7 +50,13 @@ export default function DiffViewer({
       <PatchDiff
         patch={diff}
         className="git-panel__diff-surface"
-        style={codeViewCSSVariables}
+        // Inline background + color override the shadow DOM's base-layer
+        // defaults (`--diffs-bg: light-dark(#fff, #000)`) that paint for one
+        // tick before our unsafeCSS stylesheet is attached — otherwise the
+        // host flashes black whenever the OS is in dark mode. Transparent
+        // lets the frame show through, so glass themes stay glassy and
+        // opaque themes pick up --frame-tint from the frame behind.
+        style={{ ...codeViewCSSVariables, background: "transparent", color: "var(--text-primary)" }}
         options={diffViewOptions}
       />
     </div>
