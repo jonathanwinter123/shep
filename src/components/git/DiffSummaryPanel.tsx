@@ -1,12 +1,26 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Diff } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
+import {
+  createFileTreeIconResolver,
+  getBuiltInFileIconColor,
+  getBuiltInSpriteSheet,
+  type FileTreeIconConfig,
+} from "@pierre/trees";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
 import { useGitPanelStore } from "../../stores/useGitPanelStore";
 import { gitChangedFiles, gitDiffStats } from "../../lib/tauri";
 import type { ChangedFile, DiffFileStat } from "../../lib/types";
 
+
+const DIFF_STRIP_ICONS: FileTreeIconConfig = {
+  set: "complete",
+  colored: true,
+};
+
+const DIFF_STRIP_ICON_SPRITE = getBuiltInSpriteSheet("complete");
+const diffStripIconResolver = createFileTreeIconResolver(DIFF_STRIP_ICONS);
 
 function statusLabel(status: string): string {
   return status.toLowerCase();
@@ -16,6 +30,20 @@ function formatNum(n: number): string {
   if (n >= 10_000) return `${(n / 1000).toFixed(0)}k`;
   if (n >= 1_000) return `${(n / 1000).toFixed(1)}k`;
   return String(n);
+}
+
+function changedLineCount(stat: DiffFileStat | undefined): number {
+  const additions = stat?.additions ?? 0;
+  const deletions = stat?.deletions ?? 0;
+  return additions + deletions;
+}
+
+function changeTone(stat: DiffFileStat | undefined): "add" | "del" | "mixed" {
+  const additions = stat?.additions ?? 0;
+  const deletions = stat?.deletions ?? 0;
+  if (additions > 0 && deletions === 0) return "add";
+  if (deletions > 0 && additions === 0) return "del";
+  return "mixed";
 }
 
 interface TooltipState {
@@ -129,6 +157,14 @@ export default function DiffSummaryPanel() {
     });
   }, [files, statsMap]);
 
+  const maxChangedLines = useMemo(() => {
+    let max = 1;
+    for (const file of dedupedFiles) {
+      max = Math.max(max, changedLineCount(statsMap.get(file.path)));
+    }
+    return max;
+  }, [dedupedFiles, statsMap]);
+
   const handleFileClick = useCallback((file: ChangedFile) => {
     if (!activeProjectPath) return;
     if (file.area !== "staged" && file.area !== "unstaged" && file.area !== "untracked") return;
@@ -145,9 +181,13 @@ export default function DiffSummaryPanel() {
   return (
     <div className="diff-strip" onMouseLeave={handleMouseLeave}>
       <div className="diff-strip__header">
-        <Diff size={13} className="diff-strip__header-icon" />
-        <span className="diff-strip__header-label">diffs</span>
+        <Diff size={14} className="diff-strip__header-icon" />
       </div>
+      <span
+        className="diff-strip__sprite"
+        aria-hidden="true"
+        dangerouslySetInnerHTML={{ __html: DIFF_STRIP_ICON_SPRITE }}
+      />
       <div className="diff-strip__list">
         {dedupedFiles.length === 0 ? (
           <div className="diff-strip__clean" title="Working tree clean">·</div>
@@ -159,8 +199,15 @@ export default function DiffSummaryPanel() {
               repoSelectedPath === file.path &&
               (repoPreferredDiffArea[file.path] ?? file.area) === file.area;
             const filename = file.path.split("/").pop() ?? file.path;
-            const adds = stat?.additions ?? 0;
-            const dels = stat?.deletions ?? 0;
+            const icon = diffStripIconResolver.resolveIcon("file-tree-icon-file", file.path);
+            const iconColor = icon.token ? getBuiltInFileIconColor(icon.token) : undefined;
+            const additions = stat?.additions ?? 0;
+            const deletions = stat?.deletions ?? 0;
+            const total = additions + deletions;
+            const barWidth = total > 0 ? Math.max(20, Math.round((total / maxChangedLines) * 100)) : 0;
+            const addWidth = total > 0 ? (additions / total) * 100 : 0;
+            const delWidth = total > 0 ? (deletions / total) * 100 : 0;
+            const tone = changeTone(stat);
 
             return (
               <button
@@ -171,13 +218,31 @@ export default function DiffSummaryPanel() {
                 aria-label={filename}
                 onMouseEnter={(e) => setTooltip({ file, stat, rect: e.currentTarget.getBoundingClientRect() })}
               >
-                <span className="diff-strip__pill">
-                  <span className={`diff-strip__pill-half diff-strip__pill-half--add${adds > 0 ? "" : " diff-strip__pill-half--empty"}`}>
-                    {adds > 0 ? `+${formatNum(adds)}` : ""}
-                  </span>
-                  <span className={`diff-strip__pill-half diff-strip__pill-half--del${dels > 0 ? "" : " diff-strip__pill-half--empty"}`}>
-                    {dels > 0 ? `−${formatNum(dels)}` : ""}
-                  </span>
+                <span className="diff-strip__icon-wrap">
+                  <svg
+                    aria-hidden="true"
+                    className="diff-strip__file-icon"
+                    data-icon-name={icon.remappedFrom ?? icon.name}
+                    data-icon-token={icon.token}
+                    viewBox={icon.viewBox ?? `0 0 ${icon.width ?? 16} ${icon.height ?? 16}`}
+                    width={icon.width ?? 16}
+                    height={icon.height ?? 16}
+                    style={iconColor ? { color: iconColor } : undefined}
+                  >
+                    <use href={`#${icon.name}`} />
+                  </svg>
+                  {total > 0 && (
+                    <span className="diff-strip__change-meter" data-tone={tone}>
+                      <span className="diff-strip__change-meter-fill" style={{ width: `${barWidth}%` }}>
+                        {additions > 0 && (
+                          <span className="diff-strip__change-meter-add" style={{ width: `${addWidth}%` }} />
+                        )}
+                        {deletions > 0 && (
+                          <span className="diff-strip__change-meter-del" style={{ width: `${delWidth}%` }} />
+                        )}
+                      </span>
+                    </span>
+                  )}
                 </span>
               </button>
             );
@@ -186,8 +251,11 @@ export default function DiffSummaryPanel() {
       </div>
       {dedupedFiles.length > 0 && (
         <div className="diff-strip__footer">
-          <span className="diff-strip__footer-stat">
-            {formatNum(dedupedFiles.length)} {dedupedFiles.length === 1 ? "file" : "files"}
+          <span
+            className="diff-strip__footer-stat"
+            title={`${formatNum(dedupedFiles.length)} changed ${dedupedFiles.length === 1 ? "file" : "files"}`}
+          >
+            {formatNum(dedupedFiles.length)}
           </span>
         </div>
       )}

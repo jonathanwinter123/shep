@@ -10,6 +10,7 @@ import {
 import type { ChangedFile } from "../../lib/types";
 import FileTree from "./FileTree";
 import FileViewer from "./FileViewer";
+import ErrorBoundary from "../shared/ErrorBoundary";
 import { useNoticeStore } from "../../stores/useNoticeStore";
 import { getErrorMessage } from "../../lib/errors";
 import { isMarkdownFile } from "../../lib/markdownRenderer";
@@ -510,21 +511,33 @@ export default function GitPanel() {
 
           {repoSelectedPath ? (
             viewerMode === "diff" ? (
-              <Suspense
-                fallback={(
+              <ErrorBoundary
+                resetKey={`${repoSelectedPath}:${resolvedDiffArea ?? "none"}`}
+                fallback={(error) => (
                   <div className="git-panel__diff">
-                    <div style={{ padding: 24, opacity: 0.45, fontSize: 12 }}>Loading diff viewer…</div>
+                    <div style={{ padding: 24, opacity: 0.55, fontSize: 12 }}>
+                      Couldn't render diff for {repoSelectedPath}
+                      {import.meta.env.DEV && `: ${error.message}`}
+                    </div>
                   </div>
                 )}
               >
-                <DiffViewer
-                  key={`${repoSelectedPath}:${resolvedDiffArea ?? "none"}`}
-                  diff={repoDiffContent}
-                  filePath={repoSelectedPath}
-                  loading={repoDiffLoading}
-                  error={repoDiffError}
-                />
-              </Suspense>
+                <Suspense
+                  fallback={(
+                    <div className="git-panel__diff">
+                      <div style={{ padding: 24, opacity: 0.45, fontSize: 12 }}>Loading diff viewer…</div>
+                    </div>
+                  )}
+                >
+                  <DiffViewer
+                    key={`${repoSelectedPath}:${resolvedDiffArea ?? "none"}`}
+                    diff={repoDiffContent}
+                    filePath={repoSelectedPath}
+                    loading={repoDiffLoading}
+                    error={repoDiffError}
+                  />
+                </Suspense>
+              </ErrorBoundary>
             ) : (
               <FileViewer
                 key={repoSelectedPath}
