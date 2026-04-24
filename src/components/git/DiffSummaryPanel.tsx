@@ -32,17 +32,18 @@ function formatNum(n: number): string {
   return String(n);
 }
 
-function changeBadge(file: ChangedFile, stat: DiffFileStat | undefined): string {
-  if (file.status === "R") return "R";
-  if (file.status === "U") return "!";
-  if (file.status === "D") return "-";
-  if (file.status === "A" || file.status === "?") return "+";
+function changedLineCount(stat: DiffFileStat | undefined): number {
   const additions = stat?.additions ?? 0;
   const deletions = stat?.deletions ?? 0;
-  if (additions > 0 && deletions > 0) return "±";
-  if (additions > 0) return "+";
-  if (deletions > 0) return "-";
-  return "M";
+  return additions + deletions;
+}
+
+function changeTone(stat: DiffFileStat | undefined): "add" | "del" | "mixed" {
+  const additions = stat?.additions ?? 0;
+  const deletions = stat?.deletions ?? 0;
+  if (additions > 0 && deletions === 0) return "add";
+  if (deletions > 0 && additions === 0) return "del";
+  return "mixed";
 }
 
 interface TooltipState {
@@ -156,6 +157,14 @@ export default function DiffSummaryPanel() {
     });
   }, [files, statsMap]);
 
+  const maxChangedLines = useMemo(() => {
+    let max = 1;
+    for (const file of dedupedFiles) {
+      max = Math.max(max, changedLineCount(statsMap.get(file.path)));
+    }
+    return max;
+  }, [dedupedFiles, statsMap]);
+
   const handleFileClick = useCallback((file: ChangedFile) => {
     if (!activeProjectPath) return;
     if (file.area !== "staged" && file.area !== "unstaged" && file.area !== "untracked") return;
@@ -193,7 +202,13 @@ export default function DiffSummaryPanel() {
             const filename = file.path.split("/").pop() ?? file.path;
             const icon = diffStripIconResolver.resolveIcon("file-tree-icon-file", file.path);
             const iconColor = icon.token ? getBuiltInFileIconColor(icon.token) : undefined;
-            const badge = changeBadge(file, stat);
+            const additions = stat?.additions ?? 0;
+            const deletions = stat?.deletions ?? 0;
+            const total = additions + deletions;
+            const barWidth = total > 0 ? Math.max(20, Math.round((total / maxChangedLines) * 100)) : 0;
+            const addWidth = total > 0 ? (additions / total) * 100 : 0;
+            const delWidth = total > 0 ? (deletions / total) * 100 : 0;
+            const tone = changeTone(stat);
 
             return (
               <button
@@ -217,9 +232,18 @@ export default function DiffSummaryPanel() {
                   >
                     <use href={`#${icon.name}`} />
                   </svg>
-                  <span className="diff-strip__change-badge" data-badge={badge}>
-                    {badge}
-                  </span>
+                  {total > 0 && (
+                    <span className="diff-strip__change-meter" data-tone={tone}>
+                      <span className="diff-strip__change-meter-fill" style={{ width: `${barWidth}%` }}>
+                        {additions > 0 && (
+                          <span className="diff-strip__change-meter-add" style={{ width: `${addWidth}%` }} />
+                        )}
+                        {deletions > 0 && (
+                          <span className="diff-strip__change-meter-del" style={{ width: `${delWidth}%` }} />
+                        )}
+                      </span>
+                    </span>
+                  )}
                 </span>
               </button>
             );

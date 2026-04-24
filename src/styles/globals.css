@@ -3091,7 +3091,6 @@ select {
 }
 
 .diff-strip__row {
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3103,36 +3102,6 @@ select {
   border: none;
   cursor: pointer;
   transition: background 100ms ease;
-}
-
-.diff-strip__row::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 7px;
-  bottom: 7px;
-  width: 2px;
-  border-radius: 0 2px 2px 0;
-  background: color-mix(in srgb, var(--text-muted) 35%, transparent);
-  opacity: 0.55;
-}
-
-.diff-strip__row[data-status="M"]::before,
-.diff-strip__row[data-status="R"]::before {
-  background: var(--status-attention);
-}
-
-.diff-strip__row[data-status="A"]::before,
-.diff-strip__row[data-status="?"]::before {
-  background: var(--status-added);
-}
-
-.diff-strip__row[data-status="D"]::before {
-  background: var(--status-deleted);
-}
-
-.diff-strip__row[data-status="U"]::before {
-  background: var(--status-crashed);
 }
 
 .diff-strip__row:hover {
@@ -3170,51 +3139,48 @@ select {
   opacity: 1;
 }
 
-.diff-strip__change-badge {
+.diff-strip__change-meter {
   position: absolute;
-  right: 1px;
+  left: 4px;
+  right: 4px;
   bottom: 1px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-width: 12px;
-  height: 12px;
-  padding: 0 2px;
-  border-radius: 4px;
-  background: var(--surface-raised);
-  border: 1px solid var(--glass-border);
-  font-family: monospace;
-  font-size: 9px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  color: var(--text-muted);
+  justify-content: flex-start;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--overlay) 8%, transparent);
 }
 
-.diff-strip__change-badge[data-badge="+"] {
-  color: var(--diff-add);
-  border-color: color-mix(in srgb, var(--diff-add) 32%, transparent);
-  background: color-mix(in srgb, var(--diff-add) 12%, var(--surface-raised));
+.diff-strip__change-meter-fill {
+  display: flex;
+  min-width: 5px;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--status-attention) 28%, transparent);
 }
 
-.diff-strip__change-badge[data-badge="-"] {
-  color: var(--diff-del);
-  border-color: color-mix(in srgb, var(--diff-del) 32%, transparent);
-  background: color-mix(in srgb, var(--diff-del) 12%, var(--surface-raised));
+.diff-strip__change-meter-add,
+.diff-strip__change-meter-del {
+  height: 100%;
 }
 
-.diff-strip__change-badge[data-badge="±"],
-.diff-strip__change-badge[data-badge="R"],
-.diff-strip__change-badge[data-badge="M"] {
-  color: var(--status-attention);
-  border-color: color-mix(in srgb, var(--status-attention) 32%, transparent);
-  background: color-mix(in srgb, var(--status-attention) 12%, var(--surface-raised));
+.diff-strip__change-meter-add {
+  background: var(--diff-add);
 }
 
-.diff-strip__change-badge[data-badge="!"] {
-  color: var(--status-crashed);
-  border-color: color-mix(in srgb, var(--status-crashed) 38%, transparent);
-  background: color-mix(in srgb, var(--status-crashed) 12%, var(--surface-raised));
+.diff-strip__change-meter-del {
+  background: var(--diff-del);
+}
+
+.diff-strip__change-meter[data-tone="mixed"] .diff-strip__change-meter-add {
+  border-radius: 999px 0 0 999px;
+}
+
+.diff-strip__change-meter[data-tone="mixed"] .diff-strip__change-meter-del {
+  border-radius: 0 999px 999px 0;
 }
 
 /* ── Diff strip tooltip ──────────────────────────────────── */
