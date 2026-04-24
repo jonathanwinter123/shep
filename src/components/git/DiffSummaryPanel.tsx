@@ -181,8 +181,7 @@ export default function DiffSummaryPanel() {
   return (
     <div className="diff-strip" onMouseLeave={handleMouseLeave}>
       <div className="diff-strip__header">
-        <Diff size={13} className="diff-strip__header-icon" />
-        <span className="diff-strip__header-label">diffs</span>
+        <Diff size={14} className="diff-strip__header-icon" />
       </div>
       <span
         className="diff-strip__sprite"
@@ -252,8 +251,11 @@ export default function DiffSummaryPanel() {
       </div>
       {dedupedFiles.length > 0 && (
         <div className="diff-strip__footer">
-          <span className="diff-strip__footer-stat">
-            {formatNum(dedupedFiles.length)} {dedupedFiles.length === 1 ? "file" : "files"}
+          <span
+            className="diff-strip__footer-stat"
+            title={`${formatNum(dedupedFiles.length)} changed ${dedupedFiles.length === 1 ? "file" : "files"}`}
+          >
+            {formatNum(dedupedFiles.length)}
           </span>
         </div>
       )}
