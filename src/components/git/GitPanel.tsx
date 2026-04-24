@@ -40,6 +40,7 @@ export default function GitPanel() {
   const repoScrollPositions = panelState?.repoScrollPositions ?? {};
 
   const [files, setFiles] = useState<ChangedFile[]>([]);
+  const [changedFilesLoadedFor, setChangedFilesLoadedFor] = useState<string | null>(null);
   const [repoFiles, setRepoFiles] = useState<string[]>([]);
   const [repoFileContent, setRepoFileContent] = useState<string>("");
   const [repoFileError, setRepoFileError] = useState<string | null>(null);
@@ -90,11 +91,14 @@ export default function GitPanel() {
       setFiles([]);
       return;
     }
+    const repo = activeProjectPath;
     try {
-      const result = await gitChangedFiles(activeProjectPath);
+      const result = await gitChangedFiles(repo);
       setFiles(result);
     } catch {
       setFiles([]);
+    } finally {
+      setChangedFilesLoadedFor(repo);
     }
   }, [canLoadGitFiles, activeProjectPath]);
 
@@ -342,6 +346,11 @@ export default function GitPanel() {
   }, [handleSetLeftSearch]);
 
   useEffect(() => {
+    // Wait until the changed-files list has actually loaded for this repo.
+    // Otherwise hasSelectedDiff is spuriously false on initial mount and the
+    // "diff" mode set by an external caller (e.g. DiffSummaryPanel click)
+    // gets flipped back to "file".
+    if (changedFilesLoadedFor !== activeProjectPath) return;
     if (viewerMode === "diff" && !hasSelectedDiff) {
       handleSetViewerMode("file");
     }
@@ -356,7 +365,7 @@ export default function GitPanel() {
     ) {
       handleSetViewerMode("diff");
     }
-  }, [changedPathsMap, handleSetViewerMode, hasSelectedDiff, repoFiles, repoSelectedPath, viewerMode]);
+  }, [activeProjectPath, changedFilesLoadedFor, changedPathsMap, handleSetViewerMode, hasSelectedDiff, repoFiles, repoSelectedPath, viewerMode]);
 
   if (!activeProjectPath) {
     return (

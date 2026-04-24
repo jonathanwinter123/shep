@@ -50,7 +50,7 @@ export function getDiffViewOptions(theme: ShepTheme) {
         min-height: 100%;
         color: var(--text-primary);
         background: transparent;
-        --diffs-bg: var(--frame-tint);
+        --diffs-bg: transparent;
         --diffs-bg-buffer-override: transparent;
         --diffs-bg-hover-override: color-mix(in srgb, var(--overlay) 4%, transparent);
         --diffs-bg-context-override: transparent;

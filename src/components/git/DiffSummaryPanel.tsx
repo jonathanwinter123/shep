@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Diff } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -13,6 +13,11 @@ import { useGitPanelStore } from "../../stores/useGitPanelStore";
 import { gitChangedFiles, gitDiffStats } from "../../lib/tauri";
 import type { ChangedFile, DiffFileStat } from "../../lib/types";
 
+// Clicking a row opens GitPanel in diff mode. Both chunks are lazy in AppShell,
+// so preload them here — this module is evaluated whenever a repo is active,
+// well before the user's first click.
+void import("./GitPanel");
+void import("./DiffViewer");
 
 const DIFF_STRIP_ICONS: FileTreeIconConfig = {
   set: "complete",
@@ -124,14 +129,19 @@ export default function DiffSummaryPanel() {
     fetchData();
   }, [fetchData]);
 
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
   useEffect(() => {
     if (!canLoad || !activeProjectPath) return;
     const repo = activeProjectPath;
-    const unlistenP = listen<{ paths: string[] }>("git-fs-changed", async (event) => {
+    const unlistenP = listen<{ paths: string[] }>("git-fs-changed", (event) => {
       if (!event.payload.paths.includes(repo)) return;
-      await fetchData();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => fetchData(), 300);
     });
-    return () => { unlistenP.then((f) => f()); };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      unlistenP.then((f) => f());
+    };
   }, [canLoad, activeProjectPath, fetchData]);
 
   const dedupedFiles = useMemo(() => {
