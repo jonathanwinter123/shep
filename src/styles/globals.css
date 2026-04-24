@@ -2990,6 +2990,7 @@ select {
 /* ── Diff Strip (right rail — compact change-bar strip) ─── */
 
 .diff-strip {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 64px;
@@ -3071,6 +3072,13 @@ select {
 
 .diff-strip__list::-webkit-scrollbar { display: none; }
 
+.diff-strip__sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .diff-strip__clean {
   display: flex;
   align-items: center;
@@ -3083,17 +3091,48 @@ select {
 }
 
 .diff-strip__row {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   width: 100%;
-  height: 20px;
+  height: 28px;
   padding: 0 0 0 10px;
   background: transparent;
   border: none;
   cursor: pointer;
   transition: background 100ms ease;
+}
+
+.diff-strip__row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: color-mix(in srgb, var(--text-muted) 35%, transparent);
+  opacity: 0.55;
+}
+
+.diff-strip__row[data-status="M"]::before,
+.diff-strip__row[data-status="R"]::before {
+  background: var(--status-attention);
+}
+
+.diff-strip__row[data-status="A"]::before,
+.diff-strip__row[data-status="?"]::before {
+  background: var(--status-added);
+}
+
+.diff-strip__row[data-status="D"]::before {
+  background: var(--status-deleted);
+}
+
+.diff-strip__row[data-status="U"]::before {
+  background: var(--status-crashed);
 }
 
 .diff-strip__row:hover {
@@ -3108,42 +3147,74 @@ select {
   background: var(--surface-active);
 }
 
-.diff-strip__pill {
+.diff-strip__icon-wrap {
+  position: relative;
   display: flex;
-  width: 100%;
-  height: 18px;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+}
+
+.diff-strip__file-icon {
+  color: color-mix(in srgb, var(--text-muted) 84%, transparent);
+  flex-shrink: 0;
+}
+
+.diff-strip__file-icon:not([data-icon-token]) {
+  opacity: 0.74;
+}
+
+.diff-strip__row:hover .diff-strip__file-icon:not([data-icon-token]),
+.diff-strip__row--active .diff-strip__file-icon:not([data-icon-token]) {
+  opacity: 1;
+}
+
+.diff-strip__change-badge {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
   border-radius: 4px;
-  overflow: hidden;
+  background: var(--surface-raised);
+  border: 1px solid var(--glass-border);
   font-family: monospace;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  line-height: 18px;
+  line-height: 1;
+  color: var(--text-muted);
 }
 
-.diff-strip__pill-half {
-  flex: 1;
-  white-space: nowrap;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.diff-strip__pill-half--add {
-  background: color-mix(in srgb, var(--diff-add) 15%, transparent);
+.diff-strip__change-badge[data-badge="+"] {
   color: var(--diff-add);
-  text-align: center;
-  border-radius: 4px 0 0 4px;
+  border-color: color-mix(in srgb, var(--diff-add) 32%, transparent);
+  background: color-mix(in srgb, var(--diff-add) 12%, var(--surface-raised));
 }
 
-.diff-strip__pill-half--del {
-  background: color-mix(in srgb, var(--diff-del) 15%, transparent);
+.diff-strip__change-badge[data-badge="-"] {
   color: var(--diff-del);
-  text-align: center;
-  border-radius: 0 4px 4px 0;
+  border-color: color-mix(in srgb, var(--diff-del) 32%, transparent);
+  background: color-mix(in srgb, var(--diff-del) 12%, var(--surface-raised));
 }
 
-.diff-strip__pill-half--empty {
-  background: transparent;
+.diff-strip__change-badge[data-badge="±"],
+.diff-strip__change-badge[data-badge="R"],
+.diff-strip__change-badge[data-badge="M"] {
+  color: var(--status-attention);
+  border-color: color-mix(in srgb, var(--status-attention) 32%, transparent);
+  background: color-mix(in srgb, var(--status-attention) 12%, var(--surface-raised));
+}
+
+.diff-strip__change-badge[data-badge="!"] {
+  color: var(--status-crashed);
+  border-color: color-mix(in srgb, var(--status-crashed) 38%, transparent);
+  background: color-mix(in srgb, var(--status-crashed) 12%, var(--surface-raised));
 }
 
 /* ── Diff strip tooltip ──────────────────────────────────── */

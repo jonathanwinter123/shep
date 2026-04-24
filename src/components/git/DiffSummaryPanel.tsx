@@ -1,12 +1,26 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Diff } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
+import {
+  createFileTreeIconResolver,
+  getBuiltInFileIconColor,
+  getBuiltInSpriteSheet,
+  type FileTreeIconConfig,
+} from "@pierre/trees";
 import { useTerminalStore } from "../../stores/useTerminalStore";
 import { useGitStore } from "../../stores/useGitStore";
 import { useGitPanelStore } from "../../stores/useGitPanelStore";
 import { gitChangedFiles, gitDiffStats } from "../../lib/tauri";
 import type { ChangedFile, DiffFileStat } from "../../lib/types";
 
+
+const DIFF_STRIP_ICONS: FileTreeIconConfig = {
+  set: "complete",
+  colored: true,
+};
+
+const DIFF_STRIP_ICON_SPRITE = getBuiltInSpriteSheet("complete");
+const diffStripIconResolver = createFileTreeIconResolver(DIFF_STRIP_ICONS);
 
 function statusLabel(status: string): string {
   return status.toLowerCase();
@@ -16,6 +30,19 @@ function formatNum(n: number): string {
   if (n >= 10_000) return `${(n / 1000).toFixed(0)}k`;
   if (n >= 1_000) return `${(n / 1000).toFixed(1)}k`;
   return String(n);
+}
+
+function changeBadge(file: ChangedFile, stat: DiffFileStat | undefined): string {
+  if (file.status === "R") return "R";
+  if (file.status === "U") return "!";
+  if (file.status === "D") return "-";
+  if (file.status === "A" || file.status === "?") return "+";
+  const additions = stat?.additions ?? 0;
+  const deletions = stat?.deletions ?? 0;
+  if (additions > 0 && deletions > 0) return "±";
+  if (additions > 0) return "+";
+  if (deletions > 0) return "-";
+  return "M";
 }
 
 interface TooltipState {
@@ -148,6 +175,11 @@ export default function DiffSummaryPanel() {
         <Diff size={13} className="diff-strip__header-icon" />
         <span className="diff-strip__header-label">diffs</span>
       </div>
+      <span
+        className="diff-strip__sprite"
+        aria-hidden="true"
+        dangerouslySetInnerHTML={{ __html: DIFF_STRIP_ICON_SPRITE }}
+      />
       <div className="diff-strip__list">
         {dedupedFiles.length === 0 ? (
           <div className="diff-strip__clean" title="Working tree clean">·</div>
@@ -159,8 +191,9 @@ export default function DiffSummaryPanel() {
               repoSelectedPath === file.path &&
               (repoPreferredDiffArea[file.path] ?? file.area) === file.area;
             const filename = file.path.split("/").pop() ?? file.path;
-            const adds = stat?.additions ?? 0;
-            const dels = stat?.deletions ?? 0;
+            const icon = diffStripIconResolver.resolveIcon("file-tree-icon-file", file.path);
+            const iconColor = icon.token ? getBuiltInFileIconColor(icon.token) : undefined;
+            const badge = changeBadge(file, stat);
 
             return (
               <button
@@ -171,12 +204,21 @@ export default function DiffSummaryPanel() {
                 aria-label={filename}
                 onMouseEnter={(e) => setTooltip({ file, stat, rect: e.currentTarget.getBoundingClientRect() })}
               >
-                <span className="diff-strip__pill">
-                  <span className={`diff-strip__pill-half diff-strip__pill-half--add${adds > 0 ? "" : " diff-strip__pill-half--empty"}`}>
-                    {adds > 0 ? `+${formatNum(adds)}` : ""}
-                  </span>
-                  <span className={`diff-strip__pill-half diff-strip__pill-half--del${dels > 0 ? "" : " diff-strip__pill-half--empty"}`}>
-                    {dels > 0 ? `−${formatNum(dels)}` : ""}
+                <span className="diff-strip__icon-wrap">
+                  <svg
+                    aria-hidden="true"
+                    className="diff-strip__file-icon"
+                    data-icon-name={icon.remappedFrom ?? icon.name}
+                    data-icon-token={icon.token}
+                    viewBox={icon.viewBox ?? `0 0 ${icon.width ?? 16} ${icon.height ?? 16}`}
+                    width={icon.width ?? 16}
+                    height={icon.height ?? 16}
+                    style={iconColor ? { color: iconColor } : undefined}
+                  >
+                    <use href={`#${icon.name}`} />
+                  </svg>
+                  <span className="diff-strip__change-badge" data-badge={badge}>
+                    {badge}
                   </span>
                 </span>
               </button>
