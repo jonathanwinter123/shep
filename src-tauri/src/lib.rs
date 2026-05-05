@@ -168,6 +168,8 @@ pub fn run() {
             commands::mcp_issue_token,
             commands::mcp_revoke_token,
             commands::mcp_server_port,
+            commands::mcp_prepare_tab,
+            commands::mcp_cleanup_tab,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

@@ -1195,3 +1195,106 @@ pub fn mcp_revoke_token(
 pub fn mcp_server_port() -> Option<u16> {
     server::server_port()
 }
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpTabPrep {
+    pub token: String,
+    pub config_path: String,
+}
+
+/// Build the MCP config JSON value for a given port + token. Extracted so we
+/// can unit-test the JSON shape without needing Tauri State.
+fn build_mcp_config(port: u16, token: &str) -> serde_json::Value {
+    serde_json::json!({
+        "mcpServers": {
+            "shep": {
+                "type": "http",
+                "url": format!("http://127.0.0.1:{port}/mcp/{token}"),
+            }
+        }
+    })
+}
+
+/// Compute the tempfile path for a given tab + token. The tab id is sanitized
+/// to avoid path-separator surprises if a caller ever passes something exotic.
+fn mcp_config_path(tab_id: &str, token: &str) -> std::path::PathBuf {
+    let token_short: String = token.chars().take(8).collect();
+    let safe_tab = tab_id.replace(['/', '\\', '\0'], "_");
+    std::env::temp_dir().join(format!("shep-mcp-{safe_tab}-{token_short}.json"))
+}
+
+#[tauri::command]
+pub fn mcp_prepare_tab(
+    tab_id: String,
+    registry: tauri::State<'_, Arc<TokenRegistry>>,
+) -> Result<McpTabPrep, String> {
+    let port = server::server_port()
+        .ok_or_else(|| "MCP server not running".to_string())?;
+    let token = registry.issue(&tab_id);
+
+    let config = build_mcp_config(port, &token);
+    let path = mcp_config_path(&tab_id, &token);
+
+    std::fs::write(&path, serde_json::to_string(&config).unwrap())
+        .map_err(|e| format!("write mcp config: {e}"))?;
+
+    Ok(McpTabPrep {
+        token,
+        config_path: path.to_string_lossy().into_owned(),
+    })
+}
+
+#[tauri::command]
+pub fn mcp_cleanup_tab(
+    token: String,
+    config_path: String,
+    registry: tauri::State<'_, Arc<TokenRegistry>>,
+) {
+    registry.revoke(&token);
+    if let Err(e) = std::fs::remove_file(&config_path) {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            eprintln!("mcp_cleanup_tab: failed to remove {config_path}: {e}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod mcp_prepare_tests {
+    use super::*;
+
+    #[test]
+    fn build_config_has_expected_shape() {
+        let cfg = build_mcp_config(54321, "abcdef0123456789");
+        let server = &cfg["mcpServers"]["shep"];
+        assert_eq!(server["type"], "http");
+        assert_eq!(
+            server["url"],
+            "http://127.0.0.1:54321/mcp/abcdef0123456789"
+        );
+    }
+
+    #[test]
+    fn build_config_url_contains_port_and_token() {
+        let cfg = build_mcp_config(7, "tok");
+        let url = cfg["mcpServers"]["shep"]["url"].as_str().unwrap();
+        assert!(url.contains(":7/"), "url should contain port: {url}");
+        assert!(url.ends_with("/mcp/tok"), "url should end with token: {url}");
+    }
+
+    #[test]
+    fn config_path_uses_tab_and_token_prefix() {
+        let path = mcp_config_path("tab-1", "abcdefghijklmnop");
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        assert_eq!(name, "shep-mcp-tab-1-abcdefgh.json");
+    }
+
+    #[test]
+    fn config_path_sanitizes_path_separators() {
+        let path = mcp_config_path("../evil/tab", "abcdefgh");
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(!name.contains('/'), "filename must not contain '/': {name}");
+        assert!(!name.contains('\\'), "filename must not contain '\\': {name}");
+        assert!(name.starts_with("shep-mcp-"));
+    }
+}

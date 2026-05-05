@@ -388,3 +388,16 @@ export async function mcpRevokeToken(token: string): Promise<void> {
 export async function mcpServerPort(): Promise<number | null> {
   return invoke<number | null>("mcp_server_port");
 }
+
+export interface McpTabPrep {
+  token: string;
+  configPath: string;
+}
+
+export async function mcpPrepareTab(tabId: string): Promise<McpTabPrep> {
+  return invoke<McpTabPrep>("mcp_prepare_tab", { tabId });
+}
+
+export async function mcpCleanupTab(token: string, configPath: string): Promise<void> {
+  await invoke("mcp_cleanup_tab", { token, configPath });
+}
