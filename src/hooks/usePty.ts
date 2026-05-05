@@ -5,12 +5,13 @@ import { hexLuminance } from "../lib/themes";
 import type { PtyOutput, CommandConfig, SessionMode } from "../lib/types";
 import { toPtyColorTheme } from "../lib/ptyColorTheme";
 import { useCommandStore } from "../stores/useCommandStore";
-import { useTerminalStore, nextTabId } from "../stores/useTerminalStore";
+import { useTerminalStore, nextTabId, registerTabCleanup, runTabCleanup } from "../stores/useTerminalStore";
 import { useRepoStore } from "../stores/useRepoStore";
 import { useNoticeStore } from "../stores/useNoticeStore";
 import { CODING_ASSISTANTS } from "../components/sidebar/constants";
 import type { Terminal } from "@xterm/xterm";
 import { getErrorMessage } from "../lib/errors";
+import { buildMcpInjection } from "../lib/mcpConfig";
 
 // Map ptyId -> xterm instance for writing output
 const terminalInstances = new Map<number, Terminal>();
@@ -291,6 +292,7 @@ export function usePty() {
         removeActivity(command.ptyId);
       }
       if (tab) {
+        await runTabCleanup(tab.id);
         removeTab(tab.id);
       }
       setCommandStatus(commandName, "stopped");
@@ -387,6 +389,25 @@ export function usePty() {
         commandArgs.push(assistant.yoloFlag);
       }
 
+      // Compute the tab ID early so we can register MCP cleanup against it.
+      const id = opts?.restoreId ?? nextTabId();
+
+      // Only inject the Shep MCP server for Claude tabs. Other assistants
+      // (codex, gemini, …) handle MCP differently or not at all. Always
+      // attempt injection — including for restored tabs, since the previous
+      // session's token is gone.
+      if (assistantId === "claude") {
+        const mcp = await buildMcpInjection(id);
+        if (mcp) {
+          commandArgs.push(...mcp.args);
+          registerTabCleanup(id, mcp.cleanup);
+        } else if (import.meta.env.DEV) {
+          console.warn(
+            `Shep MCP server not ready; launching ${assistant.name} without MCP injection.`,
+          );
+        }
+      }
+
       try {
         const ptyId = await spawnSession(
           assistant.command,
@@ -399,7 +420,6 @@ export function usePty() {
         );
         if (!ptyId) return;
 
-        const id = opts?.restoreId ?? nextTabId();
         addTab({
           id,
           kind: "assistant",
@@ -414,6 +434,8 @@ export function usePty() {
 
         return ptyId;
       } catch (e) {
+        // Spawn failed — release any MCP token/tempfile we registered above.
+        await runTabCleanup(id);
         if (import.meta.env.DEV) {
           console.error(`Failed to launch ${assistant.name}:`, e);
         }
@@ -450,6 +472,7 @@ export function usePty() {
         setCommandPtyId(tab.commandName, null);
       }
 
+      await runTabCleanup(tabId);
       removeTab(tabId);
     },
     [setCommandStatus, setCommandPtyId, removeTab, removeActivity],
@@ -468,6 +491,7 @@ export function usePty() {
       });
       unregisterTerminal(tab.ptyId);
       removeActivity(tab.ptyId);
+      await runTabCleanup(tab.id);
     }
   }, [removeActivity]);
 

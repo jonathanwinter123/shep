@@ -38,6 +38,22 @@ function emptyState(): ProjectTerminalState {
   return { tabs: [], activeTabId: null };
 }
 
+// Tab-id -> cleanup callback for MCP config tempfile + token revocation.
+// Module-level (not store state) since it's not rendered, just side-effect cleanup.
+const tabCleanups = new Map<string, () => Promise<void>>();
+
+export function registerTabCleanup(tabId: string, fn: () => Promise<void>) {
+  tabCleanups.set(tabId, fn);
+}
+
+export async function runTabCleanup(tabId: string) {
+  const fn = tabCleanups.get(tabId);
+  if (fn) {
+    tabCleanups.delete(tabId);
+    await fn().catch(() => {});
+  }
+}
+
 let tabCounter = 0;
 export function nextTabId(): string {
   return `tab-${++tabCounter}`;
