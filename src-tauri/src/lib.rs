@@ -1,6 +1,7 @@
 mod commands;
 mod fonts;
 mod git;
+mod mcp;
 mod menu;
 mod pty;
 mod session_history;
