@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::ipc::Channel;
@@ -11,6 +12,8 @@ use url::Url;
 use crate::fonts::{self, FontFaceData, FontFamily};
 use crate::git;
 use crate::git::{ChangedFile, CreatedWorktree, GitStatus, WorktreeEntry};
+use crate::mcp::registry::TokenRegistry;
+use crate::mcp::server;
 use crate::tab_state::{self, PersistedTab};
 use crate::session_history::{SessionMessage, SessionSummary};
 use crate::pty::manager::PtyManager;
@@ -1168,4 +1171,27 @@ pub fn clear_tab_state(
     db: State<'_, UsageDb>,
 ) -> Result<(), String> {
     tab_state::clear_tabs(&db, repo_path)
+}
+
+// ── MCP server commands ──────────────────────────────────────────
+
+#[tauri::command]
+pub fn mcp_issue_token(
+    tab_id: String,
+    registry: tauri::State<'_, Arc<TokenRegistry>>,
+) -> String {
+    registry.issue(&tab_id)
+}
+
+#[tauri::command]
+pub fn mcp_revoke_token(
+    token: String,
+    registry: tauri::State<'_, Arc<TokenRegistry>>,
+) {
+    registry.revoke(&token);
+}
+
+#[tauri::command]
+pub fn mcp_server_port() -> Option<u16> {
+    server::server_port()
 }
