@@ -44,6 +44,16 @@ pub fn run() {
             // Start file system watcher for git status updates
             app.manage(GitWatcher::new(app.handle().clone()));
 
+            let registry = std::sync::Arc::new(crate::mcp::registry::TokenRegistry::new());
+            app.manage(registry.clone());
+            let app_handle_for_mcp = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                match crate::mcp::server::start(app_handle_for_mcp, registry).await {
+                    Ok(port) => eprintln!("MCP server listening on 127.0.0.1:{port}"),
+                    Err(e) => eprintln!("MCP server failed to start: {e}"),
+                }
+            });
+
             // Kick off background usage ingestion so it doesn't block startup
             let db = app.state::<UsageDb>().inner().clone();
             let handle = app.handle().clone();
