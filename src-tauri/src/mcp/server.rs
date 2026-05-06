@@ -26,18 +26,32 @@ pub fn server_port() -> Option<u16> {
     SERVER_PORT.get().copied()
 }
 
-pub async fn start(app: AppHandle, registry: Arc<TokenRegistry>) -> std::io::Result<u16> {
+/// Bind the MCP listener synchronously so `SERVER_PORT` is guaranteed to be
+/// set before this function returns, then spawn only the accept loop on the
+/// async runtime. Eliminates the cold-start race where a tab could be
+/// prepared before the OnceCell was populated.
+pub fn start_blocking(app: AppHandle, registry: Arc<TokenRegistry>) -> std::io::Result<u16> {
     let state = McpState { registry, app };
 
     let router = Router::new()
         .route("/mcp/:token", post(handle_mcp))
         .with_state(state);
 
-    let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0))).await?;
-    let port = listener.local_addr()?.port();
+    // Synchronous bind via std::net so we don't need to be inside an async
+    // context to know the port. Sub-millisecond on localhost.
+    let std_listener = std::net::TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))?;
+    std_listener.set_nonblocking(true)?;
+    let port = std_listener.local_addr()?.port();
     SERVER_PORT.set(port).ok();
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
+        let listener = match TcpListener::from_std(std_listener) {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("MCP server failed to convert listener: {e}");
+                return;
+            }
+        };
         let _ = axum::serve(listener, router).await;
     });
 
