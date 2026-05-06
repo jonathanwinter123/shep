@@ -75,7 +75,7 @@ export default function AppShell() {
   const activeConfig = useRepoStore((s) => s.activeConfig);
   const setActiveConfig = useRepoStore((s) => s.setActiveConfig);
   const pushNotice = useNoticeStore((s) => s.pushNotice);
-  const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab, killProjectPtys } =
+  const { startCommand, stopCommand, spawnBlankShell, launchAssistant, closeTab, killProjectPtys, branchTab } =
     usePty();
 
   const restoreAttemptedRef = useRef(false);
@@ -224,6 +224,22 @@ export default function AppShell() {
     });
     return () => { unlisten.then((f) => f()); };
   }, [fetchUsageSnapshots]);
+
+  // Spawn a branched tab when the MCP server asks via the branch_tab tool.
+  // Payload uses snake_case keys to match what `serde_json::json!({...})`
+  // emits from src-tauri/src/mcp/server.rs (Tauri does NOT auto-camelCase
+  // emitted event payloads, only Serialize-derived command return types).
+  useEffect(() => {
+    interface BranchTabRequest {
+      source_tab_id: string;
+      initial_prompt: string | null;
+    }
+    const unlisten = listen<BranchTabRequest>("branch-tab-request", (event) => {
+      const { source_tab_id, initial_prompt } = event.payload;
+      void branchTab(source_tab_id, initial_prompt ?? undefined);
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, [branchTab]);
 
   const handleSelectRepo = useCallback(
     async (repoPath: string) => {
