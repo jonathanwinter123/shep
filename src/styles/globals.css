@@ -267,6 +267,15 @@ select {
   background: rgba(239, 68, 68, 0.15);
   color: rgb(252, 129, 129);
 }
+.context-menu__item--disabled,
+.context-menu__item--disabled:hover,
+.context-menu__item--disabled:focus-visible {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: transparent;
+  color: var(--text-secondary);
+  outline: none;
+}
 .context-menu__icon {
   display: flex;
   align-items: center;

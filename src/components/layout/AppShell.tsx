@@ -777,6 +777,7 @@ export default function AppShell() {
             onNewCommands={() => useTerminalStore.getState().addPanelTab("commands")}
             onNewGit={() => useTerminalStore.getState().addPanelTab("git")}
             onOpenInEditor={() => { const p = useTerminalStore.getState().activeProjectPath; if (p) handleOpenInEditor(p); }}
+            onBranchTab={branchTab}
           />
 
           <div ref={terminalContainerRef} className="terminal-stage">

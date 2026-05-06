@@ -7,6 +7,7 @@ export interface ContextMenuItem {
   label: string;
   icon?: ReactNode;
   danger?: boolean;
+  disabled?: boolean;
   keepOpen?: boolean;
   separator?: boolean;
   onClick?: () => void;
@@ -80,10 +81,13 @@ export default function ContextMenu({ x, y, items, onClose }: ContextMenuProps) 
         return (
           <button
             key={item.label}
-            className={`context-menu__item ${item.danger ? "context-menu__item--danger" : ""}`}
+            className={`context-menu__item ${item.danger ? "context-menu__item--danger" : ""} ${item.disabled ? "context-menu__item--disabled" : ""}`}
             role="menuitem"
             autoFocus={index === 0}
+            disabled={item.disabled}
+            aria-disabled={item.disabled || undefined}
             onClick={() => {
+              if (item.disabled) return;
               item.onClick?.();
               if (!item.keepOpen) onClose();
             }}

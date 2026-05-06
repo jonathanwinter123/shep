@@ -8,6 +8,7 @@ import { assistantLogoSrc, getAssistantLogoClass } from "../../lib/assistantLogo
 import { handleActionKey } from "../../lib/a11y";
 import { useGitStore } from "../../stores/useGitStore";
 import tabKindMeta, { extraActions } from "../../lib/tabKindMeta";
+import ContextMenu from "../shared/ContextMenu";
 import type { UnifiedTab } from "../../lib/types";
 
 
@@ -101,6 +102,7 @@ interface TabBarProps {
   onNewCommands: () => void;
   onNewGit: () => void;
   onOpenInEditor: () => void;
+  onBranchTab: (tabId: string) => void;
 }
 
 export default function TabBar({
@@ -110,6 +112,7 @@ export default function TabBar({
   onNewCommands,
   onNewGit,
   onOpenInEditor,
+  onBranchTab,
 }: TabBarProps) {
   const { activeProjectPath, projectState } = useTerminalStore(
     useShallow((s) => ({ activeProjectPath: s.activeProjectPath, projectState: s.activeProjectPath ? s.projectState[s.activeProjectPath] : null })),
@@ -130,6 +133,7 @@ export default function TabBar({
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [dragTabId, setDragTabId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [tabMenu, setTabMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
   const dragRef = useRef({ startX: 0, didDrag: false, dropIndex: null as number | null });
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -233,6 +237,10 @@ export default function TabBar({
               }}
               onKeyDown={(event) => handleActionKey(event, () => handleSelectTab(tab.id))}
               onPointerDown={(e) => handlePointerDown(e, tab.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setTabMenu({ x: e.clientX, y: e.clientY, tabId: tab.id });
+              }}
               role="tab"
               tabIndex={0}
               aria-selected={isActive}
@@ -304,6 +312,33 @@ export default function TabBar({
           )}
         </span>
       )}
+      {tabMenu && (() => {
+        const tab = tabs.find((t) => t.id === tabMenu.tabId);
+        const isClaudeAssistant =
+          tab?.kind === "assistant" && tab.assistantId === "claude";
+        const hasSession = !!tab && "sessionId" in tab && !!tab.sessionId;
+        const canBranch = isClaudeAssistant && hasSession;
+
+        let label = "Branch in new tab";
+        if (!isClaudeAssistant) label = "Branch in new tab (Claude tabs only)";
+        else if (!hasSession) label = "Branch in new tab (waiting for first response)";
+
+        return (
+          <ContextMenu
+            x={tabMenu.x}
+            y={tabMenu.y}
+            onClose={() => setTabMenu(null)}
+            items={[
+              {
+                label,
+                icon: <GitBranch size={14} />,
+                disabled: !canBranch,
+                onClick: canBranch ? () => onBranchTab(tabMenu.tabId) : undefined,
+              },
+            ]}
+          />
+        );
+      })()}
     </div>
   );
 }
