@@ -681,8 +681,9 @@ export default function AppShell() {
       newAssistant: handleNewAssistant,
       closeTab,
       openInEditor: handleOpenInEditor,
+      branchTab,
     });
-  }, [handleNewShell, handleNewAssistant, closeTab, handleOpenInEditor]);
+  }, [handleNewShell, handleNewAssistant, closeTab, handleOpenInEditor, branchTab]);
 
   // Global keyboard shortcut listener (capture phase — fires before xterm.js)
   useEffect(() => {

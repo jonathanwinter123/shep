@@ -8,6 +8,7 @@ export function registerActions(callbacks: {
   newAssistant: () => void;
   closeTab: (tabId: string) => void;
   openInEditor: (repoPath: string) => void;
+  branchTab: (tabId: string) => void;
 }) {
   clearRegistry();
 
@@ -93,6 +94,22 @@ export function registerActions(callbacks: {
       const ps = store.projectState[path];
       if (!ps || !ps.activeTabId) return;
       callbacks.closeTab(ps.activeTabId);
+    },
+  });
+
+  // Branch session in new tab
+  registerAction({
+    id: "shep.tab.branch",
+    label: "Branch Session in New Tab",
+    category: "Tabs",
+    defaultShortcut: "Cmd+Shift+B",
+    execute: () => {
+      const store = useTerminalStore.getState();
+      const path = store.activeProjectPath;
+      if (!path) return;
+      const ps = store.projectState[path];
+      if (!ps || !ps.activeTabId) return;
+      callbacks.branchTab(ps.activeTabId);
     },
   });
 
