@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { spawnPty, killPty, getDefaultShell } from "../lib/tauri";
+import { spawnPty, killPty, getDefaultShell, writePty } from "../lib/tauri";
 import { useThemeStore } from "../stores/useThemeStore";
 import { hexLuminance } from "../lib/themes";
 import type { PtyOutput, CommandConfig, SessionMode } from "../lib/types";
@@ -363,7 +363,7 @@ export function usePty() {
       mode: SessionMode = "standard",
       model?: string,
       resumeSessionId?: string,
-      opts?: { restoreId?: string; restoreLabel?: string },
+      opts?: { restoreId?: string; restoreLabel?: string; forkFromSessionId?: string },
     ) => {
       if (!activeRepoPath) return;
       const assistant = CODING_ASSISTANTS.find((a) => a.id === assistantId);
@@ -376,7 +376,10 @@ export function usePty() {
         commandArgs.push(assistant.modelFlag, model);
       }
 
-      if (resumeSessionId) {
+      if (opts?.forkFromSessionId) {
+        commandArgs.push("--resume", opts.forkFromSessionId, "--fork-session");
+        tabSessionId = null;  // Forked session creates a new ID we don't know yet.
+      } else if (resumeSessionId) {
         commandArgs.push("--resume", resumeSessionId);
         tabSessionId = resumeSessionId;
       } else if (assistant.sessionIdFlag) {
@@ -450,6 +453,66 @@ export function usePty() {
     [activeRepoPath, spawnSession, addTab, pushNotice],
   );
 
+  const branchTab = useCallback(
+    async (sourceTabId: string, initialPrompt?: string) => {
+      const state = useTerminalStore.getState();
+      const path = state.activeProjectPath;
+      if (!path) return;
+      const tabs = state.projectState[path]?.tabs ?? [];
+      const source = tabs.find((t) => t.id === sourceTabId);
+
+      if (!source || source.kind !== "assistant" || !source.assistantId) {
+        pushNotice({
+          tone: "error",
+          title: "Can't branch",
+          message: "Source is not an assistant tab.",
+        });
+        return;
+      }
+      if (source.assistantId !== "claude") {
+        pushNotice({
+          tone: "error",
+          title: "Can't branch",
+          message: "Branching is only supported for Claude tabs.",
+        });
+        return;
+      }
+      if (!source.sessionId) {
+        pushNotice({
+          tone: "info",
+          title: "Wait for first response",
+          message: "The session needs at least one response before it can be branched.",
+        });
+        return;
+      }
+
+      const newPtyId = await launchAssistant(
+        source.assistantId,
+        80,
+        24,
+        source.sessionMode ?? "standard",
+        undefined,
+        undefined,
+        {
+          restoreLabel: `${source.label} ↳`,
+          forkFromSessionId: source.sessionId,
+        },
+      );
+
+      if (newPtyId && initialPrompt) {
+        // Wait for Claude to finish initializing before sending the prompt.
+        // 1500ms is a reasonable heuristic; if it proves flaky we'll add a
+        // proper readiness signal.
+        setTimeout(() => {
+          void writePty(newPtyId, `${initialPrompt}\r`);
+        }, 1500);
+      }
+
+      return newPtyId;
+    },
+    [launchAssistant, pushNotice],
+  );
+
   const closeTab = useCallback(
     async (tabId: string) => {
       const state = useTerminalStore.getState();
@@ -501,6 +564,7 @@ export function usePty() {
     restartCommand,
     spawnBlankShell,
     launchAssistant,
+    branchTab,
     closeTab,
     killProjectPtys,
   };
