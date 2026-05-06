@@ -39,6 +39,4 @@ tauri-plugin-process = "2"
 url = "2"
 axum = "0.7"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
-tempfile = "3"
-rand = "0.8"
 uuid = { version = "1", features = ["v4"] }
