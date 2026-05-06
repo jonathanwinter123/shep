@@ -165,9 +165,6 @@ pub fn run() {
             commands::load_tab_state,
             commands::save_tab_state,
             commands::clear_tab_state,
-            commands::mcp_issue_token,
-            commands::mcp_revoke_token,
-            commands::mcp_server_port,
             commands::mcp_prepare_tab,
             commands::mcp_cleanup_tab,
         ])

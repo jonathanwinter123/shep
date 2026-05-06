@@ -377,18 +377,6 @@ export function clearTabState(repoPath: string): Promise<void> {
 
 // ── MCP server commands ─────────────────────────────────────────────
 
-export async function mcpIssueToken(tabId: string): Promise<string> {
-  return invoke<string>("mcp_issue_token", { tabId });
-}
-
-export async function mcpRevokeToken(token: string): Promise<void> {
-  await invoke("mcp_revoke_token", { token });
-}
-
-export async function mcpServerPort(): Promise<number | null> {
-  return invoke<number | null>("mcp_server_port");
-}
-
 export interface McpTabPrep {
   token: string;
   configPath: string;

@@ -1175,27 +1175,6 @@ pub fn clear_tab_state(
 
 // ── MCP server commands ──────────────────────────────────────────
 
-#[tauri::command]
-pub fn mcp_issue_token(
-    tab_id: String,
-    registry: tauri::State<'_, Arc<TokenRegistry>>,
-) -> String {
-    registry.issue(&tab_id)
-}
-
-#[tauri::command]
-pub fn mcp_revoke_token(
-    token: String,
-    registry: tauri::State<'_, Arc<TokenRegistry>>,
-) {
-    registry.revoke(&token);
-}
-
-#[tauri::command]
-pub fn mcp_server_port() -> Option<u16> {
-    server::server_port()
-}
-
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpTabPrep {
