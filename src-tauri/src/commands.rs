@@ -874,6 +874,23 @@ pub async fn search_claude_sessions(
     crate::session_history::search_sessions(&repo_path, &query)
 }
 
+/// Locate the JSONL file Claude writes for a freshly forked session.
+///
+/// Claude generates the new session ID lazily on the first response, so when
+/// Shep spawns a `--fork-session` tab we don't know the ID up front. After the
+/// fork has produced output, Claude creates `~/.claude/projects/<encoded>/<id>.jsonl`.
+/// We scan that directory for any `.jsonl` whose mtime is at/after the spawn
+/// time and whose stem isn't already adopted by another tab; the most-recent
+/// such file is the new session.
+#[tauri::command]
+pub async fn find_new_claude_session(
+    repo_path: String,
+    known_session_ids: Vec<String>,
+    since_unix_ms: u64,
+) -> Result<Option<String>, String> {
+    crate::session_history::find_new_session(&repo_path, known_session_ids, since_unix_ms)
+}
+
 // ── Port commands ─────────────────────────────────────────────────
 
 #[derive(serde::Serialize, Clone)]

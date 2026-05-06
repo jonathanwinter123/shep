@@ -142,6 +142,7 @@ pub fn run() {
             commands::list_claude_sessions,
             commands::read_claude_session,
             commands::search_claude_sessions,
+            commands::find_new_claude_session,
             commands::get_usage_settings,
             commands::save_usage_settings,
             commands::get_all_usage_snapshots,

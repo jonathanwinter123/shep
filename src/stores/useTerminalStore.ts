@@ -9,6 +9,10 @@ interface ProjectTerminalState {
   activeTabId: string | null;
 }
 
+// Fields the rest of the app may patch on a tab. Currently `label` (used by
+// rename UX) and `sessionId` (used by the forked-session recovery poller).
+export type TabPatch = { label?: string; sessionId?: string | null };
+
 interface TerminalStore {
   projectState: Record<string, ProjectTerminalState>;
   activeProjectPath: string | null;
@@ -18,7 +22,7 @@ interface TerminalStore {
   addTab: (tab: UnifiedTab) => void;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
-  updateTab: (id: string, patch: Partial<Pick<UnifiedTab, "label">>) => void;
+  updateTab: (id: string, patch: TabPatch) => void;
   reorderTab: (tabId: string, toIndex: number) => void;
   addPanelTab: (kind: PanelTabKind) => void;
   removePanelTab: (kind: PanelTabKind) => void;
@@ -169,21 +173,33 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     });
   },
 
-  updateTab: (id: string, patch: Partial<Pick<UnifiedTab, "label">>) => {
+  updateTab: (id: string, patch: TabPatch) => {
     set((state) => {
-      const path = state.activeProjectPath;
-      if (!path) return state;
-      const ps = state.projectState[path];
-      if (!ps) return state;
-      return {
-        projectState: {
-          ...state.projectState,
-          [path]: {
-            ...ps,
-            tabs: ps.tabs.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-          },
-        },
-      };
+      // The forked-session poller may resolve after the user has switched
+      // projects, so search every project's tab list — not just the active one.
+      let mutated = false;
+      const nextProjectState: Record<string, ProjectTerminalState> = {};
+      for (const [path, ps] of Object.entries(state.projectState)) {
+        if (!ps.tabs.some((t) => t.id === id)) {
+          nextProjectState[path] = ps;
+          continue;
+        }
+        mutated = true;
+        nextProjectState[path] = {
+          ...ps,
+          tabs: ps.tabs.map((t) => {
+            if (t.id !== id) return t;
+            // Only `assistant`/`terminal` tabs carry sessionId; PanelTabs ignore it.
+            if (patch.sessionId !== undefined && (t.kind === "assistant" || t.kind === "terminal")) {
+              return { ...t, ...patch } as UnifiedTab;
+            }
+            const { sessionId: _drop, ...rest } = patch;
+            return { ...t, ...rest } as UnifiedTab;
+          }),
+        };
+      }
+      if (!mutated) return state;
+      return { projectState: nextProjectState };
     });
   },
 

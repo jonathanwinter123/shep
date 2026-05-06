@@ -1,6 +1,8 @@
 use serde::Serialize;
+use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -20,13 +22,89 @@ pub struct SessionMessage {
     pub timestamp: String,
 }
 
-fn claude_projects_dir() -> Result<PathBuf, String> {
+pub fn claude_projects_dir() -> Result<PathBuf, String> {
     let home = std::env::var("HOME").map_err(|_| "HOME not set".to_string())?;
     Ok(PathBuf::from(home).join(".claude").join("projects"))
 }
 
-fn encode_repo_path(repo_path: &str) -> String {
+pub fn encode_repo_path(repo_path: &str) -> String {
     repo_path.replace('/', "-")
+}
+
+/// Resolve the Claude session directory for a given repo path
+/// (e.g. ~/.claude/projects/-Users-jonathan-winter-shep).
+pub fn project_dir_for(repo_path: &str) -> Result<PathBuf, String> {
+    Ok(claude_projects_dir()?.join(encode_repo_path(repo_path)))
+}
+
+/// Search a directory of Claude `.jsonl` session files for the newest one whose
+/// mtime is >= `since` and whose stem is NOT in `known_session_ids`.
+///
+/// Returns `Ok(None)` if the directory does not exist or no eligible file is
+/// present. This is the core helper behind `find_new_claude_session` — kept
+/// directory-based so it can be unit tested without HOME.
+pub fn find_new_session_in_dir(
+    session_dir: &Path,
+    known_session_ids: &HashSet<String>,
+    since: SystemTime,
+) -> Result<Option<String>, String> {
+    if !session_dir.is_dir() {
+        return Ok(None);
+    }
+
+    let entries = fs::read_dir(session_dir)
+        .map_err(|e| format!("Failed to read session directory: {e}"))?;
+
+    let mut best: Option<(SystemTime, String)> = None;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+            continue;
+        }
+
+        let stem = match path.file_stem().and_then(|s| s.to_str()) {
+            Some(s) => s.to_string(),
+            None => continue,
+        };
+
+        if known_session_ids.contains(&stem) {
+            continue;
+        }
+
+        let metadata = match entry.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let modified = match metadata.modified() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        if modified < since {
+            continue;
+        }
+
+        match &best {
+            Some((best_mtime, _)) if *best_mtime >= modified => {}
+            _ => best = Some((modified, stem)),
+        }
+    }
+
+    Ok(best.map(|(_, id)| id))
+}
+
+/// Find a forked session ID created after `since_unix_ms` for the given repo,
+/// excluding any IDs already adopted by other tabs.
+pub fn find_new_session(
+    repo_path: &str,
+    known_session_ids: Vec<String>,
+    since_unix_ms: u64,
+) -> Result<Option<String>, String> {
+    let session_dir = project_dir_for(repo_path)?;
+    let since = UNIX_EPOCH + Duration::from_millis(since_unix_ms);
+    let known: HashSet<String> = known_session_ids.into_iter().collect();
+    find_new_session_in_dir(&session_dir, &known, since)
 }
 
 /// Extract a user-friendly prompt from raw message text.
@@ -380,4 +458,124 @@ pub fn search_sessions(repo_path: &str, query: &str) -> Result<Vec<String>, Stri
     }
 
     Ok(matching_ids)
+}
+
+#[cfg(test)]
+mod find_new_session_tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
+
+    fn unique_temp_dir(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let pid = std::process::id();
+        let dir = std::env::temp_dir().join(format!("shep-find-new-session-{label}-{pid}-{nanos}"));
+        fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    fn write_session(dir: &Path, stem: &str, mtime: SystemTime) -> PathBuf {
+        let path = dir.join(format!("{stem}.jsonl"));
+        let mut f = File::create(&path).expect("create session file");
+        writeln!(f, "{{}}").unwrap();
+        f.sync_all().unwrap();
+        set_mtime(&path, mtime);
+        path
+    }
+
+    fn set_mtime(path: &Path, mtime: SystemTime) {
+        // Use libc::utimensat to set the mtime portably on unix.
+        use std::ffi::CString;
+        let c = CString::new(path.as_os_str().to_string_lossy().as_bytes()).unwrap();
+        let secs = mtime
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        let nsecs = mtime
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .subsec_nanos() as i64;
+        let times = [
+            libc::timespec {
+                tv_sec: secs as libc::time_t,
+                tv_nsec: nsecs as libc::c_long,
+            },
+            libc::timespec {
+                tv_sec: secs as libc::time_t,
+                tv_nsec: nsecs as libc::c_long,
+            },
+        ];
+        unsafe {
+            libc::utimensat(libc::AT_FDCWD, c.as_ptr(), times.as_ptr(), 0);
+        }
+    }
+
+    #[test]
+    fn returns_none_when_dir_missing() {
+        let missing = std::env::temp_dir().join("shep-does-not-exist-xyz");
+        let result = find_new_session_in_dir(
+            &missing,
+            &HashSet::new(),
+            UNIX_EPOCH,
+        )
+        .expect("ok");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn picks_newest_unknown_session() {
+        let dir = unique_temp_dir("picks-newest");
+        let base = SystemTime::now() - Duration::from_secs(60);
+        let spawn = base + Duration::from_secs(10);
+
+        // Older than spawn — ignore.
+        write_session(&dir, "old-session", base);
+        // Eligible: after spawn, unknown.
+        write_session(&dir, "fork-1", spawn + Duration::from_secs(5));
+        // Newer eligible: should be returned.
+        write_session(&dir, "fork-2", spawn + Duration::from_secs(20));
+        // Known — must be excluded even though it's newest.
+        write_session(&dir, "known", spawn + Duration::from_secs(30));
+        // Non-jsonl file — ignore.
+        let other = dir.join("notes.txt");
+        File::create(&other).unwrap();
+        set_mtime(&other, spawn + Duration::from_secs(40));
+
+        let mut known = HashSet::new();
+        known.insert("known".to_string());
+
+        let got = find_new_session_in_dir(&dir, &known, spawn).expect("ok");
+        assert_eq!(got, Some("fork-2".to_string()));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn returns_none_when_only_known_or_old() {
+        let dir = unique_temp_dir("none-eligible");
+        let base = SystemTime::now() - Duration::from_secs(60);
+        let spawn = base + Duration::from_secs(10);
+
+        write_session(&dir, "old", base);
+        write_session(&dir, "known", spawn + Duration::from_secs(5));
+
+        let mut known = HashSet::new();
+        known.insert("known".to_string());
+
+        let got = find_new_session_in_dir(&dir, &known, spawn).expect("ok");
+        assert!(got.is_none());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn encode_repo_path_matches_claude_format() {
+        assert_eq!(
+            encode_repo_path("/Users/jonathan-winter/shep"),
+            "-Users-jonathan-winter-shep"
+        );
+    }
 }

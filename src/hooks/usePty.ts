@@ -1,5 +1,11 @@
 import { useCallback } from "react";
-import { spawnPty, killPty, getDefaultShell, writePty } from "../lib/tauri";
+import {
+  spawnPty,
+  killPty,
+  getDefaultShell,
+  writePty,
+  findNewClaudeSession,
+} from "../lib/tauri";
 import { useThemeStore } from "../stores/useThemeStore";
 import { hexLuminance } from "../lib/themes";
 import type { PtyOutput, CommandConfig, SessionMode } from "../lib/types";
@@ -39,6 +45,78 @@ function cleanupActivityState(ptyId: number) {
   const timer = activityTimers.get(ptyId);
   if (timer) { clearTimeout(timer); activityTimers.delete(ptyId); }
   activityActive.delete(ptyId);
+}
+
+// Track in-flight forked-session pollers so we don't spawn duplicates if a
+// rapid sequence of branchTab calls hits the same tab id (paranoid; tab ids
+// are monotonic).
+const forkedSessionPollers = new Set<string>();
+
+/**
+ * After a `--fork-session` launch, Claude lazily creates a new session UUID
+ * once it produces its first response. The new session's filename appears at
+ * `~/.claude/projects/<encoded-repo>/<new-id>.jsonl`. This poller asks Rust to
+ * find that file, then writes the discovered ID back onto the tab so future
+ * branches from this tab work. Silent give-up after 5 minutes.
+ */
+async function pollForForkedSessionId(
+  tabId: string,
+  repoPath: string,
+  spawnTimeMs: number,
+) {
+  if (forkedSessionPollers.has(tabId)) return;
+  forkedSessionPollers.add(tabId);
+
+  const POLL_INTERVAL_MS = 2000;
+  const TIMEOUT_MS = 5 * 60 * 1000;
+  const deadline = spawnTimeMs + TIMEOUT_MS;
+
+  try {
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+
+      // Re-read tab state every iteration so we always exclude up-to-date
+      // sibling session IDs and bail if the tab was closed mid-poll.
+      const state = useTerminalStore.getState();
+      const tabs = state.projectState[repoPath]?.tabs ?? [];
+      const target = tabs.find((t) => t.id === tabId);
+      if (!target) return;
+      if (
+        (target.kind === "assistant" || target.kind === "terminal") &&
+        target.sessionId
+      ) {
+        return;
+      }
+
+      const knownIds: string[] = [];
+      for (const t of tabs) {
+        if (
+          (t.kind === "assistant" || t.kind === "terminal") &&
+          "sessionId" in t &&
+          t.sessionId
+        ) {
+          knownIds.push(t.sessionId);
+        }
+      }
+
+      let newId: string | null = null;
+      try {
+        newId = await findNewClaudeSession(repoPath, knownIds, spawnTimeMs);
+      } catch (e) {
+        if (import.meta.env.DEV) {
+          console.warn("findNewClaudeSession failed (will retry):", e);
+        }
+        continue;
+      }
+
+      if (newId) {
+        useTerminalStore.getState().updateTab(tabId, { sessionId: newId });
+        return;
+      }
+    }
+  } finally {
+    forkedSessionPollers.delete(tabId);
+  }
 }
 
 export function registerTerminal(ptyId: number, term: Terminal) {
@@ -434,6 +512,17 @@ export function usePty() {
           sessionMode: mode,
           sessionId: tabSessionId,
         });
+
+        // For forked sessions Claude generates the new session ID lazily, only
+        // once it produces its first response. Kick off a background poller so
+        // the tab can recover the new ID and become re-branchable. Fire-and-
+        // forget — it self-terminates on success, tab close, or 5-min timeout.
+        if (opts?.forkFromSessionId) {
+          const spawnTimeMs = Date.now();
+          const repoPathForPoll = activeRepoPath;
+          const tabIdForPoll = id;
+          void pollForForkedSessionId(tabIdForPoll, repoPathForPoll, spawnTimeMs);
+        }
 
         return ptyId;
       } catch (e) {

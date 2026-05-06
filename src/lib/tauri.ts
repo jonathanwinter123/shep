@@ -341,6 +341,18 @@ export function searchClaudeSessions(repoPath: string, query: string): Promise<s
   return invoke("search_claude_sessions", { repoPath, query });
 }
 
+export function findNewClaudeSession(
+  repoPath: string,
+  knownSessionIds: string[],
+  sinceUnixMs: number,
+): Promise<string | null> {
+  return invoke("find_new_claude_session", {
+    repoPath,
+    knownSessionIds,
+    sinceUnixMs,
+  });
+}
+
 // ── Port commands ─────────────────────────────────────────────────
 
 export function listListeningPorts(): Promise<PortInfo[]> {
