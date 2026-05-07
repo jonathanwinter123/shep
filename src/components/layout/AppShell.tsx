@@ -692,9 +692,13 @@ export default function AppShell() {
       if (useShortcutStore.getState().recording) return;
       // Skip modifier-only presses
       if (["Control", "Alt", "Shift", "Meta"].includes(ev.key)) return;
-      // Skip if user is typing in an input/textarea (but not terminal)
-      const tag = (ev.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      // Skip if user is typing in a real input/textarea — but xterm.js uses a
+      // hidden textarea to capture keystrokes, and we still want shortcuts to
+      // fire when a terminal or agent tab is focused.
+      const target = ev.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const inXterm = !!target?.closest(".xterm");
+      if (!inXterm && (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT")) return;
 
       const combo = eventToCombo(ev);
       if (!combo) return;
