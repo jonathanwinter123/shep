@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "shep",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "identifier": "com.shep.terminal",
   "build": {
     "frontendDist": "../dist",
@@ -64,7 +64,10 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "entitlements": "./Entitlements.plist"
+    }
   },
   "plugins": {
     "updater": {

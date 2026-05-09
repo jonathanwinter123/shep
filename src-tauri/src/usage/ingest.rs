@@ -17,23 +17,43 @@ pub fn ingest_all(conn: &Connection) -> bool {
     let mut all_done = true;
 
     match ingest_claude(conn, MAX_FILES_PER_CYCLE) {
-        Ok(done) => { if !done { all_done = false; } }
+        Ok(done) => {
+            if !done {
+                all_done = false;
+            }
+        }
         Err(e) => eprintln!("Claude ingest error: {e}"),
     }
     match ingest_gemini(conn, MAX_FILES_PER_CYCLE) {
-        Ok(done) => { if !done { all_done = false; } }
+        Ok(done) => {
+            if !done {
+                all_done = false;
+            }
+        }
         Err(e) => eprintln!("Gemini ingest error: {e}"),
     }
     match ingest_codex(conn, MAX_FILES_PER_CYCLE) {
-        Ok(done) => { if !done { all_done = false; } }
+        Ok(done) => {
+            if !done {
+                all_done = false;
+            }
+        }
         Err(e) => eprintln!("Codex ingest error: {e}"),
     }
     match ingest_opencode(conn) {
-        Ok(done) => { if !done { all_done = false; } }
+        Ok(done) => {
+            if !done {
+                all_done = false;
+            }
+        }
         Err(e) => eprintln!("OpenCode ingest error: {e}"),
     }
     match ingest_pi(conn, MAX_FILES_PER_CYCLE) {
-        Ok(done) => { if !done { all_done = false; } }
+        Ok(done) => {
+            if !done {
+                all_done = false;
+            }
+        }
         Err(e) => eprintln!("pi ingest error: {e}"),
     }
     if let Err(e) = prune_old_messages(conn) {
@@ -132,7 +152,9 @@ fn ingest_claude_file(conn: &Connection, path: &Path) -> Result<(), String> {
 
     let file = fs::File::open(path).map_err(|e| e.to_string())?;
     let mut reader = BufReader::new(file);
-    reader.seek(SeekFrom::Start(offset as u64)).map_err(|e| e.to_string())?;
+    reader
+        .seek(SeekFrom::Start(offset as u64))
+        .map_err(|e| e.to_string())?;
 
     let mut new_offset = offset;
     let mut line = String::new();
@@ -201,7 +223,10 @@ fn ingest_gemini(conn: &Connection, budget: usize) -> Result<bool, String> {
         .into_iter()
         .filter(|p| {
             p.extension().and_then(|e| e.to_str()) == Some("json")
-                && p.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()) == Some("chats")
+                && p.parent()
+                    .and_then(|p| p.file_name())
+                    .and_then(|n| n.to_str())
+                    == Some("chats")
         })
         .collect();
 
@@ -279,7 +304,8 @@ fn ingest_gemini_file(conn: &Connection, path: &Path) -> Result<(), String> {
     conn.execute(
         "DELETE FROM usage_messages WHERE provider = 'gemini' AND session_id = ?1",
         params![session_id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     let updated_at_str = json
         .get("lastUpdated")
@@ -414,11 +440,13 @@ fn ingest_codex_file(conn: &Connection, path: &Path) -> Result<(), String> {
         match event_type {
             "session_meta" => {
                 if let Some(payload) = row.get("payload") {
-                    session_id = payload.get("id")
+                    session_id = payload
+                        .get("id")
                         .and_then(Value::as_str)
                         .unwrap_or_default()
                         .to_string();
-                    project = payload.get("cwd")
+                    project = payload
+                        .get("cwd")
                         .and_then(Value::as_str)
                         .unwrap_or_default()
                         .split('/')
@@ -453,6 +481,9 @@ fn ingest_codex_file(conn: &Connection, path: &Path) -> Result<(), String> {
                     reasoning = as_u64(info.get("reasoning_output_tokens"));
                     total = as_u64(info.get("total_tokens"));
                     has_tokens = true;
+                    if let Some(ts_str) = row.get("timestamp").and_then(Value::as_str) {
+                        timestamp = parse_iso_timestamp(ts_str).unwrap_or(timestamp);
+                    }
                 }
             }
             _ => {}
@@ -471,7 +502,8 @@ fn ingest_codex_file(conn: &Connection, path: &Path) -> Result<(), String> {
     conn.execute(
         "DELETE FROM usage_messages WHERE provider = 'codex' AND session_id = ?1",
         params![session_id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     conn.execute(
         "INSERT INTO usage_messages (provider, session_id, project, model, timestamp, tokens_input, tokens_output, tokens_cache_write, tokens_cache_read, tokens_thoughts, tokens_total, pricing_provider)
@@ -509,7 +541,8 @@ fn ingest_opencode(conn: &Connection) -> Result<bool, String> {
     let source = Connection::open_with_flags(
         &db_path,
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    ).map_err(|e| format!("Failed to open OpenCode DB: {e}"))?;
+    )
+    .map_err(|e| format!("Failed to open OpenCode DB: {e}"))?;
 
     conn.execute_batch("BEGIN").map_err(|e| e.to_string())?;
     let (last_size, last_rowid, _) = cursor.unwrap_or((0, 0, 0));
@@ -520,8 +553,9 @@ fn ingest_opencode(conn: &Connection) -> Result<bool, String> {
             .map_err(|e| e.to_string())?;
     }
 
-    let mut stmt = source.prepare(
-        "SELECT
+    let mut stmt = source
+        .prepare(
+            "SELECT
             m.rowid,
             m.session_id,
             s.directory,
@@ -531,19 +565,22 @@ fn ingest_opencode(conn: &Connection) -> Result<bool, String> {
          JOIN session s ON s.id = m.session_id
          WHERE json_extract(m.data, '$.role') = 'assistant'
            AND m.rowid > ?1
-         ORDER BY m.rowid ASC"
-    ).map_err(|e| format!("Failed to query OpenCode DB: {e}"))?;
+         ORDER BY m.rowid ASC",
+        )
+        .map_err(|e| format!("Failed to query OpenCode DB: {e}"))?;
 
     let start_rowid = if should_rebuild { 0 } else { last_rowid };
-    let rows = stmt.query_map(params![start_rowid], |row| {
-        Ok((
-            row.get::<_, i64>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, String>(2)?,
-            row.get::<_, i64>(3)?,
-            row.get::<_, String>(4)?,
-        ))
-    }).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![start_rowid], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, String>(4)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
 
     let mut max_rowid = start_rowid;
     for row in rows {
@@ -566,9 +603,18 @@ fn ingest_opencode(conn: &Connection) -> Result<bool, String> {
             .and_then(Value::as_str)
             .unwrap_or("opencode");
         let tokens = payload.get("tokens");
-        let input = tokens.and_then(|t| t.get("input")).and_then(Value::as_u64).unwrap_or(0);
-        let output = tokens.and_then(|t| t.get("output")).and_then(Value::as_u64).unwrap_or(0);
-        let thoughts = tokens.and_then(|t| t.get("reasoning")).and_then(Value::as_u64).unwrap_or(0);
+        let input = tokens
+            .and_then(|t| t.get("input"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let output = tokens
+            .and_then(|t| t.get("output"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let thoughts = tokens
+            .and_then(|t| t.get("reasoning"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
         let cache_read = tokens
             .and_then(|t| t.get("cache"))
             .and_then(|c| c.get("read"))
@@ -620,7 +666,8 @@ fn ingest_opencode(conn: &Connection) -> Result<bool, String> {
                 pricing_provider,
                 recorded_cost,
             ],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
     }
 
     upsert_cursor(conn, cursor_key, "opencode", file_size, max_rowid, mtime)?;
@@ -700,8 +747,12 @@ fn ingest_pi_file(conn: &Connection, path: &Path) -> Result<(), String> {
     };
 
     // Filename format: <iso-timestamp>_<uuid>.jsonl — session id is the uuid.
-    let file_stem = path.file_stem().and_then(|n| n.to_str()).unwrap_or_default();
-    let session_id = file_stem.rsplit_once('_')
+    let file_stem = path
+        .file_stem()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default();
+    let session_id = file_stem
+        .rsplit_once('_')
         .map(|(_, uuid)| uuid.to_string())
         .unwrap_or_else(|| file_stem.to_string());
 
@@ -709,7 +760,9 @@ fn ingest_pi_file(conn: &Connection, path: &Path) -> Result<(), String> {
 
     let file = fs::File::open(path).map_err(|e| e.to_string())?;
     let mut reader = BufReader::new(file);
-    reader.seek(SeekFrom::Start(offset as u64)).map_err(|e| e.to_string())?;
+    reader
+        .seek(SeekFrom::Start(offset as u64))
+        .map_err(|e| e.to_string())?;
 
     let mut new_offset = offset;
     let mut line = String::new();
@@ -751,11 +804,19 @@ fn ingest_pi_file(conn: &Connection, path: &Path) -> Result<(), String> {
             total = input + output + cache_read + cache_write;
         }
 
-        let model = message.get("model").and_then(Value::as_str).unwrap_or("unknown");
-        let pi_provider = message.get("provider").and_then(Value::as_str).unwrap_or("pi");
+        let model = message
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+        let pi_provider = message
+            .get("provider")
+            .and_then(Value::as_str)
+            .unwrap_or("pi");
         let pricing_provider = map_pi_provider(pi_provider);
 
-        let ts = row.get("timestamp").and_then(Value::as_str)
+        let ts = row
+            .get("timestamp")
+            .and_then(Value::as_str)
             .and_then(parse_iso_timestamp)
             .unwrap_or(0);
 
@@ -779,11 +840,20 @@ fn ingest_pi_file(conn: &Connection, path: &Path) -> Result<(), String> {
                 0, ?9, ?10, ?11
              )",
             params![
-                session_id, project, model, ts as i64,
-                input as i64, output as i64, cache_write as i64, cache_read as i64,
-                total as i64, pricing_provider, recorded_cost
+                session_id,
+                project,
+                model,
+                ts as i64,
+                input as i64,
+                output as i64,
+                cache_write as i64,
+                cache_read as i64,
+                total as i64,
+                pricing_provider,
+                recorded_cost
             ],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
     }
 
     upsert_cursor(conn, &path_str, "pi", file_size, new_offset, mtime)?;
@@ -809,7 +879,12 @@ fn read_pi_project(path: &Path) -> Option<String> {
     reader.read_line(&mut line).ok()?;
     let row: Value = serde_json::from_str(&line).ok()?;
     let cwd = row.get("cwd").and_then(Value::as_str)?;
-    Some(cwd.rsplit('/').find(|s| !s.is_empty()).unwrap_or("unknown").to_string())
+    Some(
+        cwd.rsplit('/')
+            .find(|s| !s.is_empty())
+            .unwrap_or("unknown")
+            .to_string(),
+    )
 }
 
 // ── Maintenance ───────────────────────────────────────────
@@ -831,7 +906,8 @@ fn prune_old_messages(conn: &Connection) -> Result<(), String> {
     conn.execute(
         "DELETE FROM usage_messages WHERE timestamp < ?1 AND provider != 'opencode'",
         params![cutoff],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -843,10 +919,18 @@ fn get_cursor(conn: &Connection, file_path: &str) -> Option<(i64, i64, i64)> {
         "SELECT file_size, byte_offset, last_modified FROM ingest_cursors WHERE file_path = ?1",
         params![file_path],
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-    ).ok()
+    )
+    .ok()
 }
 
-fn upsert_cursor(conn: &Connection, file_path: &str, provider: &str, file_size: i64, offset: i64, mtime: i64) -> Result<(), String> {
+fn upsert_cursor(
+    conn: &Connection,
+    file_path: &str,
+    provider: &str,
+    file_size: i64,
+    offset: i64,
+    mtime: i64,
+) -> Result<(), String> {
     let now = now_epoch_seconds() as i64;
     conn.execute(
         "INSERT INTO ingest_cursors (file_path, provider, file_size, byte_offset, last_modified, updated_at)
@@ -858,9 +942,7 @@ fn upsert_cursor(conn: &Connection, file_path: &str, provider: &str, file_size: 
 }
 
 fn clean_cursors(conn: &Connection, provider: &str, valid_files: &[PathBuf]) {
-    let mut stmt = match conn
-        .prepare("SELECT file_path FROM ingest_cursors WHERE provider = ?1")
-    {
+    let mut stmt = match conn.prepare("SELECT file_path FROM ingest_cursors WHERE provider = ?1") {
         Ok(s) => s,
         Err(_) => return,
     };
@@ -951,4 +1033,67 @@ fn file_mtime(meta: &fs::Metadata) -> i64 {
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn codex_ingest_uses_latest_token_count_timestamp() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE usage_messages (
+                provider TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                project TEXT,
+                model TEXT,
+                timestamp INTEGER NOT NULL,
+                tokens_input INTEGER NOT NULL DEFAULT 0,
+                tokens_output INTEGER NOT NULL DEFAULT 0,
+                tokens_cache_write INTEGER NOT NULL DEFAULT 0,
+                tokens_cache_read INTEGER NOT NULL DEFAULT 0,
+                tokens_thoughts INTEGER NOT NULL DEFAULT 0,
+                tokens_total INTEGER NOT NULL DEFAULT 0,
+                pricing_provider TEXT,
+                recorded_cost REAL
+            );
+            CREATE TABLE ingest_cursors (
+                file_path TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                byte_offset INTEGER NOT NULL,
+                last_modified INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );",
+        )
+        .unwrap();
+
+        let dir =
+            std::env::temp_dir().join(format!("shep-codex-ingest-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("rollout-test.jsonl");
+        let contents = [
+            r#"{"timestamp":"2026-05-01T22:33:43.601Z","type":"session_meta","payload":{"id":"session-1","cwd":"/tmp/project"}}"#,
+            r#"{"timestamp":"2026-05-01T22:34:00.000Z","type":"turn_context","payload":{"model":"gpt-5.5"}}"#,
+            r#"{"timestamp":"2026-05-03T17:18:49.201Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":20,"reasoning_output_tokens":5,"total_tokens":125}}}}"#,
+        ].join("\n");
+        std::fs::write(&path, contents).unwrap();
+
+        ingest_codex_file(&conn, &path).unwrap();
+
+        let (timestamp, total): (i64, i64) = conn
+            .query_row(
+                "SELECT timestamp, tokens_total FROM usage_messages WHERE provider = 'codex'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+
+        assert_eq!(timestamp, 1_777_828_729);
+        assert_eq!(total, 125);
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_dir(&dir);
+    }
 }
